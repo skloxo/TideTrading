@@ -32,14 +32,10 @@ _registered = False
 # ``test_valid_sources_covers_all_registered_loaders`` enforces full coverage.
 VALID_SOURCES: set[str] = {
     "tushare",
-    "okx",
-    "yfinance",
     "akshare",
     "baostock",
     "tencent",
     "mootdx",
-    "ccxt",
-    "futu",
     "auto",
 }
 
@@ -67,14 +63,10 @@ def _ensure_registered() -> None:
 
     _loader_modules = [
         "backtest.loaders.tushare",
-        "backtest.loaders.okx",
-        "backtest.loaders.yfinance_loader",
         "backtest.loaders.akshare_loader",
         "backtest.loaders.baostock_loader",
         "backtest.loaders.tencent_loader",
         "backtest.loaders.mootdx_loader",
-        "backtest.loaders.ccxt_loader",
-        "backtest.loaders.futu",
     ]
     import importlib
     for mod in _loader_modules:
@@ -90,13 +82,9 @@ def _ensure_registered() -> None:
 
 FALLBACK_CHAINS: dict[str, list[str]] = {
     "a_share":   ["tushare", "mootdx", "baostock", "tencent", "akshare"],
-    "us_equity": ["yfinance", "akshare"],
-    "hk_equity": ["yfinance", "futu", "akshare"],
-    "crypto":    ["okx", "ccxt", "yfinance"],
     "futures":   ["tushare", "akshare"],
     "fund":      ["tushare", "akshare"],
     "macro":     ["akshare", "tushare"],
-    "forex":     ["akshare", "yfinance"],
 }
 
 
@@ -107,7 +95,7 @@ def resolve_loader(market: str) -> Any:
     ``is_available()`` returns ``True``.
 
     Args:
-        market: Market type key (e.g. ``"a_share"``, ``"crypto"``).
+        market: Market type key (e.g. ``"a_share"``, ``"futures"``).
 
     Returns:
         A loader instance.
