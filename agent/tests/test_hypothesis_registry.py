@@ -35,7 +35,7 @@ def test_create_persists_hypothesis(storage_path: Path) -> None:
         thesis="Extreme perp funding mean-reverts over the next session.",
         universe="BTC-USDT perpetuals",
         signal_definition="zscore(funding) > 2",
-        data_sources=["okx", "ccxt"],
+        data_sources=["okx", "akshare"],
         skills=["perp-funding-basis"],
     )
 
@@ -46,7 +46,7 @@ def test_create_persists_hypothesis(storage_path: Path) -> None:
     reloaded = HypothesisRegistry().list()
     assert len(reloaded) == 1
     assert reloaded[0].title == "BTC funding mean reversion"
-    assert reloaded[0].data_sources == ["okx", "ccxt"]
+    assert reloaded[0].data_sources == ["okx", "akshare"]
 
 
 def test_update_status_and_invalidation_notes(storage_path: Path) -> None:
@@ -118,7 +118,7 @@ def test_tool_wrappers_use_env_isolated_storage(storage_path: Path) -> None:
     created = json.loads(CreateHypothesisTool().execute(
         title="Tool-created carry",
         thesis="Carry works when trend agrees.",
-        data_sources=["yfinance"],
+        data_sources=["akshare"],
     ))
     assert created["status"] == "ok"
     hypothesis_id = created["hypothesis"]["hypothesis_id"]

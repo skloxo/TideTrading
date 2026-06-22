@@ -444,7 +444,7 @@ class BaseEngine(ABC):
             from backtest.benchmark import resolve_benchmark
             bench_result = resolve_benchmark(
                 strategy_codes=codes,
-                source=config.get("source", "yfinance"),
+                source=config.get("source", "tushare"),
                 start_date=config.get("start_date", ""),
                 end_date=config.get("end_date", ""),
                 interval=interval,

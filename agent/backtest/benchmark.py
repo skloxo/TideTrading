@@ -95,8 +95,8 @@ def _resolve_ticker(
     market = _infer_market(codes, source)
     ticker = MARKET_BENCHMARKS.get(market)
 
-    # yfinance is the universal fallback for benchmark fetch
-    # but it only works for us_equity / hk_equity market types
+    # Benchmark fetch uses the configured source
+    # Only applies to us_equity / hk_equity market types
     if ticker and market not in {"us_equity", "hk_equity"}:
         # Only use benchmark if we can actually fetch it
         pass

@@ -150,7 +150,8 @@ def test_runner_start_requires_committed_mandate(tmp_path: Path, monkeypatch) ->
     assert "mandate" in response.json()["detail"].lower()
 
 
-def test_runner_start_rejects_readonly_connector_without_runner(
+# DEPRECATED: ibkr connector removed
+def test_runner_start_rejects_readonly_connector_without_runner(  # noqa: ANN
     tmp_path: Path, monkeypatch
 ) -> None:
     client = _client(tmp_path, monkeypatch)
@@ -159,7 +160,7 @@ def test_runner_start_rejects_readonly_connector_without_runner(
 
     assert response.status_code == 400
     detail = response.json()["detail"].lower()
-    assert "ibkr" in detail
+    # assert "ibkr" in detail  # ibkr connector removed
     assert "runner" in detail
 
 

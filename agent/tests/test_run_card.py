@@ -101,11 +101,11 @@ def test_json_and_markdown_files_are_written(tmp_path: Path) -> None:
             "interval": "1D",
             "engine": "global_equity",
             "initial_cash": 50000,
-            "source": "yfinance",
+            "source": "akshare",
             "secret": "not copied raw",
         },
         metrics,
-        data_sources=["yfinance"],
+        data_sources=["akshare"],
         warnings=["sample warning"],
     )
 
@@ -135,9 +135,9 @@ def test_api_run_response_includes_run_card(tmp_path: Path) -> None:
         "schema_version": "0.1",
         "generated_at": "2026-05-15T00:00:00Z",
         "run_dir": str(run_dir),
-        "backtest": {"codes": ["AAPL"], "source": "yfinance"},
+        "backtest": {"codes": ["AAPL"], "source": "akshare"},
         "reproducibility": {"config_hash": "abc123", "strategy_hash": "def456"},
-        "data_sources": ["yfinance"],
+        "data_sources": ["akshare"],
         "metrics": {"sharpe": 1.2},
         "warnings": ["sample warning"],
         "artifacts": [{"path": "artifacts/metrics.csv", "size_bytes": 42, "sha256": "feed"}],
@@ -274,7 +274,7 @@ def test_options_backtest_writes_run_card(tmp_path: Path) -> None:
     )
 
     class FakeLoader:
-        name = "yfinance"
+        name = "akshare"
 
         def fetch(self, codes, start_date, end_date):
             return {"SPY": bars.copy()}
@@ -301,7 +301,7 @@ def test_options_backtest_writes_run_card(tmp_path: Path) -> None:
             "codes": ["SPY"],
             "start_date": "2025-01-01",
             "end_date": "2025-01-06",
-            "source": "yfinance",
+            "source": "akshare",
             "engine": "options",
             "initial_cash": 100_000,
         },
@@ -312,6 +312,6 @@ def test_options_backtest_writes_run_card(tmp_path: Path) -> None:
 
     card = json.loads((tmp_path / "run_card.json").read_text(encoding="utf-8"))
     assert card["backtest"]["engine"] == "options"
-    assert card["data_sources"] == ["yfinance"]
+    assert card["data_sources"] == ["akshare"]
     assert "greeks.csv" in {Path(artifact["path"]).name for artifact in card["artifacts"]}
     assert (tmp_path / "run_card.md").exists()

@@ -77,9 +77,10 @@ class TestBarsPerYear:
         # previously fell back to bars_per_day=1, mis-annualising intraday vol)
         assert calc_bars_per_year("1m", "mootdx") == 252 * 240
 
-    def test_minute_futu(self) -> None:
-        # futu is equity (HK + A-share): same equity annualisation as akshare
-        assert calc_bars_per_year("1m", "futu") == 252 * 240
+    # DEPRECATED: futu connector removed
+    # def test_minute_futu(self) -> None:
+    #     # futu is equity (HK + A-share): same equity annualisation as akshare
+    #     assert calc_bars_per_year("1m", "futu") == 252 * 240
 
     def test_unknown_source(self) -> None:
         # Falls back to 252 trading days

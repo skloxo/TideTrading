@@ -132,7 +132,7 @@ def _allows_readonly_wildcard_probe(
 ) -> bool:
     """Return whether a live broker may use ``enabled_tools=["*"]``.
 
-    The only supported exception today is IBKR's official MCP read probe:
+    The only supported exception today is a broker's official MCP read probe:
     tool names are not known before OAuth, but the token request can be pinned
     to ``mcp.read``. Any write scope or missing read scope fails closed.
 
@@ -200,7 +200,7 @@ ROBINHOOD_MCP_SERVER_SEED: dict[str, object] = {
     ],
 }
 
-# IBKR MCP server seed removed during foreign-market cleanup.
+# Foreign-market MCP server seeds removed during cleanup.
 
 
 def _to_camel(name: str) -> str:

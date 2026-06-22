@@ -1,6 +1,6 @@
 """Unit tests for the shared loader retry/budget helpers.
 
-The ccxt + okx integration tests already exercise these helpers via their
+The okx integration tests already exercise these helpers via their
 real loaders; these tests pin the helper semantics directly so future
 loaders that adopt :func:`retry_with_budget` and :func:`check_budget`
 inherit the same guarantees:
@@ -423,7 +423,7 @@ def test_loader_cache_real_duckdb_round_trip(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     frame = _cache_frame()
     kwargs = {
-        "source": "yfinance",
+        "source": "akshare",
         "symbol": "AAPL.US",
         "timeframe": "1D",
         "start_date": "2025-01-01",
