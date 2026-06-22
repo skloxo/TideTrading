@@ -91,8 +91,8 @@ class TestDetectSource:
         "code, expected_source",
         [
             ("000001.SZ", "tushare"),
-            ("AAPL.US", "yfinance"),
-            ("0700.HK", "yfinance"),
+            # ("AAPL.US", "yfinance"),  # DEPRECATED: yfinance removed
+            # ("0700.HK", "yfinance"),  # DEPRECATED: yfinance removed
             ("BTC-USDT", "okx"),
             ("IF2406.CFFEX", "tushare"),
             ("EUR/USD", "akshare"),
@@ -126,10 +126,9 @@ class TestGroupCodes:
         assert _group_codes_by_market([]) == {}
 
     def test_group_by_source(self) -> None:
-        codes = ["000001.SZ", "AAPL.US"]
+        codes = ["000001.SZ", "IF2406.CFFEX"]
         groups = _group_codes_by_source(codes)
         assert "tushare" in groups
-        assert "yfinance" in groups
 
 
 # ---------------------------------------------------------------------------
@@ -144,13 +143,14 @@ class TestNormalizeCodes:
             "ETH-USDT",
         ]
 
-    def test_ccxt_uppercase(self) -> None:
-        assert _normalize_codes(["btc-usdt"], "ccxt") == ["BTC-USDT"]
+    # DEPRECATED: ccxt/yfinance removed during foreign-market cleanup
+    # def test_ccxt_uppercase(self) -> None:
+    #     assert _normalize_codes(["btc-usdt"], "ccxt") == ["BTC-USDT"]
 
     def test_non_crypto_unchanged(self) -> None:
-        codes = ["000001.SZ", "AAPL.US"]
+        codes = ["000001.SZ", "600519.SH"]
         assert _normalize_codes(codes, "tushare") == codes
-        assert _normalize_codes(codes, "yfinance") == codes
+        # assert _normalize_codes(codes, "yfinance") == codes  # DEPRECATED: yfinance removed
 
 
 # ---------------------------------------------------------------------------

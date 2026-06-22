@@ -674,7 +674,7 @@ def trading_select_connection(connection: str) -> str:
     """Select the default trading connector profile for later trading_* calls.
 
     Args:
-        connection: Profile id, e.g. ``ibkr-paper-local`` or ``robinhood-live-mcp``.
+        connection: Profile id, e.g. ``robinhood-live-mcp``.
     """
     registry = _get_registry()
     return registry.execute("trading_select_connection", {"connection": connection})
@@ -842,8 +842,8 @@ def trading_history(
         exchange: Exchange routing, default SMART.
         currency: Contract currency, default USD.
         sec_type: Security type, default STK.
-        duration: IBKR duration string, default 30 D.
-        bar_size: IBKR bar size, default 1 day.
+        duration: Trading duration string, default 30 D.
+        bar_size: Trading bar size, default 1 day.
         what_to_show: Data type, default TRADES.
         use_rth: Use regular trading hours.
     """

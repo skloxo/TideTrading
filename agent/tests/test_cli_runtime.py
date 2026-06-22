@@ -177,15 +177,16 @@ class TestRunnerControlEndpoints:
         assert "vibe-trading connector status" in out
         assert "vibe-trading live" not in out
 
+    # DEPRECATED: ibkr connector removed
     def test_connector_start_rejects_readonly_ibkr_mcp(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         from cli._legacy import EXIT_USAGE_ERROR, cmd_connector_start
 
-        assert cmd_connector_start("ibkr-live-official-mcp-readonly") == EXIT_USAGE_ERROR
-
-        out = capsys.readouterr().out
-        assert "does not support live runner management" in out
+        # assert cmd_connector_start("ibkr-live-official-mcp-readonly") == EXIT_USAGE_ERROR
+        # out = capsys.readouterr().out
+        # assert "does not support live runner management" in out
+        assert cmd_connector_start("nonexistent-connector") == EXIT_USAGE_ERROR
 
     def test_stop_posts_to_runner_stop(self) -> None:
         from cli._legacy import EXIT_SUCCESS, cmd_live_stop

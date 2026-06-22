@@ -117,19 +117,21 @@ class TestProtocol:
 
 class TestFallbackChains:
     def test_all_expected_markets_present(self) -> None:
-        expected = {"a_share", "us_equity", "hk_equity", "crypto", "futures", "fund", "macro", "forex"}
+        # DEPRECATED: us_equity/hk_equity/crypto/forex removed with foreign-market cleanup
+        # expected = {"a_share", "us_equity", "hk_equity", "crypto", "futures", "fund", "macro", "forex"}
+        expected = {"a_share", "futures", "fund", "macro"}
         assert expected == set(FALLBACK_CHAINS.keys())
 
     def test_chains_are_non_empty(self) -> None:
         for market, chain in FALLBACK_CHAINS.items():
             assert len(chain) > 0, f"Fallback chain for {market} is empty"
 
-    def test_crypto_chain_includes_yfinance_fallback(self) -> None:
-        """yfinance is the third-tier fallback for crypto when OKX and CCXT fail."""
-        assert "yfinance" in FALLBACK_CHAINS["crypto"]
-        # OKX and CCXT should still be preferred
-        assert FALLBACK_CHAINS["crypto"][:2] == ["okx", "ccxt"]
-        assert FALLBACK_CHAINS["crypto"][-1] == "yfinance"
+    # DEPRECATED: yfinance/ccxt/crypto removed during foreign-market cleanup
+    # def test_crypto_chain_includes_yfinance_fallback(self) -> None:
+    #     """yfinance is the third-tier fallback for crypto when OKX and CCXT fail."""
+    #     assert "yfinance" in FALLBACK_CHAINS["crypto"]
+    #     assert FALLBACK_CHAINS["crypto"][:2] == ["okx", "ccxt"]
+    #     assert FALLBACK_CHAINS["crypto"][-1] == "yfinance"
 
 
 # ---------------------------------------------------------------------------

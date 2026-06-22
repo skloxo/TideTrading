@@ -227,7 +227,8 @@ class TestConnectorHaltResume:
     def test_halt_with_explicit_non_live_profile_fails(self, live_root: Path) -> None:
         from cli._legacy import EXIT_USAGE_ERROR, cmd_connector_halt
 
-        assert cmd_connector_halt("ibkr-paper-local") == EXIT_USAGE_ERROR
+        # ibkr-paper-local removed; use generic nonexistent profile
+        assert cmd_connector_halt("nonexistent-paper-local") == EXIT_USAGE_ERROR
         assert not (live_root / "live" / "HALT").exists()
 
 

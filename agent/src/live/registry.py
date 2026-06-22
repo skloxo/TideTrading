@@ -27,13 +27,9 @@ from src.tools.mcp import MCPRemoteTool
 # All connector-specific classification maps removed during foreign-market
 # cleanup. Curated maps can be re-added when new connectors are implemented.
 ROBINHOOD_TOOL_CLASS: dict = {}
-IBKR_TOOL_CLASS: dict = {}
-TIGER_TOOL_CLASS: dict = {}
-LONGBRIDGE_TOOL_CLASS: dict = {}
-ALPACA_TOOL_CLASS: dict = {}
+# TODO: removed connector cleanup — ibkr/tiger/longbridge/alpaca/futu dicts deleted
 OKX_TOOL_CLASS: dict = {}
 BINANCE_TOOL_CLASS: dict = {}
-FUTU_TOOL_CLASS: dict = {}
 DHAN_TOOL_CLASS: dict = {}
 SHOONYA_TOOL_CLASS: dict = {}
 
@@ -45,13 +41,9 @@ logger = logging.getLogger(__name__)
 #: from its broker map and not annotated read-only resolves to UNKNOWN → WRITE.
 _BROKER_CURATED_MAPS = {
     "robinhood": ROBINHOOD_TOOL_CLASS,
-    "ibkr": IBKR_TOOL_CLASS,
-    "tiger": TIGER_TOOL_CLASS,
-    "longbridge": LONGBRIDGE_TOOL_CLASS,
-    "alpaca": ALPACA_TOOL_CLASS,
+    # TODO: removed connector cleanup — ibkr/tiger/longbridge/alpaca/futu map entries deleted
     "okx": OKX_TOOL_CLASS,
     "binance": BINANCE_TOOL_CLASS,
-    "futu": FUTU_TOOL_CLASS,
     "dhan": DHAN_TOOL_CLASS,
     "shoonya": SHOONYA_TOOL_CLASS,
 }
