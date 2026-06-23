@@ -197,6 +197,10 @@ class DataSourceSettingsResponse(BaseModel):
 
     tushare_token_configured: bool
     tushare_token_hint: Optional[str] = None
+    iwencai_key_configured: bool = False
+    iwencai_key_hint: Optional[str] = None
+    fred_api_key_configured: bool = False
+    fred_api_key_hint: Optional[str] = None
     baostock_supported: bool
     baostock_installed: bool
     baostock_message: str
@@ -208,6 +212,19 @@ class UpdateDataSourceSettingsRequest(BaseModel):
 
     tushare_token: Optional[str] = None
     clear_tushare_token: bool = False
+    iwencai_key: Optional[str] = None
+    clear_iwencai_key: bool = False
+    fred_api_key: Optional[str] = None
+    clear_fred_api_key: bool = False
+
+
+class FeatureFlagsResponse(BaseModel):
+    """Current feature flag state."""
+
+    shell_tools_enabled: bool
+    scheduler_enabled: bool
+    session_runtime_enabled: bool
+    env_path: str
 
 
 # ---- V4 Session Models ----
@@ -1114,11 +1131,19 @@ def _baostock_installed() -> bool:
     return importlib.util.find_spec("baostock") is not None
 
 
+IWENCAI_KEY_PLACEHOLDERS: set[str] = {"", "your-iwencai-key"}
+FRED_API_KEY_PLACEHOLDERS: set[str] = {"", "your-fred-api-key"}
+
+
 def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None) -> DataSourceSettingsResponse:
     """Build the public data source settings payload."""
     env_values = values if values is not None else _read_settings_env_values()
     token = env_values.get("TUSHARE_TOKEN", "")
     token_configured = _is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS)
+    iwencai_key = env_values.get("VIBE_TRADING_IWENCAI_KEY", "")
+    iwencai_key_configured = _is_configured_secret(iwencai_key, IWENCAI_KEY_PLACEHOLDERS)
+    fred_key = env_values.get("FRED_API_KEY", "")
+    fred_key_configured = _is_configured_secret(fred_key, FRED_API_KEY_PLACEHOLDERS)
     supported = _baostock_supported()
     installed = _baostock_installed()
     if supported:
@@ -1130,6 +1155,10 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
     return DataSourceSettingsResponse(
         tushare_token_configured=token_configured,
         tushare_token_hint=None,
+        iwencai_key_configured=iwencai_key_configured,
+        iwencai_key_hint=None,
+        fred_api_key_configured=fred_key_configured,
+        fred_api_key_hint=None,
         baostock_supported=supported,
         baostock_installed=installed,
         baostock_message=baostock_message,
@@ -1657,6 +1686,20 @@ async def update_data_source_settings(payload: UpdateDataSourceSettingsRequest):
     elif "TUSHARE_TOKEN" in current_values:
         updates["TUSHARE_TOKEN"] = current_values["TUSHARE_TOKEN"]
 
+    if payload.clear_iwencai_key:
+        updates["VIBE_TRADING_IWENCAI_KEY"] = ""
+    elif payload.iwencai_key is not None and payload.iwencai_key.strip():
+        updates["VIBE_TRADING_IWENCAI_KEY"] = payload.iwencai_key.strip()
+    elif "VIBE_TRADING_IWENCAI_KEY" in current_values:
+        updates["VIBE_TRADING_IWENCAI_KEY"] = current_values["VIBE_TRADING_IWENCAI_KEY"]
+
+    if payload.clear_fred_api_key:
+        updates["FRED_API_KEY"] = ""
+    elif payload.fred_api_key is not None and payload.fred_api_key.strip():
+        updates["FRED_API_KEY"] = payload.fred_api_key.strip()
+    elif "FRED_API_KEY" in current_values:
+        updates["FRED_API_KEY"] = current_values["FRED_API_KEY"]
+
     if updates:
         _write_env_values(ENV_PATH, updates)
         token = updates.get("TUSHARE_TOKEN", "").strip()
@@ -1664,8 +1707,33 @@ async def update_data_source_settings(payload: UpdateDataSourceSettingsRequest):
             os.environ["TUSHARE_TOKEN"] = token
         else:
             os.environ.pop("TUSHARE_TOKEN", None)
+        iwencai_key = updates.get("VIBE_TRADING_IWENCAI_KEY", "").strip()
+        if _is_configured_secret(iwencai_key, IWENCAI_KEY_PLACEHOLDERS):
+            os.environ["VIBE_TRADING_IWENCAI_KEY"] = iwencai_key
+        else:
+            os.environ.pop("VIBE_TRADING_IWENCAI_KEY", None)
+        fred_key = updates.get("FRED_API_KEY", "").strip()
+        if _is_configured_secret(fred_key, FRED_API_KEY_PLACEHOLDERS):
+            os.environ["FRED_API_KEY"] = fred_key
+        else:
+            os.environ.pop("FRED_API_KEY", None)
 
     return _build_data_source_settings_response(_read_env_values(ENV_PATH))
+
+
+@app.get(
+    "/settings/feature-flags",
+    response_model=FeatureFlagsResponse,
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_feature_flags():
+    """Return current feature flag state."""
+    return FeatureFlagsResponse(
+        shell_tools_enabled=_env_shell_tools_enabled(),
+        scheduler_enabled=_scheduled_research_scheduler_enabled(),
+        session_runtime_enabled=os.getenv("ENABLE_SESSION_RUNTIME", "true").lower() == "true",
+        env_path=_project_relative_path(ENV_PATH),
+    )
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -3295,7 +3363,7 @@ register_alpha_routes(app)
 #
 # Lightweight CRUD endpoints backed by ScheduledResearchJobStore. The endpoint
 # handlers only record and expose jobs; the optional executor lifecycle is
-# guarded separately by VIBE_TRADING_ENABLE_SCHEDULER.
+# guarded separately by VIBE_TRADING_ENABLE_SCHEDULER (defaults ON).
 
 
 _SCHEDULED_RESEARCH_SCHEDULER_ENV = "VIBE_TRADING_ENABLE_SCHEDULER"
@@ -3316,8 +3384,18 @@ def _get_scheduled_research_store() -> "ScheduledResearchJobStore":
 
 
 def _scheduled_research_scheduler_enabled() -> bool:
-    """Return whether scheduled research execution is enabled."""
-    return os.getenv(_SCHEDULED_RESEARCH_SCHEDULER_ENV, "").strip().lower() in _SCHEDULED_RESEARCH_TRUE_VALUES
+    """Return whether scheduled research execution is enabled.
+
+    Honours an explicit ``VIBE_TRADING_ENABLE_SCHEDULER`` env var.
+    When unset, defaults to *True* — the executor is a passive loop
+    that only fires when there are pending jobs, so the cost of
+    leaving it on is negligible and avoids the hidden-foot-gun.
+    """
+    explicit = os.getenv(_SCHEDULED_RESEARCH_SCHEDULER_ENV)
+    if explicit is not None:
+        return explicit.strip().lower() in _SCHEDULED_RESEARCH_TRUE_VALUES
+    # Default ON — no jobs means no work, no risk.
+    return True
 
 
 async def _dispatch_scheduled_research_job(job: "ScheduledResearchJob") -> None:

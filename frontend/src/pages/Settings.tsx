@@ -2,7 +2,7 @@ import i18n from "@/i18n";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Database, KeyRound, Loader2, RotateCcw, Save, Server, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
-import { api, isAuthRequiredError, type DataSourceSettings, type LLMProviderOption, type LLMSettings } from "@/lib/api";
+import { api, isAuthRequiredError, type DataSourceSettings, type FeatureFlagsResponse, type LLMProviderOption, type LLMSettings } from "@/lib/api";
 import { getApiAuthKey, setApiAuthKey } from "@/lib/apiAuth";
 
 interface LLMFormState {
@@ -42,6 +42,11 @@ export function Settings() {
   const [clearApiKey, setClearApiKey] = useState(false);
   const [tushareToken, setTushareToken] = useState("");
   const [clearTushareToken, setClearTushareToken] = useState(false);
+  const [iwencaiKey, setIwencaiKey] = useState("");
+  const [clearIwencaiKey, setClearIwencaiKey] = useState(false);
+  const [fredApiKey, setFredApiKey] = useState("");
+  const [clearFredApiKey, setClearFredApiKey] = useState(false);
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlagsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dataSaving, setDataSaving] = useState(false);
@@ -49,12 +54,13 @@ export function Settings() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([api.getLLMSettings(), api.getDataSourceSettings()])
-      .then(([llmData, dataSourceData]) => {
+    Promise.all([api.getLLMSettings(), api.getDataSourceSettings(), api.getFeatureFlags()])
+      .then(([llmData, dataSourceData, flagsData]) => {
         if (!alive) return;
         setSettings(llmData);
         setForm(toForm(llmData));
         setDataSettings(dataSourceData);
+        setFeatureFlags(flagsData);
         setSettingsLoadError(null);
       })
       .catch((error) => {
@@ -137,10 +143,18 @@ export function Settings() {
       const updated = await api.updateDataSourceSettings({
         tushare_token: tushareToken.trim() || undefined,
         clear_tushare_token: clearTushareToken,
+        iwencai_key: iwencaiKey.trim() || undefined,
+        clear_iwencai_key: clearIwencaiKey,
+        fred_api_key: fredApiKey.trim() || undefined,
+        clear_fred_api_key: clearFredApiKey,
       });
       setDataSettings(updated);
       setTushareToken("");
       setClearTushareToken(false);
+      setIwencaiKey("");
+      setClearIwencaiKey(false);
+      setFredApiKey("");
+      setClearFredApiKey(false);
       toast.success("Data source settings saved");
     } catch (error) {
       toast.error(`Failed to save data source settings: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -446,6 +460,68 @@ export function Settings() {
               </div>
             </label>
 
+            <label className="grid gap-2">
+              <span className={labelClass}>{"iWenCai API Key"}</span>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  value={iwencaiKey}
+                  onChange={(event) => setIwencaiKey(event.target.value)}
+                  className={`${fieldClass} pl-9`}
+                  placeholder={dataSettings.iwencai_key_configured ? "Configured" : "Leave blank to keep the current key"}
+                  autoComplete="current-password"
+                  disabled={clearIwencaiKey}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className={hintClass}>{"Used for semantic stock screening via iWenCai (\u95ee\u8d22). Free access key required."}</span>
+                <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={clearIwencaiKey}
+                    onChange={(event) => {
+                      setClearIwencaiKey(event.target.checked);
+                      if (event.target.checked) setIwencaiKey("");
+                    }}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  {"Clear saved key"}
+                </label>
+              </div>
+            </label>
+
+            <label className="grid gap-2">
+              <span className={labelClass}>{"FRED API Key"}</span>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  value={fredApiKey}
+                  onChange={(event) => setFredApiKey(event.target.value)}
+                  className={`${fieldClass} pl-9`}
+                  placeholder={dataSettings.fred_api_key_configured ? "Configured" : "Leave blank to keep the current key"}
+                  autoComplete="current-password"
+                  disabled={clearFredApiKey}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className={hintClass}>{"Used for FRED macroeconomic data (CPI, GDP, unemployment, etc.). Free key from fred.stlouisfed.org."}</span>
+                <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={clearFredApiKey}
+                    onChange={(event) => {
+                      setClearFredApiKey(event.target.checked);
+                      if (event.target.checked) setFredApiKey("");
+                    }}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  {"Clear saved key"}
+                </label>
+              </div>
+            </label>
+
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{i18n.t("settings.saved")}: </span>
               <span className="break-all font-mono">{dataSettings.env_path}</span>
@@ -479,6 +555,41 @@ export function Settings() {
           </div>
         </div>
       </form>
+
+      {featureFlags && (
+        <div className="rounded-lg border bg-card p-5 shadow-sm">
+          <div className="mb-5 space-y-1">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <h2 className="text-base font-semibold">{"Feature Flags"}</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">{"Runtime feature flags detected from environment variables."}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+              <span className="text-sm font-medium">{"Shell Tools"}</span>
+              <span className={featureFlags.shell_tools_enabled ? "text-success" : "text-muted-foreground"}>
+                {featureFlags.shell_tools_enabled ? "\u2705" : "\u274c"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+              <span className="text-sm font-medium">{"Scheduler"}</span>
+              <span className={featureFlags.scheduler_enabled ? "text-success" : "text-muted-foreground"}>
+                {featureFlags.scheduler_enabled ? "\u2705" : "\u274c"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+              <span className="text-sm font-medium">{"Session Runtime"}</span>
+              <span className={featureFlags.session_runtime_enabled ? "text-success" : "text-muted-foreground"}>
+                {featureFlags.session_runtime_enabled ? "\u2705" : "\u274c"}
+              </span>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {"Flags are read from "}<span className="font-mono">{"VIBE_TRADING_ENABLE_SHELL_TOOLS"}</span>{", "}<span className="font-mono">{"VIBE_TRADING_ENABLE_SCHEDULER"}</span>{", and "}<span className="font-mono">{"ENABLE_SESSION_RUNTIME"}</span>{" in "}<span className="font-mono">{featureFlags.env_path}</span>{"."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -143,6 +143,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(settings),
     }),
+  getFeatureFlags: () => request<FeatureFlagsResponse>("/settings/feature-flags"),
 
   // Alpha Zoo API
   listAlphas: (params: AlphaListParams = {}) => {
@@ -267,6 +268,10 @@ export interface UpdateLLMSettingsRequest {
 export interface DataSourceSettings {
   tushare_token_configured: boolean;
   tushare_token_hint?: string | null;
+  iwencai_key_configured: boolean;
+  iwencai_key_hint?: string | null;
+  fred_api_key_configured: boolean;
+  fred_api_key_hint?: string | null;
   baostock_supported: boolean;
   baostock_installed: boolean;
   baostock_message: string;
@@ -276,6 +281,17 @@ export interface DataSourceSettings {
 export interface UpdateDataSourceSettingsRequest {
   tushare_token?: string;
   clear_tushare_token?: boolean;
+  iwencai_key?: string;
+  clear_iwencai_key?: boolean;
+  fred_api_key?: string;
+  clear_fred_api_key?: boolean;
+}
+
+export interface FeatureFlagsResponse {
+  shell_tools_enabled: boolean;
+  scheduler_enabled: boolean;
+  session_runtime_enabled: boolean;
+  env_path: string;
 }
 
 // --- Types matching backend API contracts ---
