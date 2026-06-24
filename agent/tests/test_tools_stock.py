@@ -11,6 +11,7 @@ Tool参数格式:
 
 import pytest
 import json
+import os
 from src.tools.stock_tech_analysis_tool import StockTechAnalysisTool
 from src.tools.stock_risk_tool import StockRiskTool
 from src.tools.stock_info_search_tool import StockInfoSearchTool
@@ -18,6 +19,8 @@ from src.tools.portfolio_monitor_tool import PortfolioMonitorTool
 from src.tools.market_scan_tool import MarketScanTool
 
 
+@pytest.mark.allow_sockets
+@pytest.mark.skipif(os.environ.get("GITHUB_ACTIONS") == "true", reason="Skip A-share integration tests in GitHub Actions CI")
 class TestPortfolioMonitorTool:
     """PortfolioMonitorTool单元测试"""
     
@@ -68,6 +71,8 @@ class TestPortfolioMonitorTool:
         assert "total_alerts" in data["summary"]
 
 
+@pytest.mark.allow_sockets
+@pytest.mark.skipif(os.environ.get("GITHUB_ACTIONS") == "true", reason="Skip A-share integration tests in GitHub Actions CI")
 class TestStockTechAnalysisTool:
     """StockTechAnalysisTool单元测试"""
     
@@ -89,6 +94,8 @@ class TestStockTechAnalysisTool:
             assert "code" in data
 
 
+@pytest.mark.allow_sockets
+@pytest.mark.skipif(os.environ.get("GITHUB_ACTIONS") == "true", reason="Skip A-share integration tests in GitHub Actions CI")
 class TestStockRiskTool:
     """StockRiskTool单元测试"""
     
@@ -108,6 +115,8 @@ class TestStockRiskTool:
         assert isinstance(data, list)
 
 
+@pytest.mark.allow_sockets
+@pytest.mark.skipif(os.environ.get("GITHUB_ACTIONS") == "true", reason="Skip A-share integration tests in GitHub Actions CI")
 class TestStockInfoSearchTool:
     """StockInfoSearchTool单元测试"""
     
@@ -127,6 +136,8 @@ class TestStockInfoSearchTool:
         assert isinstance(data, list)
 
 
+@pytest.mark.allow_sockets
+@pytest.mark.skipif(os.environ.get("GITHUB_ACTIONS") == "true", reason="Skip A-share integration tests in GitHub Actions CI")
 class TestMarketScanTool:
     """MarketScanTool单元测试"""
     
@@ -166,6 +177,8 @@ class TestMarketScanTool:
         assert "scan_type" in data
 
 
+@pytest.mark.allow_sockets
+@pytest.mark.skipif(os.environ.get("GITHUB_ACTIONS") == "true", reason="Skip A-share integration tests in GitHub Actions CI")
 class TestIntegrationScenarios:
     """14场景集成测试"""
     

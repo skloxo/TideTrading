@@ -55,6 +55,7 @@ dependencies = [
     "weasyprint>=60.0",
     "prompt_toolkit>=3.0.0",
     "lark-oapi>=1.6.8",
+    "mootdx",
 ]
 
 [project.urls]
