@@ -409,8 +409,11 @@
     "assetCodesHint": "Comma-separated ticker symbols, e.g. 000001.SZ,600519.SH,000858.SZ",
     "windowDays": "Window (days)",
     "method": "Method",
+    "method_pearson": "Pearson",
+    "method_spearman": "Spearman",
     "compute": "Compute",
-    "loading": "Loading..."
+    "loading": "Computing...",
+    "failedToCompute": "Failed to compute correlation"
   },
   "alphaZoo": {
     "title": "Alpha Zoo",

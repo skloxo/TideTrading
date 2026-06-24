@@ -25,7 +25,7 @@ export function Correlation() {
       setLabels(result.labels);
       setMatrix(result.matrix);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to compute correlation");
+      setError(e instanceof Error ? e.message : i18n.t("correlation.failedToCompute"));
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ export function Correlation() {
             className="w-full px-3 py-2 rounded-md border bg-background text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            Comma-separated ticker symbols, e.g. 000001.SZ,600519.SH,000858.SZ
+            {i18n.t("correlation.assetCodesHint")}
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export function Correlation() {
                       : "border-muted-foreground/30 hover:border-primary"
                   }`}
                 >
-                  {m}
+                  {i18n.t(`correlation.method_${m}`)}
                 </button>
               ))}
             </div>

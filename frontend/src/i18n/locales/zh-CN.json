@@ -409,8 +409,11 @@
     "assetCodesHint": "逗号分隔的标的代码，如 000001.SZ,600519.SH,000858.SZ",
     "windowDays": "窗口（天）",
     "method": "方法",
+    "method_pearson": "皮尔逊相关",
+    "method_spearman": "斯皮尔曼秩相关",
     "compute": "计算",
-    "loading": "加载中..."
+    "loading": "计算中...",
+    "failedToCompute": "计算相关性失败"
   },
   "alphaZoo": {
     "title": "Alpha 因子库",
