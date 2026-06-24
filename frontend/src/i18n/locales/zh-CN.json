@@ -493,8 +493,37 @@
     "icSampleCount": "IC 样本数量",
     "alpha": "Alpha",
     "alphaComparisonRanking": "Alpha 对比排名",
-    "skippedPre": "跳过:"
+    "skippedPre": "跳过:",
+    "zooCardTitle": {
+      "qlib158": "Qlib 158",
+      "alpha101": "Kakushadze 101 公式化 Alpha",
+      "gtja191": "国泰君安 191",
+      "academic": "学术文献异象因子"
+    },
+    "zooCardDesc": {
+      "qlib158": "微软 Qlib 完整的 158 特征库，涵盖动量、波动率、成交量及滚动统计信号。",
+      "alpha101": "来自 Kakushadze（2015）的 101 个公式化 Alpha 信号；短周期截面信号。",
+      "gtja191": "国泰君安证券的 191 个 Alpha；专门针对中国 A 股市场优化的技术面与微观结构信号。",
+      "academic": "来自学术文献的长期异象因子精选（价值、动量、质量、低波动率等）。"
+    },
+    "universeOption": {
+      "csi300": "沪深 300（A 股）",
+      "sp500": "标普 500（美股）",
+      "btc-usdt": "BTC-USDT（加密货币）"
+    },
+    "compareTooltip": "在下方勾选 2 个或更多 Alpha，然后进行头对头对比",
+    "loadingAlpha": "正在加载 {{id}}…",
+    "comparedRankedBy": "已对比 {{count}} 个 · 按 {{sort}} 排名 · {{universe}} · {{period}}",
+    "skippedCount": "跳过 {{count}} 个",
+    "gapTitle": "与领先者在 {{sort}} 上的差距",
+    "sortOption": {
+      "ir": "IR（信息比率）",
+      "icMean": "IC 均值",
+      "icPositiveRatio": "IC > 0 期占比",
+      "icCount": "样本数量"
+    }
   },
+
   "validation": {
     "noData": "暂无验证数据。",
     "monteCarlo": "蒙特卡罗置换检验",
