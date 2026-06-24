@@ -244,72 +244,35 @@ class FeishuAdapter(BasePlatformAdapter):
     ) -> str:
         _ensure_lark_imports()
         
-        # If title is provided, send as a message card (interactive)
-        if title:
-            card_json = self._build_card_json(title, content, "running")
-            body = (
-                CreateMessageRequestBody.builder()
-                .receive_id(chat_id)
-                .msg_type("interactive")
-                .content(card_json)
-                .build()
-            )
-            request = (
-                CreateMessageRequest.builder()
-                .receive_id_type("chat_id")
-                .request_body(body)
-                .build()
-            )
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: self._client.im.v1.message.create(request)
-            )
+        # Always deliver via interactive markdown cards to ensure rich-text formatting (bold, tables, code blocks)
+        card_json = self._build_card_json(title, content, "running" if title else "success")
+        body = (
+            CreateMessageRequestBody.builder()
+            .receive_id(chat_id)
+            .msg_type("interactive")
+            .content(card_json)
+            .build()
+        )
+        request = (
+            CreateMessageRequest.builder()
+            .receive_id_type("chat_id")
+            .request_body(body)
+            .build()
+        )
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: self._client.im.v1.message.create(request)
+        )
 
-            if response.code != 0:
-                logger.error("[Feishu] Failed to send message: %s (%s)", response.msg, response.code)
-                raise RuntimeError(f"Feishu send failed: {response.msg}")
+        if response.code != 0:
+            logger.error("[Feishu] Failed to send message: %s (%s)", response.msg, response.code)
+            raise RuntimeError(f"Feishu send failed: {response.msg}")
 
-            # Parse message ID from response data
-            data_dict = json.loads(response.raw.content.decode("utf-8"))
-            msg_id = data_dict.get("data", {}).get("message_id", "")
-            return msg_id
-        else:
-            # Send as plain text, split into chunks if too long to avoid Feishu API limits (typically 30KB)
-            chunk_size = 5000
-            chunks = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size)]
-            if not chunks:
-                chunks = [""]
-
-            last_msg_id = ""
-            for chunk in chunks:
-                body = (
-                    CreateMessageRequestBody.builder()
-                    .receive_id(chat_id)
-                    .msg_type("text")
-                    .content(json.dumps({"text": chunk}, ensure_ascii=False))
-                    .build()
-                )
-                request = (
-                    CreateMessageRequest.builder()
-                    .receive_id_type("chat_id")
-                    .request_body(body)
-                    .build()
-                )
-                loop = asyncio.get_running_loop()
-                response = await loop.run_in_executor(
-                    None,
-                    lambda req=request: self._client.im.v1.message.create(req)
-                )
-
-                if response.code != 0:
-                    logger.error("[Feishu] Failed to send text chunk: %s (%s)", response.msg, response.code)
-                    raise RuntimeError(f"Feishu send failed: {response.msg}")
-
-                data_dict = json.loads(response.raw.content.decode("utf-8"))
-                last_msg_id = data_dict.get("data", {}).get("message_id", "")
-                
-            return last_msg_id
+        # Parse message ID from response data
+        data_dict = json.loads(response.raw.content.decode("utf-8"))
+        msg_id = data_dict.get("data", {}).get("message_id", "")
+        return msg_id
 
     async def update_message(
         self,
@@ -384,7 +347,7 @@ class FeishuAdapter(BasePlatformAdapter):
 
     def _split_markdown_into_elements(self, text: str) -> List[Dict[str, Any]]:
         elements = []
-        chunk_size = 1900
+        chunk_size = 15000
         if not text:
             text = "..."
         for i in range(0, len(text), chunk_size):
@@ -398,7 +361,7 @@ class FeishuAdapter(BasePlatformAdapter):
             })
         return elements
 
-    def _build_card_json(self, title: str, content: str, status: str = "running") -> str:
+    def _build_card_json(self, title: Optional[str], content: str, status: str = "running") -> str:
         template_color = "blue"
         if status == "success":
             template_color = "green"
@@ -411,15 +374,18 @@ class FeishuAdapter(BasePlatformAdapter):
             "config": {
                 "wide_screen_mode": True
             },
-            "header": {
+            "elements": elements
+        }
+        
+        if title:
+            card["header"] = {
                 "title": {
                     "tag": "plain_text",
                     "content": title
                 },
                 "template": template_color
-            },
-            "elements": elements
-        }
+            }
+            
         return json.dumps(card, ensure_ascii=False)
 
     def _stop_ws_client_thread(self) -> None:
