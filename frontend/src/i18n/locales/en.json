@@ -297,7 +297,7 @@
     "feishuAppId": "Feishu App ID",
     "feishuAppSecret": "Feishu App Secret",
     "feishuAllowedUsers": "Allowed Users (OpenIDs)",
-    "feishuAllowedUsersDesc": "Comma-separated list of Feishu open_ids allowed to interact. Highly recommended for security.",
+    "feishuAllowedUsersDesc": "Comma-separated list of Feishu open_ids allowed to interact (highly recommended). To get your OpenID, send '/myid' or any message to this Bot in Feishu.",
     "feishuAllowAllUsers": "Allow all users in group chat to interact (debug only)",
     "channelSaved": "Feishu channel saved successfully",
     "channelDeleted": "Feishu channel deleted successfully",

@@ -297,7 +297,7 @@
     "feishuAppId": "飞书 App ID",
     "feishuAppSecret": "飞书 App Secret",
     "feishuAllowedUsers": "允许访问的用户 OpenID 列表",
-    "feishuAllowedUsersDesc": "以英文逗号分隔的飞书用户 OpenID 列表（高度推荐配置以保证系统安全）。",
+    "feishuAllowedUsersDesc": "以英文逗号分隔的飞书用户 OpenID 列表（高安全推荐）。获取方式：直接在飞书里给该 Bot 发送任意消息或「/myid」，Bot 会自动回复您的 OpenID。",
     "feishuAllowAllUsers": "允许群聊内所有用户直接交互（仅用于调试）",
     "channelSaved": "飞书通道保存成功",
     "channelDeleted": "飞书通道已删除",

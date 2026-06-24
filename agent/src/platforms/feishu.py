@@ -135,17 +135,7 @@ class FeishuAdapter(BasePlatformAdapter):
             if not message_id or not chat_id or not sender_open_id:
                 return
 
-            # Check authorization
-            if not self._allow_all_users and self._allowed_users and sender_open_id not in self._allowed_users:
-                logger.warning("[Feishu] Unauthorized user %s tried to send message: %s", sender_open_id, message_id)
-                # Send polite unauthorized message back
-                asyncio.run_coroutine_threadsafe(
-                    self.send_message(chat_id, "⚠️ 您没有权限使用此智能体系统。请联系管理员添加您的 OpenID 到白名单。"),
-                    asyncio.get_event_loop()
-                )
-                return
-
-            # Parse message content
+            # Parse message content first (needed for both public commands and authorized checks)
             text_content = ""
             if message_type.lower() == "text":
                 try:
@@ -155,6 +145,28 @@ class FeishuAdapter(BasePlatformAdapter):
                     text_content = raw_content.strip()
             else:
                 # Skip non-text messages for now
+                return
+
+            # Feature: Help users fetch their OpenID directly from the Bot
+            if text_content.lower() in ("/myid", "/id", "myid", "id", "我的id", "我的openid", "我的id是什么", "获取id"):
+                asyncio.run_coroutine_threadsafe(
+                    self.send_message(chat_id, f"您的飞书 OpenID 是:\n`{sender_open_id}`"),
+                    asyncio.get_event_loop()
+                )
+                return
+
+            # Check authorization
+            if not self._allow_all_users and self._allowed_users and sender_open_id not in self._allowed_users:
+                logger.warning("[Feishu] Unauthorized user %s tried to send message: %s", sender_open_id, message_id)
+                # Send polite unauthorized message back with their OpenID
+                err_msg = (
+                    f"⚠️ 您没有权限使用此智能体系统。请联系管理员将您的 OpenID 添加到白名单。\n\n"
+                    f"您的 OpenID 是:\n`{sender_open_id}`"
+                )
+                asyncio.run_coroutine_threadsafe(
+                    self.send_message(chat_id, err_msg),
+                    asyncio.get_event_loop()
+                )
                 return
 
             # Remove self mentions if in group chats
