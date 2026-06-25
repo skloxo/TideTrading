@@ -30,6 +30,7 @@ WORKDIR /app
 #   silently downgrades to HTML-only. fonts-dejavu-core gives non-blank PDFs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libharfbuzz0b \

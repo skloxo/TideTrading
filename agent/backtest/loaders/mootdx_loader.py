@@ -187,8 +187,17 @@ class DataLoader:
             if df is None or df.empty:
                 break
             chunks.append(df)
-            first_dt = pd.to_datetime(df["datetime"].iloc[0])
-            if first_dt <= start_ts:
+            try:
+                # Coerce errors to avoid crashing on corrupted server date bytes (e.g. "11095-30-70")
+                parsed_dts = pd.to_datetime(df["datetime"], errors="coerce")
+                valid_dts = parsed_dts.dropna()
+                if not valid_dts.empty:
+                    first_dt = valid_dts.iloc[0]
+                    if first_dt <= start_ts:
+                        break
+                else:
+                    break
+            except Exception:
                 break
         else:
             logger.warning(
@@ -234,7 +243,9 @@ class DataLoader:
             return None
         out = df.copy()
         if "datetime" in out.columns:
-            out["trade_date"] = pd.to_datetime(out["datetime"])
+            # Coerce errors to avoid crashing on corrupted server date bytes
+            out["trade_date"] = pd.to_datetime(out["datetime"], errors="coerce")
+            out = out.dropna(subset=["trade_date"])
             out = out.set_index("trade_date")
         else:
             out.index = pd.to_datetime(out.index)

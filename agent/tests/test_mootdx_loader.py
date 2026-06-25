@@ -209,3 +209,25 @@ def test_registry_lists_mootdx_in_a_share_chain() -> None:
     # tushare (key-gated REST, placed last).
     assert chain.index("mootdx") < chain.index("akshare")
     assert chain.index("akshare") < chain.index("tushare")
+
+
+def test_normalize_bars_gracefully_handles_corrupt_dates() -> None:
+    df = pd.DataFrame(
+        {
+            "open":     [10.0, 11.0, 12.0],
+            "close":    [10.5, 11.5, 12.5],
+            "high":     [10.8, 11.8, 12.8],
+            "low":      [9.9, 10.9, 11.9],
+            "volume":   [100, 200, 300],
+            "datetime": ["2025-01-02 09:30", "11095-30-70 15:00", "2025-01-02 09:45"],
+        }
+    )
+    # This should not raise ValueError, and should drop the corrupt second row
+    out = DataLoader._normalize_bars(df, "2025-01-01", "2025-01-03")
+    assert out is not None
+    assert len(out) == 2
+    assert pd.Timestamp("2025-01-02 09:30") in out.index
+    assert pd.Timestamp("2025-01-02 09:45") in out.index
+    # The middle row should be dropped because of the invalid datetime
+    assert len(out.loc[out["open"] == 11.0]) == 0
+
