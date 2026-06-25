@@ -104,3 +104,6 @@ agent/stocks.db
 
 # OpenClaw integration docs (keep in openclaw repo instead)
 .openclaw-*.md
+
+# Local helper/test scripts
+test_feishu_adapter.py
