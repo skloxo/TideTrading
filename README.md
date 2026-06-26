@@ -13,6 +13,12 @@
   <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=flat" alt="FastAPI">
   <img src="https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat&logo=react&logoColor=white" alt="React">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat" alt="License"></a>
+  <a href="https://github.com/skloxo/Vibe-Trading/actions/workflows/test.yml"><img src="https://github.com/skloxo/Vibe-Trading/actions/workflows/test.yml/badge.svg" alt="CI Status"></a>
+  <a href="https://github.com/skloxo/Vibe-Trading/actions/workflows/docker-publish.yml"><img src="https://github.com/skloxo/Vibe-Trading/actions/workflows/docker-publish.yml/badge.svg" alt="Docker Build Status"></a>
+</p>
+
+<p align="center">
+  <a href="https://codespaces.new/skloxo/Vibe-Trading"><img src="https://github.com/codespaces/badge.svg" alt="Open in GitHub Codespaces" style="max-width: 100%;"></a>
 </p>
 
 > [!NOTE]
