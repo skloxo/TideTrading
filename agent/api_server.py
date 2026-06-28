@@ -966,6 +966,7 @@ async def _reload_platform_manager() -> None:
     """Stop the running platform manager and start it with the latest active channel adapters."""
     global _platform_manager
     session_service = _get_session_service()
+    logger.warning("[Platform] Reloading platform manager (session_service=%s)...", session_service is not None)
     if session_service:
         try:
             if _platform_manager:
@@ -1030,9 +1031,9 @@ async def _reload_platform_manager() -> None:
             finally:
                 active_tenant_var.set(original_tenant)
 
-            if registered_count > 0:
-                logger.info(f"[Platform] Registered and started {registered_count} Feishu adapter(s) across all active tenants.")
+            logger.warning(f"[Platform] Registered {registered_count} adapter(s) across all active tenants. Starting...")
             await _platform_manager.start()
+            logger.warning(f"[Platform] Platform manager started successfully.")
         except Exception as e:
             logger.exception("[Platform] Failed to reload platform manager: %s", e)
 
@@ -2772,7 +2773,7 @@ async def create_wechat_channel(payload: CreateWechatChannelRequest):
         "picoclaw_url": (payload.picoclaw_url or "http://127.0.0.1:18790").strip(),
         "enabled": payload.enabled,
         "ilink_bot_token": (payload.ilink_bot_token or "").strip(),
-        "ilink_base_url": (payload.ilink_base_url or "").strip(),
+        "ilink_base_url": (payload.ilink_base_url or "https://ilinkai.weixin.qq.com").strip(),
         "ilink_bot_id": (payload.ilink_bot_id or "").strip(),
         "ilink_user_id": (payload.ilink_user_id or "").strip(),
     }
@@ -2781,6 +2782,25 @@ async def create_wechat_channel(payload: CreateWechatChannelRequest):
     _save_wechat_channels(channels)
     
     await _reload_platform_manager()
+    
+    if payload.mode.strip() == "ilink" and payload.enabled and new_channel["ilink_user_id"]:
+        from src.config.paths import active_tenant_var
+        tid = active_tenant_var.get() or "default"
+        adapter_key = f"wechat_{tid}_{new_channel['id']}"
+        if _platform_manager and adapter_key in _platform_manager._adapters:
+            adapter = _platform_manager._adapters[adapter_key]
+            welcome_msg = "你好，我是量化金融研究助手，我已经成功接收到您的消息并连接成功。"
+            
+            async def _send_welcome():
+                try:
+                    await asyncio.sleep(1.5)
+                    await adapter.send_message(new_channel["ilink_user_id"], welcome_msg)
+                    logger.warning(f"[WeChat iLink] Sent proactive welcome message to {new_channel['ilink_user_id']}")
+                except Exception as ex:
+                    import traceback
+                    logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
+                    
+            asyncio.create_task(_send_welcome())
     
     return WechatChannelResponse(
         id=new_channel["id"],
@@ -2832,10 +2852,14 @@ async def update_wechat_channel(channel_id: str, payload: UpdateWechatChannelReq
         elif wecom_secret == "":
             c["wecom_secret"] = ""
             
+    old_token = c.get("ilink_bot_token", "")
+    old_user_id = c.get("ilink_user_id", "")
+    old_enabled = c.get("enabled", False)
+
     if payload.ilink_bot_token is not None:
         c["ilink_bot_token"] = payload.ilink_bot_token.strip()
     if payload.ilink_base_url is not None:
-        c["ilink_base_url"] = payload.ilink_base_url.strip()
+        c["ilink_base_url"] = payload.ilink_base_url.strip() or "https://ilinkai.weixin.qq.com"
     if payload.ilink_bot_id is not None:
         c["ilink_bot_id"] = payload.ilink_bot_id.strip()
     if payload.ilink_user_id is not None:
@@ -2844,6 +2868,29 @@ async def update_wechat_channel(channel_id: str, payload: UpdateWechatChannelReq
     _save_wechat_channels(channels)
     
     await _reload_platform_manager()
+
+    token_changed = (payload.ilink_bot_token is not None and payload.ilink_bot_token.strip() != old_token)
+    user_id_changed = (payload.ilink_user_id is not None and payload.ilink_user_id.strip() != old_user_id)
+    enabled_changed = (payload.enabled != old_enabled)
+
+    if c["mode"] == "ilink" and c["enabled"] and c["ilink_user_id"] and (token_changed or user_id_changed or (enabled_changed and c["enabled"])):
+        from src.config.paths import active_tenant_var
+        tid = active_tenant_var.get() or "default"
+        adapter_key = f"wechat_{tid}_{c['id']}"
+        if _platform_manager and adapter_key in _platform_manager._adapters:
+            adapter = _platform_manager._adapters[adapter_key]
+            welcome_msg = "你好，我是量化金融研究助手，我已经成功接收到您的消息并连接成功。"
+            
+            async def _send_welcome():
+                try:
+                    await asyncio.sleep(1.5)
+                    await adapter.send_message(c["ilink_user_id"], welcome_msg)
+                    logger.warning(f"[WeChat iLink] Sent proactive welcome message to {c['ilink_user_id']}")
+                except Exception as ex:
+                    import traceback
+                    logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
+                    
+            asyncio.create_task(_send_welcome())
     
     return WechatChannelResponse(
         id=c["id"],
@@ -2882,21 +2929,23 @@ async def delete_wechat_channel(channel_id: str):
     return {"status": "success"}
 
 
+active_transient_logins: dict[str, dict] = {}
+
+
 @app.get(
-    "/settings/platforms/wechat/channels/{channel_id}/qrcode",
+    "/settings/platforms/wechat/transient/qrcode",
     dependencies=[Depends(require_local_or_auth)],
 )
-async def get_wechat_channel_qrcode(channel_id: str):
-    """Fetch WeChat login QR code from the local PicoClaw instance or iLink official gateway."""
-    channels = _load_wechat_channels()
-    channel = next((c for c in channels if c["id"] == channel_id), None)
-    if not channel:
-        raise HTTPException(status_code=404, detail="WeChat channel not found")
-        
-    mode = channel.get("mode", "wecom")
+async def get_wechat_transient_qrcode(mode: str = "ilink", picoclaw_url: Optional[str] = "http://127.0.0.1:18790"):
+    """Fetch WeChat login QR code transiently without requiring an existing channel."""
+    import secrets
+    import time
+    import httpx
+    import urllib.parse
+
+    temp_id = f"temp_{secrets.token_hex(8)}"
+
     if mode == "ilink":
-        import httpx
-        import time
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.post(
@@ -2906,36 +2955,179 @@ async def get_wechat_channel_qrcode(channel_id: str):
                 )
                 res.raise_for_status()
                 data = res.json()
-                qrcode = data.get("qrcode")
-                qrcode_img_content = data.get("qrcode_img_content")
-                if qrcode and qrcode_img_content:
-                    active_ilink_logins[channel_id] = {
-                        "qrcode": qrcode,
-                        "qrcode_url": qrcode_img_content,
-                        "started_at": time.time(),
-                        "api_base_url": "https://ilinkai.weixin.qq.com",
-                    }
-                    return {"status": "waiting", "qrcode": qrcode_img_content}
+            qrcode = data.get("qrcode")
+            qrcode_img_content = data.get("qrcode_img_content")
+            if qrcode and qrcode_img_content:
+                active_transient_logins[temp_id] = {
+                    "qrcode": qrcode,
+                    "qrcode_url": qrcode_img_content,
+                    "started_at": time.time(),
+                    "api_base_url": "https://ilinkai.weixin.qq.com",
+                    "mode": "ilink",
+                }
+                qr_image_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote_plus(qrcode_img_content)}"
+                return {"status": "waiting", "qrcode": qr_image_url, "temp_id": temp_id}
+            else:
+                raise HTTPException(status_code=500, detail="微信 iLink 官方网关返回空数据，请稍后重试。")
         except Exception as e:
             logger.warning("Failed to fetch official iLink QR code: %s", e)
-            
-        mock_qrcode = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-        return {"status": "waiting", "qrcode": mock_qrcode}
+            raise HTTPException(status_code=500, detail=f"获取微信官方 iLink 二维码失败: {e}")
+
+    elif mode == "picoclaw":
+        url = (picoclaw_url or "http://127.0.0.1:18790").strip()
+        async with httpx.AsyncClient() as client:
+            try:
+                res = await client.get(f"{url}/api/login/qrcode", timeout=5)
+                if res.status_code == 200:
+                    ret = res.json()
+                    ret["temp_id"] = temp_id
+                    active_transient_logins[temp_id] = {
+                        "mode": "picoclaw",
+                        "picoclaw_url": url,
+                        "started_at": time.time(),
+                    }
+                    return ret
+                else:
+                    raise HTTPException(status_code=res.status_code, detail=f"PicoClaw 网关响应错误 (HTTP {res.status_code})")
+            except Exception as e:
+                logger.warning("Failed to fetch QR code from PicoClaw at %s: %s", url, e)
+                raise HTTPException(status_code=400, detail=f"连接 PicoClaw 微信网关失败，请确保本地 PicoClaw 服务已在 {url} 正常启动并且可达。")
+
+    raise HTTPException(status_code=400, detail="Unsupported mode")
+
+
+@app.get(
+    "/settings/platforms/wechat/transient/status",
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_wechat_transient_status(temp_id: str):
+    """Fetch WeChat login status transiently."""
+    login_context = active_transient_logins.get(temp_id)
+    if not login_context:
+        return {"status": "waiting"}
+
+    mode = login_context.get("mode")
+    if mode == "ilink":
+        qrcode = login_context["qrcode"]
+        api_base_url = login_context.get("api_base_url", "https://ilinkai.weixin.qq.com")
+
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=36) as client:
+                res = await client.get(
+                    f"{api_base_url}/ilink/bot/get_qrcode_status?qrcode={qrcode}",
+                )
+                res.raise_for_status()
+                data = res.json()
+        except Exception as e:
+            logger.warning("Failed to poll official iLink QR status: %s", e)
+            return {"status": "waiting"}
+
+        try:
+            status = data.get("status")
+            if status == "scaned_but_redirect" and data.get("redirect_host"):
+                new_host = f"https://{data.get('redirect_host')}"
+                login_context["api_base_url"] = new_host
+                return {"status": "scanned"}
+            elif status == "wait":
+                return {"status": "waiting"}
+            elif status == "scaned":
+                return {"status": "scanned"}
+            elif status == "expired":
+                return {"status": "expired"}
+            elif status in ("confirmed", "binded_redirect"):
+                bot_token = data.get("bot_token")
+                baseurl = data.get("baseurl") or api_base_url
+                ilink_bot_id = data.get("ilink_bot_id")
+                ilink_user_id = data.get("ilink_user_id")
+
+                active_transient_logins.pop(temp_id, None)
+
+                return {
+                    "status": "success",
+                    "bot_token": bot_token,
+                    "baseurl": baseurl,
+                    "ilink_bot_id": ilink_bot_id,
+                    "ilink_user_id": ilink_user_id,
+                }
+        except Exception as e:
+            logger.warning("Failed to process official iLink QR status data: %s", e)
+            return {"status": "waiting"}
+
+    elif mode == "picoclaw":
+        picoclaw_url = login_context.get("picoclaw_url")
+        import httpx
+        async with httpx.AsyncClient() as client:
+            try:
+                res = await client.get(f"{picoclaw_url}/api/login/status", timeout=5)
+                if res.status_code == 200:
+                    return res.json()
+            except Exception as e:
+                logger.warning("Failed to fetch status from PicoClaw at %s: %s", picoclaw_url, e)
+
+        return {"status": "waiting"}
+
+    return {"status": "waiting"}
+
+
+@app.get(
+    "/settings/platforms/wechat/channels/{channel_id}/qrcode",
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_wechat_channel_qrcode(channel_id: str):
+    """Fetch WeChat login QR code from the local PicoClaw instance or iLink official gateway."""
+    channels = _load_wechat_channels()
+    channel = next((c for c in channels if c["id"] == channel_id), None)
+    if not channel:
+        raise HTTPException(status_code=404, detail="微信通道不存在")
         
+    mode = channel.get("mode", "wecom")
+    if mode == "ilink":
+        import httpx
+        import time
+        
+        token = channel.get("ilink_bot_token", "").strip()
+        local_tokens = [token] if token else []
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.post(
+                    "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3",
+                    json={"local_token_list": local_tokens},
+                    timeout=10,
+                )
+                res.raise_for_status()
+                data = res.json()
+            qrcode = data.get("qrcode")
+            qrcode_img_content = data.get("qrcode_img_content")
+            if qrcode and qrcode_img_content:
+                active_ilink_logins[channel_id] = {
+                    "qrcode": qrcode,
+                    "qrcode_url": qrcode_img_content,
+                    "started_at": time.time(),
+                    "api_base_url": "https://ilinkai.weixin.qq.com",
+                }
+                import urllib.parse
+                qr_image_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote_plus(qrcode_img_content)}"
+                return {"status": "waiting", "qrcode": qr_image_url}
+            else:
+                raise HTTPException(status_code=500, detail="微信 iLink 官方网关返回空数据，请稍后重试。")
+        except Exception as e:
+            logger.warning("Failed to fetch official iLink QR code: %s", e)
+            raise HTTPException(status_code=500, detail=f"获取微信官方 iLink 二维码失败: {e}")
+            
     picoclaw_url = channel.get("picoclaw_url", "http://127.0.0.1:18790").strip()
-    
     import httpx
     async with httpx.AsyncClient() as client:
         try:
             res = await client.get(f"{picoclaw_url}/api/login/qrcode", timeout=5)
             if res.status_code == 200:
                 return res.json()
+            else:
+                raise HTTPException(status_code=res.status_code, detail=f"PicoClaw 网关响应错误 (HTTP {res.status_code})")
         except Exception as e:
             logger.warning("Failed to fetch QR code from PicoClaw at %s: %s", picoclaw_url, e)
-            
-    # Mock fallback for local dev/testing
-    mock_qrcode = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-    return {"status": "waiting", "qrcode": mock_qrcode}
+            raise HTTPException(status_code=400, detail=f"连接 PicoClaw 微信网关失败，请确保本地 PicoClaw 服务已在 {picoclaw_url} 正常启动并且可达。")
 
 
 @app.get(
@@ -2960,52 +3152,75 @@ async def get_wechat_channel_status(channel_id: str):
         
         import httpx
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=36) as client:
                 res = await client.get(
                     f"{api_base_url}/ilink/bot/get_qrcode_status?qrcode={qrcode}",
-                    timeout=36,
                 )
                 res.raise_for_status()
                 data = res.json()
-                status = data.get("status")
-                
-                if status == "scaned_but_redirect" and data.get("redirect_host"):
-                    new_host = f"https://{data.get('redirect_host')}"
-                    login_context["api_base_url"] = new_host
-                    return {"status": "scanned"}
-                elif status == "wait":
-                    return {"status": "waiting"}
-                elif status == "scaned":
-                    return {"status": "scanned"}
-                elif status == "expired":
-                    return {"status": "expired"}
-                elif status in ("confirmed", "binded_redirect"):
-                    bot_token = data.get("bot_token")
-                    baseurl = data.get("baseurl") or api_base_url
-                    ilink_bot_id = data.get("ilink_bot_id")
-                    ilink_user_id = data.get("ilink_user_id")
-                    
-                    for c in channels:
-                        if c["id"] == channel_id:
-                            if bot_token:
-                                c["ilink_bot_token"] = bot_token
-                            if baseurl:
-                                c["ilink_base_url"] = baseurl
-                            if ilink_bot_id:
-                                c["ilink_bot_id"] = ilink_bot_id
-                            if ilink_user_id:
-                                c["ilink_user_id"] = ilink_user_id
-                            c["enabled"] = True
-                            break
-                    _save_wechat_channels(channels)
-                    active_ilink_logins.pop(channel_id, None)
-                    
-                    await _reload_platform_manager()
-                    return {"status": "logged_in"}
         except Exception as e:
             logger.warning("Failed to poll official iLink QR status: %s", e)
-            
-        return {"status": "waiting"}
+            return {"status": "waiting"}
+
+        try:
+            status = data.get("status")
+            if status == "scaned_but_redirect" and data.get("redirect_host"):
+                new_host = f"https://{data.get('redirect_host')}"
+                login_context["api_base_url"] = new_host
+                return {"status": "scanned"}
+            elif status == "wait":
+                return {"status": "waiting"}
+            elif status == "scaned":
+                return {"status": "scanned"}
+            elif status == "expired":
+                return {"status": "expired"}
+            elif status in ("confirmed", "binded_redirect"):
+                bot_token = data.get("bot_token")
+                baseurl = data.get("baseurl") or api_base_url
+                ilink_bot_id = data.get("ilink_bot_id")
+                ilink_user_id = data.get("ilink_user_id")
+                
+                for c in channels:
+                    if c["id"] == channel_id:
+                        if bot_token:
+                            c["ilink_bot_token"] = bot_token
+                        if baseurl:
+                            c["ilink_base_url"] = baseurl
+                        if ilink_bot_id:
+                            c["ilink_bot_id"] = ilink_bot_id
+                        if ilink_user_id:
+                            c["ilink_user_id"] = ilink_user_id
+                        c["enabled"] = True
+                        break
+                _save_wechat_channels(channels)
+                active_ilink_logins.pop(channel_id, None)
+                
+                await _reload_platform_manager()
+                
+                if ilink_user_id:
+                    from src.config.paths import active_tenant_var
+                    tid = active_tenant_var.get() or "default"
+                    adapter_key = f"wechat_{tid}_{channel_id}"
+                    if _platform_manager and adapter_key in _platform_manager._adapters:
+                        adapter = _platform_manager._adapters[adapter_key]
+                        welcome_msg = "你好，我是量化金融研究助手，我已经成功接收到您的消息并连接成功。"
+                        
+                        async def _send_welcome():
+                            try:
+                                # Sleep briefly to make sure the poller loop has fully started and registered the adapter
+                                await asyncio.sleep(1.5)
+                                await adapter.send_message(ilink_user_id, welcome_msg)
+                                logger.warning(f"[WeChat iLink] Sent proactive welcome message to {ilink_user_id}")
+                            except Exception as ex:
+                                import traceback
+                                logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
+                                
+                        asyncio.create_task(_send_welcome())
+                        
+                return {"status": "logged_in"}
+        except Exception as e:
+            logger.warning("Failed to process official iLink QR status data: %s", e)
+            return {"status": "waiting"}
         
     picoclaw_url = channel.get("picoclaw_url", "http://127.0.0.1:18790").strip()
     

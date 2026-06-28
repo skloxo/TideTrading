@@ -180,6 +180,20 @@ export const api = {
     request<{ status: string; qrcode: string }>(`/settings/platforms/wechat/channels/${id}/qrcode`),
   getWechatChannelStatus: (id: string) =>
     request<{ status: string }>(`/settings/platforms/wechat/channels/${id}/status`),
+  getWechatTransientQrcode: (mode: string = "ilink", picoclawUrl?: string) => {
+    const q = new URLSearchParams();
+    q.set("mode", mode);
+    if (picoclawUrl) q.set("picoclaw_url", picoclawUrl);
+    return request<{ status: string; qrcode: string; temp_id: string }>(`/settings/platforms/wechat/transient/qrcode?${q.toString()}`);
+  },
+  getWechatTransientStatus: (tempId: string) =>
+    request<{
+      status: string;
+      bot_token?: string;
+      baseurl?: string;
+      ilink_bot_id?: string;
+      ilink_user_id?: string;
+    }>(`/settings/platforms/wechat/transient/status?temp_id=${tempId}`),
 
   // Alpha Zoo API
   listAlphas: (params: AlphaListParams = {}) => {

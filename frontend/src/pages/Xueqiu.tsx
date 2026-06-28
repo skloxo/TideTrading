@@ -37,6 +37,15 @@ export function Xueqiu() {
   const [expandedCombos, setExpandedCombos] = useState<Record<string, boolean>>({});
   const [expandedStock, setExpandedStock] = useState<Record<string, string | null>>({});
 
+  // Pagination State for Rebalancing Logs
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // Reset to first page when new logs are loaded/refreshed
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [logs]);
+
   // Forms State
   const [newComboName, setNewComboName] = useState("");
   const [newComboId, setNewComboId] = useState("");
@@ -262,6 +271,11 @@ export function Xueqiu() {
       </div>
     );
   }
+
+  // Paginated Logs calculation
+  const totalLogs = logs.length;
+  const totalPages = Math.ceil(totalLogs / pageSize) || 1;
+  const paginatedLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -844,7 +858,7 @@ export function Xueqiu() {
                       </td>
                     </tr>
                   ) : (
-                    logs.map((log, index) => {
+                    paginatedLogs.map((log, index) => {
                       const isBuy = log.operation.includes("买") || log.operation.includes("加");
                       const isSell = log.operation.includes("卖") || log.operation.includes("减");
                       
@@ -883,6 +897,51 @@ export function Xueqiu() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalLogs > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t text-xs text-muted-foreground select-none">
+                <div className="flex items-center gap-2">
+                  <span>每页显示</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="rounded border bg-background px-2 py-1 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+                  >
+                    <option value={20}>20 条</option>
+                    <option value={50}>50 条</option>
+                    <option value={100}>100 条</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span>
+                    第 <span className="font-semibold text-foreground">{currentPage}</span> / <span className="font-semibold text-foreground">{totalPages}</span> 页 (共 {totalLogs} 条记录)
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded border bg-background hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                    >
+                      &lt;
+                    </button>
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded border bg-background hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                    >
+                      &gt;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
