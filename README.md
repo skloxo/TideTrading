@@ -333,7 +333,7 @@ vibe-trading-cnx run -p "分析我的 A股/港股交易行为，提取我的 Sha
 | `risk_committee` | 回撤 + 尾部风险 + regime review → 审批 |
 | `global_allocation_committee` | A 股 + 加密 + 港/美股 → 跨市场配置 |
 
-<sub>另有 20+ 专业 presets，可运行 vibe-trading --swarm-presets 查看全部。
+<sub>另有 20+ 专业 presets，可运行 vibe-trading-cnx --swarm-presets 查看全部。
 
 </sub>
 
@@ -355,7 +355,7 @@ vibe-trading-cnx run -p "分析我的 A股/港股交易行为，提取我的 Sha
 | **gtja191** | 191 | 国君证券 (2014)《191 个短周期交易型 alpha 因子》研报 | 公式属于数学内容 |
 | **academic** | 6 | Fama-French 5 因子 + Carhart 动量（基于价格的代理实现） | 公开学术文献 |
 
-运行 `vibe-trading alpha list` 浏览全部因子，`vibe-trading alpha show <id>` 查看公式与源码，`vibe-trading alpha bench --zoo X --universe Y --period Z` 给一整个 zoo 打分。
+运行 `vibe-trading-cnx alpha list` 浏览全部因子，`vibe-trading-cnx alpha show <id>` 查看公式与源码，`vibe-trading-cnx alpha bench --zoo X --universe Y --period Z` 给一整个 zoo 打分。
 
 </details>
 
@@ -494,7 +494,7 @@ vibe-trading-cnx serve --port 9888     # FastAPI serves dist/ as static files
 ### Path D: ClawHub（一条命令）
 
 ```bash
-npx clawhub@latest install vibe-trading --force
+npx clawhub@latest install vibe-trading-cnx --force
 ```
 
 skill + MCP config 会下载到你的智能体 skills 目录。详情见 [ClawHub install](#-mcp-plugin)。
