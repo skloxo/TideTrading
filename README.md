@@ -388,29 +388,29 @@ https://github.com/user-attachments/assets/3754a414-c3ee-464f-b1e8-78e1a74fbd30
 ### 一行安装（PyPI）
 
 ```bash
-pip install vibe-trading-ai
+pip install vibe-trading-cnx-ai
 ```
 
-然后运行第一个研究任务：
+然后运行第一个 A股 研究任务：
 
 ```bash
-vibe-trading init
-vibe-trading run -p "Backtest a BTC-USDT 20/50 moving-average strategy for 2024 and summarize return and drawdown"
+vibe-trading-cnx init
+vibe-trading-cnx run -p "回测贵州茅台 (600519) 2024年的 20/50 日均线交叉策略，并微信推送研究简报"
 ```
 
-> **包名与命令：** PyPI 包名是 `vibe-trading-ai`。安装后会获得三个命令：
+> **包名与命令：** PyPI 包名是 `vibe-trading-cnx-ai`。安装后会获得三个命令：
 >
 > | 命令 | 用途 |
 > |------|------|
-> | `vibe-trading` | 交互式 CLI / TUI |
-> | `vibe-trading serve` | 启动 FastAPI web server |
-> | `vibe-trading-mcp` | 启动 MCP server（用于 Claude Desktop、OpenClaw、Cursor 等） |
+> | `vibe-trading-cnx` | 交互式 CLI / TUI |
+> | `vibe-trading-cnx serve` | 启动 FastAPI web server (默认端口 9888) |
+> | `vibe-trading-cnx-mcp` | 启动 MCP server（用于 Claude Desktop、OpenClaw、Cursor 等） |
 
 ```bash
-vibe-trading init              # interactive .env setup
-vibe-trading                   # launch CLI
-vibe-trading serve --port 8899 # launch web UI
-vibe-trading-mcp               # start MCP server (stdio)
+vibe-trading-cnx init              # interactive .env setup
+vibe-trading-cnx                   # launch CLI
+vibe-trading-cnx serve --port 9888 # launch web UI
+vibe-trading-cnx-mcp               # start MCP server (stdio)
 ```
 
 ### 或选择一种路径
@@ -427,31 +427,30 @@ vibe-trading-mcp               # start MCP server (stdio)
 - 任意受支持 provider 的 **LLM API key**，或使用 **Ollama** 本地运行（无需 key）
 - 路径 B 需要 **Python 3.11+**
 - 路径 A 需要 **Docker**
-- OpenAI Codex 也可通过 ChatGPT OAuth 使用：设置 `LANGCHAIN_PROVIDER=openai-codex`，然后运行 `vibe-trading provider login openai-codex`。它不使用 `OPENAI_API_KEY`。
 
-> **支持的 LLM providers：** OpenRouter、OpenAI、DeepSeek、Gemini、Groq、DashScope/Qwen、Zhipu、Moonshot/Kimi、MiniMax、Xiaomi MIMO、Z.ai、Ollama（本地）。配置见 `.env.example`。
+> **支持的 LLM providers：** OpenRouter、OpenAI、DeepSeek、Gemini、Groq、DashScope/Qwen、Zhipu、Moonshot/Kimi、MiniMax、Xiaomi MIMO、Ollama（本地）。配置见 `.env.example`。
 
-> **提示：** 由于自动 fallback，所有市场都可以在没有任何 API key 的情况下工作。yfinance（港/美股）、OKX（加密）、mootdx（A 股，TCP 直连不封 IP）和 AKShare（A 股、美股、港股、期货、外汇）都是免费的。Tushare token 是可选项 —— mootdx 是首选的免 token A 股 fallback，AKShare 作为覆盖更广的兜底。
+> **提示：** 由于自动 fallback，数据可以在没有任何 API key 的情况下工作。yfinance（港股）、mootdx（A 股，TCP 直连不封 IP）和 AKShare（A 股、港股、期货、外汇）都是免费的。Tushare token 是可选项 —— mootdx 是首选的免 token A 股 fallback，AKShare 作为覆盖更广的兜底。而情绪面支持则可通过设置页面一键绑定您的雪球网凭证进行深度监控。
 
 ### Path A: Docker（零配置）
 
 ```bash
-git clone https://github.com/HKUDS/Vibe-Trading.git
-cd Vibe-Trading
+git clone https://github.com/skloxo/Vibe-Trading-CNX.git
+cd Vibe-Trading-CNX
 cp agent/.env.example agent/.env
 # Edit agent/.env — uncomment your LLM provider and set API key
 docker compose up --build
 ```
 
-打开 `http://localhost:8899`。后端 + 前端在同一个容器中运行。
+打开 `http://localhost:9888`。后端 + 前端在同一个容器中运行。
 
-Docker 默认将后端发布在 `127.0.0.1:8899`，并以非 root 容器用户运行应用。如果你有意将 API 暴露到本机之外，请设置强 `API_AUTH_KEY`，并让客户端发送 `Authorization: Bearer <key>`。
+Docker 默认将后端发布在 `127.0.0.1:9888`，并以非 root 容器用户运行应用。如果你有意将 API 暴露到本机之外，请设置强 `API_AUTH_KEY`，并让客户端发送 `Authorization: Bearer <key>`。
 
 ### Path B: Local install
 
 ```bash
-git clone https://github.com/HKUDS/Vibe-Trading.git
-cd Vibe-Trading
+git clone https://github.com/skloxo/Vibe-Trading-CNX.git
+cd Vibe-Trading-CNX
 python -m venv .venv
 
 # Activate
@@ -460,7 +459,7 @@ source .venv/bin/activate          # Linux / macOS
 
 pip install -e .
 cp agent/.env.example agent/.env   # Edit — set your LLM provider API key
-vibe-trading                       # Launch interactive TUI
+vibe-trading-cnx                   # Launch interactive TUI
 ```
 
 <details>
@@ -468,23 +467,23 @@ vibe-trading                       # Launch interactive TUI
 
 ```bash
 # Terminal 1: API server
-vibe-trading serve --port 8899
+vibe-trading-cnx serve --port 9888
 
 # Terminal 2: Frontend dev server
 cd frontend && npm install && npm run dev
 ```
 
-打开 `http://localhost:5899`。前端会将 API 调用代理到 `localhost:8899`。
+打开 `http://localhost:5173` 或控制台打印的前端开发服务地址。前端会将 API 调用代理到 `localhost:9888`。
 
 **生产模式（单 server）：**
 
 ```bash
 cd frontend && npm run build && cd ..
-vibe-trading serve --port 8899     # FastAPI serves dist/ as static files
+vibe-trading-cnx serve --port 9888     # FastAPI serves dist/ as static files
 ```
 
 > [!NOTE]
-> `vibe-trading serve` 绑定 `0.0.0.0`，但默认只信任 loopback：在**同一台机器**上打开 UI（`http://localhost:8899`）零配置即可用。若你从**另一台机器、虚拟机宿主机或局域网内的手机**访问，敏感接口会返回 `403`，聊天会提示 “Remote API access requires an API key”——请在 `agent/.env` 里设置一个强 `API_AUTH_KEY`，重启，并在 **Settings** 中输入同一个 key。（Docker Desktop 宿主网关场景：设 `VIBE_TRADING_TRUST_DOCKER_LOOPBACK=1` 并保持默认的 `127.0.0.1` 端口绑定。）
+> `vibe-trading-cnx serve` 绑定 `0.0.0.0`，但默认只信任 loopback。若你从**另一台机器、虚拟机宿主机或局域网内的手机**访问，敏感接口会返回 `403` 且阻止写入，报错 `Cross-site request denied`。请配置 `agent/.env` 中的 `API_ALLOWED_HOSTS` 来信任您的公网/局域网域名或 IP 地址，这允许您在安全的局域网内免 key 异地使用和配置 settings；若要公开使用，请同时开启 `API_AUTH_KEY` 以确保网络传输安全。
 
 </details>
 
