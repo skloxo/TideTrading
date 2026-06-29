@@ -76,13 +76,13 @@ def test_tilde_expansion_resolves_to_mock_home(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setenv("USERPROFILE", str(mock_home))
 
     # Configure mock home as allowed write root
-    monkeypatch.setenv("VIBE_TRADING_ALLOWED_WRITE_ROOTS", str(mock_home / ".vibe-trading"))
+    monkeypatch.setenv("VIBE_TRADING_ALLOWED_WRITE_ROOTS", str(mock_home / ".vibe-trading-cnx"))
     allowed_write = allowed_write_roots()
     assert any(p.is_relative_to(mock_home) for p in allowed_write)
 
     # Resolve safe path using tilde
-    resolved = resolve_safe_path("~/.vibe-trading/scripts/strat.py", None, allowed_write, purpose="write")
-    assert resolved == mock_home / ".vibe-trading" / "scripts" / "strat.py"
+    resolved = resolve_safe_path("~/.vibe-trading-cnx/scripts/strat.py", None, allowed_write, purpose="write")
+    assert resolved == mock_home / ".vibe-trading-cnx" / "scripts" / "strat.py"
 
 
 def test_read_write_separation_prevent_cross_escalation(tmp_path: Path, monkeypatch) -> None:

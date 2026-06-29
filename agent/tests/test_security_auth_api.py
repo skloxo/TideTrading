@@ -687,7 +687,7 @@ def test_admin_tenant_keys_crud_and_config_inheritance(
     assert data["is_active"] is True
     
     # Check that tenant directory exists
-    tenant_dir = tmp_path / ".vibe-trading" / "tenants" / tenant_id
+    tenant_dir = tmp_path / ".vibe-trading-cnx" / "tenants" / tenant_id
     assert tenant_dir.exists()
     
     # List keys should now show the new key
@@ -906,7 +906,7 @@ def test_tenant_register_validation_and_use_default_cleanup(
     tenant_headers = {"Authorization": f"Bearer {tenant_key}"}
     
     # Set custom keys in tenant env
-    tenant_env_file = tmp_path / ".vibe-trading" / "tenants" / tenant_id / ".env"
+    tenant_env_file = tmp_path / ".vibe-trading-cnx" / "tenants" / tenant_id / ".env"
     tenant_env_file.write_text(
         "OPENAI_API_KEY=sk-tenant-custom\n"
         "LANGCHAIN_PROVIDER=openai\n"

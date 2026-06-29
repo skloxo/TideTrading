@@ -272,7 +272,7 @@ def test_explicit_config_path_does_not_mutate_default_runtime_root(tmp_path: Pat
     load_agent_config(config_path)
 
     assert get_runtime_root(config_path) == config_path.parent
-    assert get_runtime_root() == Path.home() / ".vibe-trading"
+    assert get_runtime_root() == Path.home() / ".vibe-trading-cnx"
     assert get_config_path(config_path) == config_path
 
 

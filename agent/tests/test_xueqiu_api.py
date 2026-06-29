@@ -13,7 +13,7 @@ import api_server
 
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    # Mock data directory so we do not pollute the user's home folder ~/.vibe-trading
+    # Mock data directory so we do not pollute the user's home folder ~/.vibe-trading-cnx
     monkeypatch.setattr("src.config.paths.get_data_dir", lambda *args, **kwargs: tmp_path)
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
     return TestClient(api_server.app, client=("127.0.0.1", 50000))

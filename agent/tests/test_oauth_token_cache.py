@@ -42,9 +42,9 @@ def test_build_token_store_expands_user(monkeypatch, tmp_path: Path) -> None:
     fake_home.mkdir()
     monkeypatch.setenv("HOME", str(fake_home))
 
-    _build_token_store("~/.vibe-trading/live/robinhood/oauth")
+    _build_token_store("~/.vibe-trading-cnx/live/robinhood/oauth")
 
-    resolved = fake_home / ".vibe-trading" / "live" / "robinhood" / "oauth"
+    resolved = fake_home / ".vibe-trading-cnx" / "live" / "robinhood" / "oauth"
     assert resolved.is_dir()
 
 
