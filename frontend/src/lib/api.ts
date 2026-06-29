@@ -235,7 +235,7 @@ export const api = {
     }),
   // Read the persistent runtime status across all authorized brokers (SPEC §7.5).
   // Polled by the RunnerStatus panel; a plain authenticated GET, never a chat message.
-  getLiveStatus: () => request<LiveStatus>("/live/status"),
+  getLiveStatus: (signal?: AbortSignal) => request<LiveStatus>("/live/status", { signal }),
   authorizeLive: (broker: string) =>
     request<LiveAuthorizeResponse>("/live/authorize", {
       method: "POST",
