@@ -192,19 +192,16 @@ class WechatAdapter(BasePlatformAdapter):
         
         Pushes message directly to WeChat iLink gateway.
         """
-        # iLink Mode
         base_url = self._ilink_base_url.rstrip("/")
         headers = self._generate_uin_headers()
         formatted_content = f"{title}\n\n{content}" if title else content
-        
         ctx_token = self._last_context_tokens.get(chat_id, "")
-        
         payload = {
             "msg": {
                 "from_user_id": "",
                 "to_user_id": chat_id,
                 "client_id": f"client_{uuid.uuid4().hex}",
-                "message_type": 2,
+                "message_type": 2 if ctx_token else 1,
                 "message_state": 2,
                 "item_list": [
                     {
