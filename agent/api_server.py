@@ -48,14 +48,14 @@ AGENT_DIR = Path(__file__).resolve().parent
 
 class _DynamicEnvPath(type(Path())):
     def __new__(cls):
-        return super().__new__(cls, AGENT_DIR / ".env")
+        return super().__new__(cls, Path.home() / ".vibe-trading-cnx" / ".env")
 
     @property
     def _actual(self) -> Path:
         from src.config.paths import active_tenant_var
         tenant = active_tenant_var.get()
         if tenant == "default":
-            return AGENT_DIR / ".env"
+            return Path.home() / ".vibe-trading-cnx" / ".env"
         return Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
 
     def exists(self) -> bool:
@@ -1554,7 +1554,9 @@ def _read_settings_env_values() -> Dict[str, str]:
     if not isinstance(ENV_PATH, _DynamicEnvPath):
         admin_env = ENV_PATH
     else:
-        admin_env = AGENT_DIR / ".env"
+        admin_env = Path.home() / ".vibe-trading-cnx" / ".env"
+        if not admin_env.exists():
+            admin_env = AGENT_DIR / ".env"
 
     base_values = {}
     if admin_env.exists():
