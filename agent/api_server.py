@@ -2234,7 +2234,7 @@ async def get_settings_profile(request: Request):
     from src.config.paths import active_tenant_var
     tenant = active_tenant_var.get()
     role = "admin" if tenant == "default" else "tenant"
-    name = None
+    name = "Admin"
     if tenant != "default":
         for item in _load_tenant_keys():
             if item.get("tenant_id") == tenant:
