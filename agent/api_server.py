@@ -43,24 +43,34 @@ for _s in ("stdout", "stderr"):
     if callable(_r):
         _r(encoding="utf-8", errors="replace")
 
-RUNS_DIR = Path(__file__).resolve().parent / "runs"
-SESSIONS_DIR = Path(__file__).resolve().parent / "sessions"
-UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
+from src.config.paths import get_runs_dir, get_sessions_dir, get_uploads_dir
+RUNS_DIR = get_runs_dir()
+SESSIONS_DIR = get_sessions_dir()
+UPLOADS_DIR = get_uploads_dir()
 AGENT_DIR = Path(__file__).resolve().parent
 
 def _get_sessions_dir() -> Path:
-    from src.config.paths import get_sessions_dir
-    return get_sessions_dir()
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get() or "default"
+    if tenant == "default":
+        return SESSIONS_DIR
+    return get_runtime_root() / "sessions"
 
 
 def _get_runs_dir() -> Path:
-    from src.config.paths import get_runs_dir
-    return get_runs_dir()
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get() or "default"
+    if tenant == "default":
+        return RUNS_DIR
+    return get_runtime_root() / "runs"
 
 
 def _get_uploads_dir() -> Path:
-    from src.config.paths import get_uploads_dir
-    return get_uploads_dir()
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get() or "default"
+    if tenant == "default":
+        return UPLOADS_DIR
+    return get_runtime_root() / "uploads"
 
 class _DynamicEnvPath(type(Path())):
     def __new__(cls):
@@ -1124,13 +1134,13 @@ async def _run_startup_preflight() -> None:
     except Exception as e:
         logger.error("[XueqiuWatcher] Failed to start watcher: %s", e)
 
-    # Initialize and start TdxGateway connection pool
+    # Initialize and start SharedMemoryHub cache refresher
     try:
-        from src.market.tdx_bridge import TdxGateway
-        TdxGateway().start()
-        logger.info("[TdxGateway] Startup connection pool initialized.")
+        from src.market.shared_data_hub import SharedMemoryHub
+        SharedMemoryHub().start()
+        logger.info("[SharedMemoryHub] Startup cache refresher and connection pool initialized.")
     except Exception as e:
-        logger.error("[TdxGateway] Failed to start connection pool: %s", e)
+        logger.error("[SharedMemoryHub] Failed to start cache refresher: %s", e)
 
 
 @app.on_event("shutdown")
@@ -1155,7 +1165,14 @@ async def _stop_scheduled_research_on_shutdown() -> None:
         except Exception as e:
             logger.exception("[Platform] Error stopping platforms manager: %s", e)
 
-    # Stop TdxGateway connection pool
+    # Stop SharedMemoryHub and TdxGateway connection pool
+    try:
+        from src.market.shared_data_hub import SharedMemoryHub
+        SharedMemoryHub().stop()
+        logger.info("[SharedMemoryHub] Cache refresher stopped.")
+    except Exception as e:
+        logger.error("[SharedMemoryHub] Error stopping cache refresher: %s", e)
+
     try:
         from src.market.tdx_bridge import TdxGateway
         TdxGateway().stop()
@@ -3912,20 +3929,16 @@ async def get_xueqiu_combos_details():
 )
 async def get_realtime_quotes(codes: str):
     """Batch fetch realtime L1 quotes for symbols."""
-    from src.market.tdx_bridge import TdxGateway, TdxConnectionError
+    from src.market.shared_data_hub import SharedMemoryHub
     
     symbol_list = [s.strip() for s in codes.split(",") if s.strip()]
     if not symbol_list:
         return {}
 
-    gateway = TdxGateway()
     try:
-        return gateway.get_quotes(symbol_list)
-    except TdxConnectionError:
-        logger.warning("TdxGateway failed. Falling back to Tencent HTTP for batch quotes: %s", symbol_list)
-        return gateway.fetch_tencent_quotes(symbol_list)
+        return SharedMemoryHub().get_quotes(symbol_list)
     except Exception as e:
-        logger.error("Error fetching realtime quotes: %s", e)
+        logger.error("Error fetching realtime quotes via SharedMemoryHub: %s", e)
         return {}
 
 
@@ -3935,18 +3948,13 @@ async def get_realtime_quotes(codes: str):
 )
 async def get_realtime_quote(code: str):
     """Fetch single realtime L1 quote."""
-    from src.market.tdx_bridge import TdxGateway, TdxConnectionError
+    from src.market.shared_data_hub import SharedMemoryHub
 
-    gateway = TdxGateway()
     try:
-        quotes = gateway.get_quotes([code])
-        return quotes.get(code, {})
-    except TdxConnectionError:
-        logger.warning("TdxGateway failed. Falling back to Tencent HTTP for single quote: %s", code)
-        quotes = gateway.fetch_tencent_quotes([code])
+        quotes = SharedMemoryHub().get_quotes([code])
         return quotes.get(code, {})
     except Exception as e:
-        logger.error("Error fetching single quote %s: %s", code, e)
+        logger.error("Error fetching single quote %s via SharedMemoryHub: %s", code, e)
         return {}
 
 

@@ -233,7 +233,11 @@ def test_api_endpoints() -> None:
         "pool": []
     }
 
-    with patch("src.market.tdx_bridge.TdxGateway", return_value=mock_gateway):
+    mock_hub = MagicMock()
+    mock_hub.get_quotes.return_value = mock_gateway.get_quotes.return_value
+
+    with patch("src.market.shared_data_hub.SharedMemoryHub", return_value=mock_hub), \
+         patch("src.market.tdx_bridge.TdxGateway", return_value=mock_gateway):
         # Test GET /api/quote/realtime
         response = client.get("/api/quote/realtime?codes=600519.SH")
         assert response.status_code == 200
