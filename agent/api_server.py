@@ -49,27 +49,18 @@ UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
 AGENT_DIR = Path(__file__).resolve().parent
 
 def _get_sessions_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return SESSIONS_DIR
-    return get_runtime_root() / "sessions"
+    from src.config.paths import get_sessions_dir
+    return get_sessions_dir()
 
 
 def _get_runs_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return RUNS_DIR
-    return get_runtime_root() / "runs"
+    from src.config.paths import get_runs_dir
+    return get_runs_dir()
 
 
 def _get_uploads_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return UPLOADS_DIR
-    return get_runtime_root() / "uploads"
+    from src.config.paths import get_uploads_dir
+    return get_uploads_dir()
 
 class _DynamicEnvPath(type(Path())):
     def __new__(cls):
@@ -2160,7 +2151,11 @@ async def get_run_code(run_id: str):
     _validate_path_param(run_id, "run_id")
     run_dir = _get_runs_dir() / run_id / "code"
     if not run_dir.exists():
-        raise HTTPException(status_code=404, detail=f"Code directory for run {run_id} not found")
+        legacy_dir = RUNS_DIR / run_id / "code"
+        if legacy_dir.exists():
+            run_dir = legacy_dir
+        else:
+            raise HTTPException(status_code=404, detail=f"Code directory for run {run_id} not found")
     result = {}
     for f in ["signal_engine.py"]:
         p = run_dir / f
@@ -2182,7 +2177,11 @@ async def get_run_pine(run_id: str):
     _validate_path_param(run_id, "run_id")
     pine_path = _get_runs_dir() / run_id / "artifacts" / "strategy.pine"
     if not pine_path.exists():
-        return {"exists": False, "content": None}
+        legacy_path = RUNS_DIR / run_id / "artifacts" / "strategy.pine"
+        if legacy_path.exists():
+            pine_path = legacy_path
+        else:
+            return {"exists": False, "content": None}
     return {
         "exists": True,
         "content": pine_path.read_text(encoding="utf-8"),
@@ -2209,10 +2208,14 @@ async def get_run_result(
     run_dir = _get_runs_dir() / run_id
 
     if not run_dir.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Run {run_id} not found"
-        )
+        legacy_dir = RUNS_DIR / run_id
+        if legacy_dir.exists():
+            run_dir = legacy_dir
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run {run_id} not found"
+            )
 
     wants_chart_meta = bool(chart_payload or chart_symbol)
     chart_symbols: List[str] = []
