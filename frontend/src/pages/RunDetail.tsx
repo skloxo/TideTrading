@@ -18,7 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, type BacktestMetrics, type RunCard, type RunData } from "@/lib/api";
+import { api, isAuthRequiredError, type BacktestMetrics, type RunCard, type RunData } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
@@ -27,6 +27,8 @@ import { MetricsCard } from "@/components/chat/MetricsCard";
 import { ValidationPanel } from "@/components/charts/ValidationPanel";
 import { Skeleton, SkeletonMetrics, SkeletonChart } from "@/components/common/Skeleton";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { AuthBarrier } from "@/components/layout/AuthBarrier";
+import { setApiAuthKey } from "@/lib/apiAuth";
 
 const rehypePlugins = [rehypeHighlight];
 
@@ -97,6 +99,8 @@ export function RunDetail() {
   const [code, setCode] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<Tab>("chart");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [authFailed, setAuthFailed] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState("");
   const [chartPickerSymbol, setChartPickerSymbol] = useState("");
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
@@ -119,10 +123,16 @@ export function RunDetail() {
 
   useEffect(() => {
     if (!runId) return;
+    setLoading(true);
+    setError(null);
+    setAuthFailed(false);
+    let isMounted = true;
+
     Promise.all([
-      api.getRun(runId, { chart_payload: "summary" }).catch(() => null),
+      api.getRun(runId, { chart_payload: "summary" }),
       api.getRunCode(runId).catch(() => ({})),
     ]).then(([r, c]) => {
+      if (!isMounted) return;
       setRun(r);
       setCode(c || {});
       const firstSymbol = r?.chart_symbols?.[0] || Object.keys(r?.price_series || {})[0] || "";
@@ -135,8 +145,35 @@ export function RunDetail() {
       if (firstSymbol && !initialCache[firstSymbol]?.price_series?.[firstSymbol]?.length) {
         void loadChartSymbol(firstSymbol);
       }
-    }).finally(() => setLoading(false));
+    }).catch((err) => {
+      if (!isMounted) return;
+      console.error("Failed to load run detail:", err);
+      if (isAuthRequiredError(err)) {
+        setAuthFailed(true);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }).finally(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    return () => { isMounted = false; };
   }, [runId]);
+
+  if (authFailed) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="mx-auto max-w-md w-full p-6 space-y-6">
+          <AuthBarrier
+            onLogin={(key) => {
+              setApiAuthKey(key);
+              window.location.reload();
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -147,21 +184,23 @@ export function RunDetail() {
       </div>
     );
   }
-  if (!run) return (
-    <div className="p-8 space-y-2">
-      <p className="text-red-500 font-medium">{i18n.t("runDetail.runNotFound")}</p>
-      <p className="text-sm text-muted-foreground">
-        {i18n.t("runDetail.runNotFoundDesc")}, or your browser may not have API access configured.
-        Check that the API authentication key is set in Settings if accessing remotely.
-      </p>
-      <button
-        onClick={() => navigate(-1)}
-        className="text-sm text-primary hover:underline inline-flex items-center gap-1.5"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> {i18n.t("runDetail.goBack")}
-      </button>
-    </div>
-  );
+
+  if (error || !run) {
+    return (
+      <div className="p-8 space-y-2">
+        <p className="text-red-500 font-medium">{i18n.t("runDetail.runNotFound")}</p>
+        <p className="text-sm text-muted-foreground">
+          {error ? `${i18n.t("runDetail.runNotFoundDesc")} (Error: ${error})` : i18n.t("runDetail.runNotFoundDesc")}
+        </p>
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-primary hover:underline inline-flex items-center gap-1.5 mt-2"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> {i18n.t("runDetail.goBack")}
+        </button>
+      </div>
+    );
+  }
 
   const ok = run.status === "success";
 

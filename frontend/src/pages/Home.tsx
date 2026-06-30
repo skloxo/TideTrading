@@ -7,12 +7,12 @@ import {
   UserCircle2,
   Database,
   ShieldAlert,
-  Wrench,
   Cpu,
-  Settings,
   HelpCircle,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  History,
+  Compass
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -61,7 +61,7 @@ export function Home() {
         
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v0.1.10.cnx.1.3 Stable</span>
+          <span>v0.1.10.cnx.1.4 Stable</span>
         </div>
 
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">
@@ -69,8 +69,8 @@ export function Home() {
         </h1>
         <p className="max-w-2xl text-base md:text-lg text-muted-foreground leading-relaxed">
           {isZh
-            ? "基于大模型语义编排机制与高性能行情基建的专业量化策略研究与交易工作站。"
-            : "Next-generation quantitative strategy research & transaction workstation powered by LLM orchestration."}
+            ? "聚焦 A股与港股 的智能交易与多维分析工作站，深度融合舆情情绪面、资金流向、技术指标回测与基本面分析，支持多通道即插即用推送与多租户隔离沙箱。"
+            : "A multi-dimensional trading & analysis workstation focused on A/H-shares, integrating sentiment parsing, capital flows, backtesting, and secure multi-tenant sandbox."}
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
@@ -80,13 +80,6 @@ export function Home() {
           >
             {isZh ? "进入智能体工作区" : "Enter Agent Workspace"} 
             <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Link
-            to="/monitor"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border bg-card hover:bg-muted transition text-foreground font-medium"
-          >
-            <Settings className="h-4 w-4 text-muted-foreground" />
-            {isZh ? "系统配置与监控" : "Configure & Monitor"}
           </Link>
         </div>
       </section>
@@ -254,12 +247,12 @@ export function Home() {
         </div>
       </section>
 
-      {/* 5. Best Configuration Wizard */}
+      {/* 5. Tenant Onboarding Wizard */}
       <section className="space-y-6">
         <div className="text-center space-y-2">
-          <h2 className="text-xl md:text-2xl font-bold">{isZh ? "系统最佳配置向导" : "System Configuration Wizard"}</h2>
+          <h2 className="text-xl md:text-2xl font-bold">{isZh ? "租户新手引导向导" : "Tenant Onboarding Wizard"}</h2>
           <p className="text-xs text-muted-foreground max-w-xl mx-auto">
-            {isZh ? "新手开发者或交易员请按照以下步骤，快速配齐工作空间的核心基建配置。" : "Follow these steps to configure your quant environment keys and backtest engines."}
+            {isZh ? "简单四步，配齐并校验您的私人量化智能体工作空间配置。" : "Follow these steps to set up your private quant workspace and start trading."}
           </p>
         </div>
 
@@ -270,11 +263,11 @@ export function Home() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/5 text-primary border border-primary/10">
               <UserCircle2 className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-xs">{isZh ? "步骤一：解锁后台" : "Step 1: Unlock Page"}</h3>
+            <h3 className="font-semibold text-xs">{isZh ? "步骤一：配置券商密钥" : "Step 1: Broker Authentication"}</h3>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {isZh
-                ? "前往「设置」页面，先输入您的系统 API 认证密钥以解锁敏感设置项。"
-                : "Navigate to Settings and enter your system password to unlock options."}
+                ? "前往「设置」，在个人配置中填写您的券商密钥（如 Longbridge API 密钥、Xueqiu Cookie 等）以激活交易连接。"
+                : "Navigate to Settings and add your broker credentials (e.g. Longbridge API key, Xueqiu cookie)."}
             </p>
           </div>
 
@@ -284,11 +277,11 @@ export function Home() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/5 text-primary border border-primary/10">
               <Cpu className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-xs">{isZh ? "步骤二：大模型后端" : "Step 2: LLM Backend"}</h3>
+            <h3 className="font-semibold text-xs">{isZh ? "步骤二：配置私有模型" : "Step 2: Private LLM Backend"}</h3>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {isZh
-                ? "选择大语言模型服务商，填写正确的模型名称、基础 URL 和 API 认证密钥并保存。"
-                : "Choose a provider (OpenAI, Gemini), input the model name, base URL, and key."}
+                ? "配置您专属的 AI 大模型后端（OpenAI, OpenRouter 等），设定个性化决策参数。"
+                : "Configure your private LLM provider, setting model name, base URL, and API key."}
             </p>
           </div>
 
@@ -296,13 +289,13 @@ export function Home() {
           <div className="border border-border/60 bg-card p-5 rounded-xl space-y-3 relative">
             <div className="absolute top-4 right-4 text-2xl font-black text-primary/10">03</div>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/5 text-primary border border-primary/10">
-              <Database className="h-4 w-4" />
+              <Activity className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-xs">{isZh ? "步骤三：配置数据源" : "Step 3: Data Sources"}</h3>
+            <h3 className="font-semibold text-xs">{isZh ? "步骤三：校验风控状态" : "Step 3: Verify Runtime"}</h3>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {isZh
-                ? "填写您的 Tushare 令牌；如果无密钥，系统会自动降级启用 Baostock 行情源。"
-                : "Paste your Tushare API Token or leave empty to default to the TCP Baostock handler."}
+                ? "前往「运行状态」监视面板，校验账户连接状况、当前的限额规则（Mandate）及风控到期时间。"
+                : "Visit the Runtime Monitor page to double check account status, mandate limits, and expiry."}
             </p>
           </div>
 
@@ -310,29 +303,134 @@ export function Home() {
           <div className="border border-border/60 bg-card p-5 rounded-xl space-y-3 relative">
             <div className="absolute top-4 right-4 text-2xl font-black text-primary/10">04</div>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/5 text-primary border border-primary/10">
-              <Wrench className="h-4 w-4" />
+              <Bot className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-xs">{isZh ? "步骤四：监控与测试" : "Step 4: Verify"}</h3>
+            <h3 className="font-semibold text-xs">{isZh ? "步骤四：开启量化对话" : "Step 4: Start Chatting"}</h3>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {isZh
-                ? "前往「服务监控」看板刷新网关，看到正常的 TCP 延迟指标后，即代表配置成功！"
-                : "Open Monitor dashboard, refresh, verify connection latency and start testing."}
+                ? "进入「智能体工作区」或「回测报告」，向智能体下达指令，启动多智能体策略回测。"
+                : "Open Quant Agent Workspace or Reports to initiate backtests and view details."}
             </p>
           </div>
         </div>
 
-        <div className="text-center pt-4">
-          <Link
-            to="/settings"
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md border border-primary text-primary bg-primary/5 hover:bg-primary/10 transition"
-          >
-            <Settings className="h-3.5 w-3.5" />
-            {isZh ? "立即前往配置设置" : "Configure Settings Now"}
-          </Link>
+
+      </section>
+
+      {/* 6. Roadmap & Changelog Section (画饼与里程碑) */}
+      <section className="space-y-8">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl md:text-2xl font-bold flex items-center justify-center gap-2">
+            <Compass className="h-5 w-5 text-primary" />
+            {isZh ? "线路蓝图与迭代展望" : "Roadmap & Release Changelog"}
+          </h2>
+          <p className="text-xs text-muted-foreground max-w-xl mx-auto">
+            {isZh ? "Vibe-Trading-CNX 产品线的最新演进动态与中长期功能规划蓝图。" : "Track our current milestones and mid-to-long term quantitative roadmap."}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left: Changelog */}
+          <div className="border border-border/60 bg-card p-6 rounded-xl space-y-4">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-primary border-b pb-2">
+              <History className="h-4 w-4" />
+              {isZh ? "迭代记录 (Milestones Completed)" : "Milestones Completed"}
+            </h3>
+            <div className="space-y-4">
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background animate-pulse" />
+                <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                  v0.1.10.cnx.1.4
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-normal">{isZh ? "已上线" : "Stable"}</span>
+                </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "首页产品文案及上手向导优化，精简冗余操作按钮，迭代记录补齐与一致性规范化。" : "Optimized homepage copy, onboarding wizard, and complete milestone consistency."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary/60 border-2 border-background" />
+                <h4 className="text-xs font-semibold">v0.1.10.cnx.1.3</h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "平台指引优化、侧边栏 H5 自适应抽屉修复、系统参数与日志加固监控。" : "Platform guide optimization, responsive drawer navigation, and system parameter monitors."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary/60 border-2 border-background" />
+                <h4 className="text-xs font-semibold">v0.1.10.cnx.1.2</h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "正式先锋迭代，上线一键平滑热升级系统与重启服务功能，布局移动端基础框架。" : "Implemented smooth online upgrades, live restarts, and foundational mobile Layout."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary/60 border-2 border-background" />
+                <h4 className="text-xs font-semibold">v0.1.10.cnx.1.1</h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "引入 pytdx 高频行情基建，支持低延迟心跳保活与 A 股秒级 5 档行情直连。" : "Introduced pytdx connection pools, automatic speed checks, and live L1 A-share feeds."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary/60 border-2 border-background" />
+                <h4 className="text-xs font-semibold">v0.1.10.cnx.1.0</h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "Vibe-Trading-CNX 量化工作站首发版。集成微信 iLink 网关以支持扫码登录与防屏蔽，Docker 容器数据向前兼容。" : "Official release of Vibe-Trading-CNX. Integrated WeChat iLink gateway with session persistence and backward compatibility."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Roadmap (画饼) */}
+          <div className="border border-border/60 bg-card p-6 rounded-xl space-y-4">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-orange-500 border-b pb-2">
+              <Zap className="h-4 w-4" />
+              {isZh ? "规划蓝图 (Future Blueprints)" : "Future Blueprints"}
+            </h3>
+            <div className="space-y-4">
+              <div className="relative pl-4 border-l-2 border-orange-500/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-orange-500 border-2 border-background animate-pulse" />
+                <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                  {isZh ? "共享行情缓存公库" : "Shared Memory Caching Hub"}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 font-normal">{isZh ? "进行中" : "In Progress"}</span>
+                </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "开发全局 SharedMemoryHub 行情定时轮询服务，保护多租户并发访问免于券商封 IP。" : "Thread-safe cache wheels index/sector quotes during trading hours to bypass broker IP limits."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-orange-500/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-muted border-2 border-background" />
+                <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                  {isZh ? "同花顺自选股同步" : "Tonghuashun Watchlist Sync"}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal">{isZh ? "计划中" : "Planned"}</span>
+                </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "支持与同花顺云端自选列表进行 30s 高频双向自动实时同步。" : "30s bi-directional synchronization with Tonghuashun watchlist cloud data."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-orange-500/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-muted border-2 border-background" />
+                <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                  {isZh ? "自选股秒级实时预警" : "Watchlist Real-time Alerts"}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal">{isZh ? "计划中" : "Planned"}</span>
+                </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "交易时间内对自选股进行实时盯盘，满足条件时毫秒级拼装并推送飞书/微信通知。" : "Instant watchlist monitoring and margin limit triggers with Feishu/WeChat push alerts."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-orange-500/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-muted border-2 border-background" />
+                <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                  {isZh ? "投委会多智能体 Debate 机制" : "Investment Committee Swarm Debate"}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal">{isZh ? "规划中" : "Proposed"}</span>
+                </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "多智能体围绕持仓和选股在交易前进行辩论表决，输出防偏见多视角投研结论。" : "Multi-agent committee debates portfolio choices (bull vs bear) to generate unbiased proposals."}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* 6. Help Info / Platforms */}
+      {/* 7. Help Info / Platforms */}
       <footer className="pt-8 border-t border-border/60 flex flex-col md:flex-row items-center justify-between text-xs text-muted-foreground gap-4">
         <div className="flex items-center gap-1">
           <HelpCircle className="h-4 w-4" />
