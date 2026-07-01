@@ -36,12 +36,11 @@ def get_commit_gap(local_ref, remote_ref):
 
 def get_recent_commits(ref, count=5):
     commits_raw = run_git_cmd(['log', f'-{count}', '--format=- `%h` **%an** (%ar): %s', ref])
-    if commits_raw.startswith("Error"):
-        return "* (无法获取日志)"
+    if commits_raw.startswith("Error") or not commits_raw.strip():
+        return "* (暂无提交日志)"
     return commits_raw
 
 def get_commits_since_hashes(ref, seen_hashes, count=100):
-    # Returns a list of dictionaries with commit info
     commits_raw = run_git_cmd(['log', f'-{count}', '--format=%h|%an|%ad|%s', ref])
     if commits_raw.startswith("Error") or not commits_raw:
         return []
@@ -62,6 +61,22 @@ def get_commits_since_hashes(ref, seen_hashes, count=100):
         })
     return new_commits
 
+def get_remote_default_branch(remote_name):
+    # Check if refs/remotes/<remote>/HEAD exists (e.g. symbolic link set up by clone)
+    # Otherwise check verify refs for common branch names
+    for br in ['main', 'master', 'develop']:
+        ref_path = f"refs/remotes/{remote_name}/{br}"
+        res = run_git_cmd(['show-ref', '--verify', ref_path])
+        if not res.startswith("Error"):
+            return br
+    # Fallback: scan remote branches
+    branches_raw = run_git_cmd(['branch', '-r'])
+    for line in branches_raw.split('\n'):
+        line = line.strip()
+        if line.startswith(f"{remote_name}/") and "HEAD" not in line:
+            return line.split('/', 1)[1]
+    return 'main'
+
 def main():
     # Make sure we are in the project root
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -81,20 +96,38 @@ def main():
         except Exception:
             seen_commits = {}
 
-    # Tracked Repos
+    # 2. Dynamically discover tracking remotes
+    remotes_raw = run_git_cmd(['remote'])
+    if remotes_raw.startswith("Error"):
+        print("❌ 获取 remote 列表失败")
+        return
+
+    # Upstream is always tracked
     repos = {
-        "upstream": {"ref": "upstream/main", "name": "Vibe-Trading (原上游官方库)"},
-        "mirofish": {"ref": "ref-mirofish/main", "name": "MiroFish (参考项目一)"},
-        "tradingagents": {"ref": "ref-tradingagents/main", "name": "TradingAgents-CN (参考项目二)"}
+        "upstream": {
+            "ref": "upstream/main", 
+            "name": "Vibe-Trading (原上游官方库)",
+            "url": run_git_cmd(['remote', 'get-url', 'upstream'])
+        }
     }
 
-    # Fetch all to make sure we are comparing latest
-    # (The cron or wrapper runner should handle fetch --all, but we do it anyway)
-    
-    # 2. Extract New Commits (Deltas)
+    # Gather ref-* remotes
+    for remote in remotes_raw.split('\n'):
+        remote = remote.strip()
+        if remote.startswith('ref-'):
+            br = get_remote_default_branch(remote)
+            url = run_git_cmd(['remote', 'get-url', remote])
+            # Display name formatting
+            display_name = remote[4:].replace('_', ' ').replace('-', ' ').title()
+            repos[remote] = {
+                "ref": f"{remote}/{br}",
+                "name": f"{display_name} (参考项目)",
+                "url": url
+            }
+
+    # 3. Extract New Commits (Deltas)
     today_str = datetime.now().strftime('%Y-%m-%d')
     daily_new_commits = {}
-    new_seen_hashes_added = False
 
     for key, info in repos.items():
         ref = info["ref"]
@@ -110,16 +143,12 @@ def main():
                 seen_commits[key] = []
             for c in recent_list:
                 seen_commits[key].append(c["hash"])
-            new_seen_hashes_added = True
 
-    # 3. If there are new commits, generate/append to Daily Log
+    # 4. If there are new commits, generate/append to Daily Log
     if daily_new_commits:
         daily_log_path = os.path.join(logs_dir, f"{today_str}.md")
-        
-        # Build Daily Log Content
         daily_md = []
         if os.path.exists(daily_log_path):
-            # If script runs multiple times in a day, append
             with open(daily_log_path, 'r', encoding='utf-8') as f:
                 daily_md.append(f.read().strip())
             daily_md.append("\n\n---\n")
@@ -142,15 +171,11 @@ def main():
         with open(state_file, 'w', encoding='utf-8') as f:
             json.dump(seen_commits, f, ensure_ascii=False, indent=2)
 
-    # 4. Fetch current status metadata for main board
+    # 5. Fetch current status metadata for main board
     local_info = get_latest_commit_info('main')
-    upstream_info = get_latest_commit_info('upstream/main')
-    miro_info = get_latest_commit_info('ref-mirofish/main')
-    agents_info = get_latest_commit_info('ref-tradingagents/main')
-
     ahead, behind = get_commit_gap('main', 'upstream/main')
 
-    # 5. Build Main REPOSITORIES_STATUS.md
+    # 6. Build Main REPOSITORIES_STATUS.md
     md = []
     md.append("# 🗺️ 参考项目与上游仓库追踪看板\n")
     md.append(f"> [!NOTE]\n> 本页面由系统自动维护生成。最近更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -162,15 +187,13 @@ def main():
     # Local
     if local_info:
         md.append(f"| **Vibe-Trading-CNX (本地主分支)** | `skloxo/Vibe-Trading-CNX` | `main` | `{local_info['hash']}` | {local_info['author']} | {local_info['relative_date']} |")
-    # Upstream
-    if upstream_info:
-        md.append(f"| **Vibe-Trading (原上游官方库)** | `HKUDS/Vibe-Trading` | `main` | `{upstream_info['hash']}` | {upstream_info['author']} | {upstream_info['relative_date']} |")
-    # MiroFish
-    if miro_info:
-        md.append(f"| **MiroFish (参考项目一)** | `666ghj/MiroFish` | `main` | `{miro_info['hash']}` | {miro_info['author']} | {miro_info['relative_date']} |")
-    # TradingAgents-CN
-    if agents_info:
-        md.append(f"| **TradingAgents-CN (参考项目二)** | `hsliuping/TradingAgents-CN` | `main` | `{agents_info['hash']}` | {agents_info['author']} | {agents_info['relative_date']} |")
+    
+    # Add all repos sorted by key
+    for key in sorted(repos.keys()):
+        info = repos[key]
+        ref_info = get_latest_commit_info(info["ref"])
+        if ref_info:
+            md.append(f"| **{info['name']}** | `{info['url'].replace('https://github.com/', '')}` | `{info['ref'].split('/', 1)[1]}` | `{ref_info['hash']}` | {ref_info['author']} | {ref_info['relative_date']} |")
     
     md.append("\n")
 
@@ -186,7 +209,6 @@ def main():
     if log_files:
         for f_name in log_files:
             date_part = f_name.replace('.md', '')
-            # URL formatted using ironclad rule for skloxo
             file_url = f"file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/Vibe-Trading/.agents/research_archive/repo_sync_logs/{f_name}"
             md.append(f"- [{date_part} 增量日志]({file_url})")
     else:
@@ -195,20 +217,12 @@ def main():
 
     md.append("## 📜 追踪分支最近提交详情 (Top 5)\n")
 
-    # Upstream Commits
-    md.append("### 🔗 Vibe-Trading (上游官方) 最近更新\n")
-    md.append(get_recent_commits('upstream/main'))
-    md.append("\n")
-
-    # MiroFish Commits
-    md.append("### 🐟 MiroFish (参考项目一) 最近更新\n")
-    md.append(get_recent_commits('ref-mirofish/main'))
-    md.append("\n")
-
-    # TradingAgents-CN Commits
-    md.append("### 🤖 TradingAgents-CN (参考项目二) 最近更新\n")
-    md.append(get_recent_commits('ref-tradingagents/main'))
-    md.append("\n")
+    # Add commit details for each remote
+    for key in sorted(repos.keys()):
+        info = repos[key]
+        md.append(f"### 🔗 {info['name']} 最近更新\n")
+        md.append(get_recent_commits(info["ref"]))
+        md.append("\n")
 
     # Write output file
     output_path = os.path.join(project_root, 'REPOSITORIES_STATUS.md')
