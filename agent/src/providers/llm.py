@@ -47,6 +47,88 @@ if ChatOpenAI is not None:
             super().__init__(*args, **kwargs)
             self._vibe_provider = vibe_provider
 
+        def rotate_key(self, new_key: str) -> None:
+            """Rotate the API key and rebuild the underlying client."""
+            from pydantic import SecretStr
+            self.openai_api_key = SecretStr(new_key)
+            self.root_client = None
+            self.client = None
+            self.root_async_client = None
+            self.async_client = None
+            self.validate_environment()
+
+        def _generate(self, messages: list, stop: Optional[list] = None, run_manager = None, **kwargs: Any) -> Any:
+            import openai
+            from src.providers.key_pool import LLMKeyPoolManager
+            from src.config.paths import active_tenant_var
+
+            tenant_id = active_tenant_var.get()
+            provider = self._vibe_provider or "openai"
+            
+            key_env, _ = provider_env_names(provider, self.model_name)
+            raw_key_str = os.getenv(key_env or "OPENAI_API_KEY", "")
+
+            for attempt in range(3):
+                try:
+                    return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+                except Exception as exc:
+                    is_rate_limit = isinstance(exc, openai.RateLimitError) or (
+                        hasattr(exc, "status_code") and exc.status_code == 429
+                    ) or "429" in str(exc)
+                    
+                    if not is_rate_limit:
+                        raise exc
+                    
+                    failed_key = self.openai_api_key.get_secret_value() if self.openai_api_key else ""
+                    if failed_key:
+                        LLMKeyPoolManager().mark_cooling(tenant_id, provider, failed_key, duration=60.0)
+                        logger.warning("LLM Key rate limited (429). Marking as cooling: %s", failed_key[:10] + "...")
+                    
+                    next_key = LLMKeyPoolManager().get_next_key(tenant_id, provider, raw_key_str)
+                    if not next_key or next_key == failed_key:
+                        raise exc
+                        
+                    self.rotate_key(next_key)
+                    logger.info("Rotated to next LLM Key: %s", next_key[:10] + "...")
+            
+            return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+        async def _agenerate(self, messages: list, stop: Optional[list] = None, run_manager = None, **kwargs: Any) -> Any:
+            import openai
+            from src.providers.key_pool import LLMKeyPoolManager
+            from src.config.paths import active_tenant_var
+
+            tenant_id = active_tenant_var.get()
+            provider = self._vibe_provider or "openai"
+            
+            key_env, _ = provider_env_names(provider, self.model_name)
+            raw_key_str = os.getenv(key_env or "OPENAI_API_KEY", "")
+
+            for attempt in range(3):
+                try:
+                    return await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+                except Exception as exc:
+                    is_rate_limit = isinstance(exc, openai.RateLimitError) or (
+                        hasattr(exc, "status_code") and exc.status_code == 429
+                    ) or "429" in str(exc)
+                    
+                    if not is_rate_limit:
+                        raise exc
+                    
+                    failed_key = self.openai_api_key.get_secret_value() if self.openai_api_key else ""
+                    if failed_key:
+                        LLMKeyPoolManager().mark_cooling(tenant_id, provider, failed_key, duration=60.0)
+                        logger.warning("LLM Key rate limited (429). Marking as cooling: %s", failed_key[:10] + "...")
+                    
+                    next_key = LLMKeyPoolManager().get_next_key(tenant_id, provider, raw_key_str)
+                    if not next_key or next_key == failed_key:
+                        raise exc
+                        
+                    self.rotate_key(next_key)
+                    logger.info("Rotated to next LLM Key: %s", next_key[:10] + "...")
+            
+            return await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
         def _capabilities(self):
             model = (
                 getattr(self, "model_name", None)
@@ -386,6 +468,8 @@ def _build_native_deepseek(
     model: str,
     temperature: float,
     callbacks: Any = None,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> Any | None:
     """Build the optional native DeepSeek adapter when installed.
 
@@ -400,9 +484,12 @@ def _build_native_deepseek(
         logger.info("DeepSeek native adapter unavailable; using OpenAI-compatible path: %s", exc)
         return None
 
-    key_env, base_env = provider_env_names("deepseek", model)
-    api_key = os.getenv(key_env or "", "") or os.getenv("OPENAI_API_KEY", "")
-    base_url = os.getenv(base_env, "") or os.getenv("OPENAI_BASE_URL", "") or os.getenv("OPENAI_API_BASE", "")
+    # Use passed credentials or fallback to active environment variables
+    if not api_key or not base_url:
+        key_env, base_env = provider_env_names("deepseek", model)
+        api_key = api_key or os.getenv(key_env or "", "") or os.getenv("OPENAI_API_KEY", "")
+        base_url = base_url or os.getenv(base_env, "") or os.getenv("OPENAI_BASE_URL", "") or os.getenv("OPENAI_API_BASE", "")
+
     return chat_deepseek(
         model=model,
         temperature=temperature,
@@ -412,6 +499,7 @@ def _build_native_deepseek(
         api_key=api_key or None,
         base_url=base_url or None,
     )
+
 
 
 def _load_env_file(path: Path) -> None:
@@ -563,6 +651,33 @@ def provider_diagnostics() -> dict[str, Any]:
     }
 
 
+def resolve_llm_credentials(provider: str, model_name: str) -> tuple[Optional[str], Optional[str]]:
+    """Resolve the API key and base URL for the given provider and model name.
+
+    Reads from the active tenant context (intercepted by monkeypatched os.getenv).
+    Does NOT mutate os.environ globally.
+    """
+    _ensure_dotenv()
+    if provider in {"openai-codex", "openai_codex"}:
+        codex_url = os.getenv("OPENAI_CODEX_BASE_URL", "https://chatgpt.com/backend-api/codex/responses")
+        return None, codex_url
+
+    key_env, base_env = provider_env_names(provider, model_name)
+
+    # Resolve API key
+    if key_env is not None:
+        api_key = os.getenv(key_env, "").strip() or os.getenv("OPENAI_API_KEY", "").strip()
+    else:
+        api_key = os.getenv("OPENAI_API_KEY", "").strip() or "ollama"
+
+    # Resolve base URL
+    base_url = os.getenv(base_env, "").strip() or os.getenv("OPENAI_BASE_URL", "").strip() or os.getenv("OPENAI_API_BASE", "").strip()
+    if provider == "ollama" and base_url:
+        base_url = _normalize_ollama_base_url(base_url)
+
+    return api_key or None, base_url or None
+
+
 def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any:
     """Construct a ChatOpenAI instance.
 
@@ -576,13 +691,22 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
     Raises:
         RuntimeError: If langchain-openai is missing or LANGCHAIN_MODEL_NAME is unset.
     """
-    _sync_provider_env()
     name = model_name or os.getenv("LANGCHAIN_MODEL_NAME", "").strip()
     if not name:
         raise RuntimeError("LANGCHAIN_MODEL_NAME is not set")
     temperature = float(os.getenv("LANGCHAIN_TEMPERATURE", "0.0"))
     provider = os.getenv("LANGCHAIN_PROVIDER", "openai").lower()
     caps = get_provider_capabilities(provider, name)
+
+    # Resolve credentials without global os.environ mutation
+    api_key, base_url = resolve_llm_credentials(provider, name)
+
+    # Use LLMKeyPoolManager to get the first active single key from the potential key pool
+    from src.providers.key_pool import LLMKeyPoolManager
+    from src.config.paths import active_tenant_var
+    tenant = active_tenant_var.get()
+    single_key = LLMKeyPoolManager().get_next_key(tenant, provider, api_key) if api_key else None
+
     if provider in {"openai-codex", "openai_codex"}:
         from src.providers.openai_codex import OpenAICodexLLM
 
@@ -592,6 +716,7 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
             temperature=temperature,
             timeout=int(os.getenv("TIMEOUT_SECONDS", "120")),
             reasoning_effort=effort or None,
+            base_url=base_url or None,
         )
 
     if provider == "deepseek":
@@ -601,12 +726,14 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
                 model=name,
                 temperature=temperature,
                 callbacks=callbacks,
+                api_key=single_key,
+                base_url=base_url,
             )
             if native_llm is not None:
                 return native_llm
             if adapter_mode == "native":
                 raise RuntimeError(
-                    "VIBE_TRADING_DEEPSEEK_ADAPTER=native requires langchain-deepseek"
+                     "VIBE_TRADING_DEEPSEEK_ADAPTER=native requires langchain-deepseek"
                 )
 
     if ChatOpenAI is None:
@@ -631,6 +758,8 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
         "callbacks": callbacks,
         "extra_body": {"reasoning": {"effort": effort}} if effort and caps.openrouter_reasoning_body else None,
         "vibe_provider": provider,
+        "openai_api_key": single_key,
+        "openai_api_base": base_url,
     }
     if caps.default_headers:
         headers = dict(caps.default_headers)
@@ -640,3 +769,5 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
                 headers["User-Agent"] = custom_ua
         kwargs["default_headers"] = headers
     return ChatOpenAIWithReasoning(**kwargs)
+
+

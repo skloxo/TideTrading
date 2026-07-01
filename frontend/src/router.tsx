@@ -37,6 +37,10 @@ const Monitor = lazy(() =>
 const Logs = lazy(() =>
   import("@/pages/Logs").then((m) => ({ default: m.Logs })),
 );
+const GlobalDashboard = lazy(() =>
+  import("@/pages/GlobalDashboard").then((m) => ({ default: m.GlobalDashboard })),
+);
+
 
 function PageLoader() {
   return (
@@ -59,6 +63,7 @@ export const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: "/", element: wrap(Home) },
+      { path: "/dashboard", element: wrap(GlobalDashboard) },
       { path: "/agent", element: wrap(Agent) },
       { path: "/runtime", element: wrap(Runtime) },
       { path: "/reports", element: wrap(Reports) },

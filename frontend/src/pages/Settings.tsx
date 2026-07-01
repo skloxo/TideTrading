@@ -793,13 +793,13 @@ export function Settings() {
                       value={apiKey}
                       onChange={(event) => setApiKey(event.target.value)}
                       className={`${fieldClass} pl-9`}
-                      placeholder={keyStatus}
+                      placeholder={settings.api_key_hint || keyStatus}
                       autoComplete="current-password"
                       disabled={apiKeyDisabled}
                     />
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className={hintClass}>{keyStatus}</span>
+                    <span className={hintClass}>{settings.api_key_hint || keyStatus}</span>
                     {selectedProvider?.api_key_required ? (
                       <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                         <input
@@ -815,7 +815,13 @@ export function Settings() {
                       </label>
                     ) : null}
                   </div>
+                  {selectedProvider?.api_key_required && (
+                    <div className="text-xs text-muted-foreground/80 mt-1">
+                      支持配置多个 Key（以英文逗号分隔），系统会自动进行并发轮换与 429 冷却重试自愈。
+                    </div>
+                  )}
                 </label>
+
               </div>
             </section>
 
@@ -1403,13 +1409,13 @@ export function Settings() {
                           value={apiKey}
                           onChange={(event) => setApiKey(event.target.value)}
                           className={`${fieldClass} pl-9`}
-                          placeholder={keyStatus}
+                          placeholder={settings.api_key_hint || keyStatus}
                           autoComplete="current-password"
                           disabled={apiKeyDisabled}
                         />
                       </div>
                       <div className="flex items-center justify-between gap-3">
-                        <span className={hintClass}>{keyStatus}</span>
+                        <span className={hintClass}>{settings.api_key_hint || keyStatus}</span>
                         {selectedProvider?.api_key_required ? (
                           <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                             <input
@@ -1425,6 +1431,11 @@ export function Settings() {
                           </label>
                         ) : null}
                       </div>
+                      {selectedProvider?.api_key_required && (
+                        <div className="text-xs text-muted-foreground/80 mt-1">
+                          支持配置多个 Key（以英文逗号分隔），系统会自动进行并发轮换与 429 冷却重试自愈。
+                        </div>
+                      )}
                     </label>
                   </div>
                 </section>

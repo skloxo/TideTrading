@@ -1805,6 +1805,26 @@ def _coerce_int(value: str, default: int) -> int:
         return default
 
 
+def mask_api_key(key: str) -> str:
+    """Mask a single API key, showing only the first few and last few characters."""
+    k = key.strip()
+    if not k:
+        return ""
+    if len(k) <= 8:
+        return "****"
+    return f"{k[:4]}...{k[-4:]}"
+
+
+def mask_api_keys(keys_str: str) -> str:
+    """Mask a single key or comma-separated list of keys."""
+    if not keys_str:
+        return ""
+    keys = [k.strip() for k in keys_str.split(",") if k.strip()]
+    if not keys:
+        return ""
+    return ", ".join(mask_api_key(k) for k in keys)
+
+
 def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_public: bool = False) -> LLMSettingsResponse:
     """Build the public settings payload from dotenv values."""
     from src.config.paths import active_tenant_var
@@ -1830,16 +1850,9 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
         api_key_configured = bool(token)
         api_key_hint = None
     else:
-        if tenant != "default" and not is_public:
-            # Mask inherited global key
-            tenant_env = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
-            tenant_has_key = False
-            if tenant_env.exists():
-                tenant_vals = _read_env_values(tenant_env)
-                if provider.api_key_env and provider.api_key_env in tenant_vals:
-                    tenant_has_key = _is_configured_secret(tenant_vals[provider.api_key_env], LLM_API_KEY_PLACEHOLDERS)
-            if api_key_configured and not tenant_has_key:
-                api_key_hint = "********"
+        if api_key_configured and not is_public:
+            api_key_hint = mask_api_keys(api_key)
+
 
     is_custom = True
     if tenant != "default":

@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
-import { Activity, BarChart3, Bot, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal } from "lucide-react";
+import { Activity, BarChart3, Bot, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, isAuthRequiredError, type SessionItem, type UserProfile } from "@/lib/api";
@@ -45,6 +45,7 @@ export function Layout() {
 
   const NAV = [
     { to: "/", icon: BarChart3, label: t('layout.home') },
+    { to: "/dashboard", icon: Compass, label: i18nHook.language === "zh-CN" ? "数据大屏" : "Live Dashboard" },
     { to: "/agent", icon: Bot, label: t('layout.agent') },
     { to: "/runtime", icon: Activity, label: t('layout.runtime') },
     { to: "/reports", icon: FileText, label: t('layout.reports') },
