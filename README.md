@@ -40,6 +40,12 @@
 
 ## 📰 最新动态
 
+- **2026-07-01** 🚀 **v0.1.10.cnx.1.6 — 行情网关自愈预检、多参考仓库对账看板与 GitHub CLI SOP 版本发布**：
+  - **行情网关启动自愈预检**：新增 `_check_mootdx_and_heal` 预检机制。服务启动时自动检查 `mootdx` 缓存配置文件完整性，秒级捕获并清除 `BESTIP` 损坏导致的 `ValueError` 异常，自动重新测速生成最佳 HQ 主站配置，彻底根治公网环境下的 A股 实时数据查询失败。
+  - **多参考仓库动态追踪看板**：新增 `update_repositories_status.py` 脚本，动态扫描以 `ref-` 为前缀的所有 Git 远程追踪源（支持自动推断 `main`/`master` 默认分支）；项目根目录下自动输出 [REPOSITORIES_STATUS.md](file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/Vibe-Trading/REPOSITORIES_STATUS.md) 大看板，展示最新提交与版本差异。
+  - **历史每日增量日志归档**：实现按天增量记录 Commit Delta 日志，自动归档至 `.agents/research_archive/repo_sync_logs/`，使主看板内容更聚焦，规避长期运行导致的文件膨胀。
+  - **统一的 GitHub CLI 跨仓库贡献 SOP**：明确在 `AGENTS.md` 中固化了向官方上游贡献通用代码的 `gh pr create` 命令行流程，确保 CNX 本地隔离代码不会污染上游 Pull Request。
+
 - **2026-07-01** 🚀 **v0.1.10.cnx.1.5 — 同花顺自选双向同步、秒级自选盯盘与收盘对账自愈系统版本发布**：
   - **同花顺自选股双向同步**：新增同花顺网页端 Cookie 多租户隔离持久化，实现基于本地 ⇄ 云端自动差分对账的真双向同步；前台新增「立即同步自选股」手动触发按钮与结果状态栏。
   - **智能自适应频率轮询**：根据 A 股交易时间自动调整轮询同步频率，交易日盘中（周一至五 09:30-15:00）每 5 分钟同步一次，非交易时段及周末自动降频至 30 分钟一次，最大限度避免超频限流。

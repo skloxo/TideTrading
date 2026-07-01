@@ -61,7 +61,7 @@ export function Home() {
         
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v0.1.10.cnx.1.5 Stable</span>
+          <span>v0.1.10.cnx.1.6 Stable</span>
         </div>
 
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">
@@ -340,9 +340,16 @@ export function Home() {
               <div className="relative pl-4 border-l-2 border-primary/20">
                 <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background animate-pulse" />
                 <h4 className="text-xs font-semibold flex items-center gap-1.5">
-                  v0.1.10.cnx.1.5
+                  v0.1.10.cnx.1.6
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-normal">{isZh ? "已上线" : "Stable"}</span>
                 </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "行情网关启动自愈预检（秒拔 mootdx BESTIP 损坏），Git 远程多参考仓库动态追踪大看板与每日增量对账日志，跨仓库 CLI 贡献 SOP 确立。" : "Gateway self-healing preflight check, dynamic reference repositories status board with daily logs, and GitHub CLI contribution SOP."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary/40 border-2 border-background" />
+                <h4 className="text-xs font-semibold text-muted-foreground">v0.1.10.cnx.1.5</h4>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   {isZh ? "同花顺多租户双向自动/手动同步（交易日5分钟/其余30分钟自适应），秒级自选股实时监控，收盘数据维护与 Gap Healing 对账自愈。" : "Multi-tenant bi-directional Tonghuashun watchlist sync with smart scheduling, close maintenance with self-healing, and real-time alerts."}
                 </p>
