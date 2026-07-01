@@ -118,4 +118,6 @@ daily_stock_analysis/
 # Local helper/test scripts
 debug_ths*.py
 get_cookie.py
+REPOSITORIES_STATUS.md
+
 
