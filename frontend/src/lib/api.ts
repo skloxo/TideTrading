@@ -1214,6 +1214,7 @@ export interface MonitorStats {
   total_sessions: number;
   total_runs: number;
   memory_usage_mb: number;
+  services?: Record<string, any>;
 }
 
 export interface LogEntry {
