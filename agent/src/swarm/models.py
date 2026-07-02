@@ -84,6 +84,10 @@ class SwarmAgentSpec(BaseModel):
     model_name: str | None = None
     max_retries: int = 2
 
+    @property
+    def name(self) -> str:
+        return self.role or self.id
+
 
 class SwarmTask(BaseModel):
     """A task node in the Swarm DAG.
