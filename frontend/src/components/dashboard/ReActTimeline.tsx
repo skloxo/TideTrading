@@ -1,15 +1,13 @@
+import { useEffect, useState } from "react";
 import { Cpu, Terminal, Eye, AlertCircle } from "lucide-react";
+import { api } from "../../lib/api";
 
 interface TimelineStep {
-  id: number;
+  id: number | string;
   type: "THOUGHT" | "ACTION" | "OBSERVATION" | "DECISION";
   content: string;
   status: "running" | "success" | "pending" | "error";
   timestamp?: string;
-}
-
-interface ReActTimelineProps {
-  steps?: TimelineStep[];
 }
 
 const DEFAULT_STEPS: TimelineStep[] = [
@@ -39,7 +37,116 @@ const DEFAULT_STEPS: TimelineStep[] = [
   },
 ];
 
-export function ReActTimeline({ steps = DEFAULT_STEPS }: ReActTimelineProps) {
+export function ReActTimeline() {
+  const [steps, setSteps] = useState<TimelineStep[]>([]);
+
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let pollInterval: any = null;
+
+    const parseLogLine = (logEntry: any) => {
+      let type: TimelineStep["type"] = "THOUGHT";
+      let content = "";
+      
+      if (logEntry.action === "thought") {
+        type = "THOUGHT";
+        content = logEntry.details?.thought || "";
+      } else if (logEntry.action === "tool_call") {
+        type = "ACTION";
+        const argsStr = JSON.stringify(logEntry.details?.tool_args || {});
+        content = `调用工具: \`${logEntry.details?.tool_name}\` 参数: ${argsStr}`;
+      } else if (logEntry.action === "observation") {
+        type = "OBSERVATION";
+        content = `监测结果: ${logEntry.details?.observation || ""}`;
+      } else if (logEntry.action === "decision") {
+        type = "DECISION";
+        content = logEntry.details?.text || "";
+      }
+
+      return {
+        id: logEntry.elapsed_seconds || Date.now(),
+        type,
+        content,
+        status: logEntry.action === "decision" ? "success" : "success" as any,
+        timestamp: logEntry.timestamp ? new Date(logEntry.timestamp).toLocaleTimeString() : undefined
+      };
+    };
+
+    const startSSE = () => {
+      try {
+        eventSource = new EventSource(api.getDashboardReactLogsStreamUrl());
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            const newStep = parseLogLine(data);
+            setSteps((prev) => {
+              // Deduplicate steps by content
+              if (prev.some((s) => s.content === newStep.content)) return prev;
+              const updated = prev.map((s) => s.status === "running" ? { ...s, status: "success" as const } : s);
+              return [...updated, newStep];
+            });
+          } catch (e) {
+            console.error("Failed to parse SSE line:", e);
+          }
+        };
+
+        eventSource.onerror = (err) => {
+          console.warn("EventSource SSE error, falling back to JSON polling:", err);
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          startPolling();
+        };
+      } catch (err) {
+        console.warn("Failed to instantiate EventSource, falling back to JSON polling:", err);
+        startPolling();
+      }
+    };
+
+    const startPolling = () => {
+      if (pollInterval) return; // Prevent multiple intervals
+      const poll = async () => {
+        try {
+          const res = await api.getDashboardReactLogs();
+          if (res && res.length > 0) {
+            const formatted = res.map((log: any, idx: number) => {
+              const step = parseLogLine(log);
+              step.id = idx + 1;
+              return step;
+            });
+            // Mark the last step as running if it's not a decision yet
+            if (formatted.length > 0) {
+              const last = formatted[formatted.length - 1];
+              if (last.type !== "DECISION") {
+                last.status = "running";
+              }
+            }
+            setSteps(formatted);
+          }
+        } catch (err) {
+          console.error("Polling ReACT logs failed:", err);
+        }
+      };
+      poll();
+      pollInterval = setInterval(poll, 3000);
+    };
+
+    startSSE();
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, []);
+
+  const displaySteps = steps.length > 0 ? steps : DEFAULT_STEPS;
+
   const getBadgeStyles = (type: TimelineStep["type"], status: TimelineStep["status"]) => {
     let base = "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ";
     if (status === "running") {
@@ -63,7 +170,7 @@ export function ReActTimeline({ steps = DEFAULT_STEPS }: ReActTimelineProps) {
       case "running":
         return "bg-rose-600 dark:bg-[#ff3366] ring-4 ring-rose-500/30 animate-pulse";
       case "success":
-        return "bg-emerald-650 dark:bg-[#00ff88]";
+        return "bg-emerald-500 dark:bg-[#00ff88]";
       case "error":
         return "bg-red-500 dark:bg-red-600";
       default:
@@ -93,7 +200,7 @@ export function ReActTimeline({ steps = DEFAULT_STEPS }: ReActTimelineProps) {
       </span>
       
       <div className="text-[10px] space-y-4 relative pl-5 border-l border-slate-200 dark:border-[#222233]/80 py-1.5 ml-2">
-        {steps.map((step, idx) => (
+        {displaySteps.map((step, idx) => (
           <div key={step.id} className="relative flex flex-col gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
             {/* Timeline node dot */}
             <span className={`absolute -left-[26px] top-1 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#10101a] flex items-center justify-center text-[7px] text-white font-extrabold ${getIndicatorStyles(step.status)}`}>
@@ -101,7 +208,7 @@ export function ReActTimeline({ steps = DEFAULT_STEPS }: ReActTimelineProps) {
             </span>
             
             <div className="flex items-center gap-2">
-              <span className="text-slate-450 dark:text-slate-500">{getIcon(step.type)}</span>
+              <span className="text-slate-405 dark:text-slate-500">{getIcon(step.type)}</span>
               <span className={getBadgeStyles(step.type, step.status)}>{step.type}</span>
               {step.timestamp && (
                 <span className="text-[8px] text-slate-400 dark:text-slate-500 font-mono ml-auto">

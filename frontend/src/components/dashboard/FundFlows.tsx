@@ -5,14 +5,20 @@ interface SectorFlow {
   sparkline: number[];
 }
 
-export function FundFlows() {
-  const sectors: SectorFlow[] = [
+interface FundFlowsProps {
+  data?: SectorFlow[];
+}
+
+export function FundFlows({ data }: FundFlowsProps) {
+  const defaultSectors: SectorFlow[] = [
     { name: "低空经济", flow: 38.4, change: 4.82, sparkline: [10, 15, 8, 20, 25, 45, 60] },
     { name: "AI算力", flow: 29.1, change: 3.15, sparkline: [12, 10, 18, 14, 22, 30, 42] },
     { name: "华为星闪", flow: 15.6, change: 2.78, sparkline: [5, 12, 9, 15, 20, 18, 28] },
     { name: "医药生物", flow: -18.2, change: -2.10, sparkline: [30, 25, 28, 18, 12, 15, 10] },
     { name: "证券金融", flow: 8.5, change: 0.42, sparkline: [15, 12, 16, 14, 18, 15, 19] },
   ];
+
+  const sectors = data && data.length > 0 ? data : defaultSectors;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">

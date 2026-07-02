@@ -195,6 +195,45 @@ def get_runtime_root(config_path: Path | None = None) -> Path:
     return Path.home() / ".vibe-trading-cnx" / "tenants" / tenant
 
 
+def get_market_db_path() -> Path:
+    """Return the path to the SHARED public market database (stocks_market.db).
+
+    This database contains all public A-share market data shared across ALL tenants:
+      - kline_daily, kline_weekly (historical price/volume)
+      - stock_meta, company_profile, theme_mapping, trade_calendar (reference data)
+      - financial_* (fundamentals)
+      - capital_flow, stock_valuation, margin_trading, north_bound_flow (capital)
+      - longhu_records, limit_up_records (sentiment)
+      - intraday_1min, intraday_5min (intraday cache, watched stocks only)
+
+    There is ONE instance of this file regardless of how many tenants exist.
+    Always lives under the default runtime root (~/.vibe-trading-cnx/).
+    """
+    base = Path.home() / ".vibe-trading-cnx"
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "stocks_market.db"
+
+
+def get_tenant_db_path(tenant_id: str | None = None) -> Path:
+    """Return the path to the PRIVATE per-tenant database.
+
+    This database contains only user-private data:
+      - Watchlist (self-selected stocks + metadata)
+      - AlertRules (price/indicator alert rules)
+      - positions (future: position records)
+
+    Each tenant has their own independent copy.
+    """
+    tid = tenant_id or active_tenant_var.get() or "default"
+    if tid == "default":
+        root = Path.home() / ".vibe-trading-cnx"
+    else:
+        root = Path.home() / ".vibe-trading-cnx" / "tenants" / tid
+    root.mkdir(parents=True, exist_ok=True)
+    return root / f"stocks_{tid}.db"
+
+
+
 def get_config_candidates(config_path: Path | None = None) -> list[Path]:
     """Return supported config path candidates in lookup order.
 

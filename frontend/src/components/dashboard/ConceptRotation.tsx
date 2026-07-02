@@ -7,14 +7,42 @@ interface ConceptItem {
   change: number;
 }
 
-export function ConceptRotation() {
-  const concepts: ConceptItem[] = [
+interface ConceptRotationProps {
+  data?: any[];
+}
+
+export function ConceptRotation({ data }: ConceptRotationProps) {
+  const defaultConcepts: ConceptItem[] = [
     { name: "低空经济", leadStock: "万丰奥威", leadStockCode: "301550", heat: 98, sentiment: "bull", change: 5.62 },
     { name: "华为智驾", leadStock: "赛力斯", leadStockCode: "601127", heat: 92, sentiment: "bull", change: 3.18 },
     { name: "AI算力", leadStock: "工业富联", leadStockCode: "601138", heat: 88, sentiment: "bull", change: 4.10 },
     { name: "生物医药", leadStock: "恒瑞医药", leadStockCode: "600276", heat: 45, sentiment: "bear", change: -1.85 },
     { name: "中特估", leadStock: "工商银行", leadStockCode: "601398", heat: 60, sentiment: "neutral", change: 0.23 }
   ];
+
+  const conceptLeaderMap: Record<string, { stock: string, code: string }> = {
+    "低空经济": { stock: "万丰奥威", code: "301550" },
+    "AI算力": { stock: "工业富联", code: "601138" },
+    "华为概念": { stock: "赛力斯", code: "601127" },
+    "半导体": { stock: "中芯国际", code: "688981" },
+    "生物医药": { stock: "恒瑞医药", code: "600276" },
+    "中特估": { stock: "工商银行", code: "601398" }
+  };
+
+  const concepts: ConceptItem[] = data && data.length > 0 ? data.map((item: any) => {
+    const leader = conceptLeaderMap[item.name] || { stock: "龙头股", code: "------" };
+    const change = item.change || 0;
+    const heat = Math.min(100, Math.max(10, Math.round(50 + change * 8)));
+    const sentiment = change > 1.5 ? "bull" : change < -1.5 ? "bear" : "neutral";
+    return {
+      name: item.name,
+      leadStock: leader.stock,
+      leadStockCode: leader.code,
+      heat,
+      sentiment,
+      change
+    };
+  }) : defaultConcepts;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">

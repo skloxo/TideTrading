@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageSquare, Send } from "lucide-react";
+import { api } from "../../lib/api";
 
 interface Message {
   sender: string;
@@ -16,36 +17,42 @@ export function AgentChatConsole() {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
   const [selectedAgent, setSelectedAgent] = useState("yuzi");
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { sender: "User", content: input, isAgent: false };
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = input;
     setInput("");
+    setIsLoading(true);
 
-    // Simulate Agent response after 1s
-    setTimeout(() => {
-      let responseContent = "";
-      const agentName = selectedAgent === "yuzi" ? "游资·游侠" : "北向资金";
-      
-      if (selectedAgent === "yuzi") {
-        responseContent = `对于您询问的 [${input}]，我们目前判定主力游资席位依旧是持筹观望为主，万丰奥威连板期间未见明显出货痕迹。若今日回调不破10日均线，倾向于继续加仓做多。`;
-      } else {
-        responseContent = `根据最新的北向持股异动，[${input}] 关联的宁德时代今日获外资逆势抄底增持约 8200 万元。近期由于估值边际改善，外资对新能源权重股呈持续净买入状态。`;
-      }
+    const agentName = selectedAgent === "yuzi" ? "游资·游侠" : "北向资金";
+    const loadingMessage: Message = { sender: agentName, content: "正在研判盘面与筹码分布，请稍候...", isAgent: true };
+    setMessages((prev) => [...prev, loadingMessage]);
 
-      setMessages((prev) => [
-        ...prev,
-        { sender: agentName, content: responseContent, isAgent: true },
-      ]);
-    }, 1000);
+    try {
+      const res = await api.sendAgentChatMessage(selectedAgent, currentInput);
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => m.content !== "正在研判盘面与筹码分布，请稍候...");
+        return [...filtered, { sender: agentName, content: res.response, isAgent: true }];
+      });
+    } catch (err: any) {
+      console.error("Agent chat failed:", err);
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => m.content !== "正在研判盘面与筹码分布，请稍候...");
+        return [...filtered, { sender: agentName, content: `质询请求失败: ${err.message || err}`, isAgent: true }];
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,7 +65,8 @@ export function AgentChatConsole() {
         <select
           value={selectedAgent}
           onChange={(e) => setSelectedAgent(e.target.value)}
-          className="text-[9px] bg-slate-100 dark:bg-[#12121e] border border-slate-200 dark:border-[#222233] rounded px-1.5 py-0.5 text-slate-700 dark:text-slate-350 focus:outline-none"
+          disabled={isLoading}
+          className="text-[9px] bg-slate-100 dark:bg-[#12121e] border border-slate-200 dark:border-[#222233] rounded px-1.5 py-0.5 text-slate-700 dark:text-slate-350 focus:outline-none disabled:opacity-50"
         >
           <option value="yuzi">游资·游侠 (Agent)</option>
           <option value="beixiang">北向资金 (Agent)</option>
@@ -94,12 +102,14 @@ export function AgentChatConsole() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={`向 ${selectedAgent === "yuzi" ? "游资·游侠" : "北向资金"} 提问板块或个股主力动向...`}
-          className="flex-1 text-[10px] bg-slate-50 dark:bg-[#12121e] border border-slate-200 dark:border-[#222233] px-2.5 py-1.5 rounded text-slate-800 dark:text-slate-350 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-[#00abc0] dark:focus:border-[#00e5ff]"
+          disabled={isLoading}
+          placeholder={isLoading ? "请等待智能体分析中..." : `向 ${selectedAgent === "yuzi" ? "游资·游侠" : "北向资金"} 提问板块或个股主力动向...`}
+          className="flex-1 text-[10px] bg-slate-50 dark:bg-[#12121e] border border-slate-200 dark:border-[#222233] px-2.5 py-1.5 rounded text-slate-800 dark:text-slate-350 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-[#00abc0] dark:focus:border-[#00e5ff] disabled:opacity-60"
         />
         <button
           type="submit"
-          className="bg-rose-600 dark:bg-[#ff3366] hover:bg-rose-700 dark:hover:bg-[#ff1a53] text-white px-2.5 py-1 rounded flex items-center justify-center transition-colors"
+          disabled={isLoading || !input.trim()}
+          className="bg-rose-600 dark:bg-[#ff3366] hover:bg-rose-700 dark:hover:bg-[#ff1a53] text-white px-2.5 py-1 rounded flex items-center justify-center transition-colors disabled:opacity-50"
         >
           <Send className="h-3 w-3" />
         </button>

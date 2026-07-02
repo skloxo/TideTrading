@@ -270,6 +270,15 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(layout),
     }),
+  getDashboardGraph: () => request<any>("/settings/dashboard/graph"),
+  getDashboardReactLogs: () => request<any[]>("/settings/dashboard/react-logs?stream=false"),
+  getDashboardReactLogsStreamUrl: () => withAuthQuery(`${BASE}/settings/dashboard/react-logs`),
+  getDashboardMarketData: () => request<any>("/settings/dashboard/market-data"),
+  sendAgentChatMessage: (agent_id: string, message: string) =>
+    request<{ response: string }>("/settings/dashboard/agent-chat", {
+      method: "POST",
+      body: JSON.stringify({ agent_id, message }),
+    }),
   getMonitorStats: () => request<MonitorStats>("/admin/monitor/stats"),
   getMonitorLogs: (params?: { limit?: number; level?: string; keyword?: string }) => {
     const q = new URLSearchParams();

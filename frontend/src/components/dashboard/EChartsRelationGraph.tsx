@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as echarts from "echarts";
+import { api } from "../../lib/api";
 
 interface EChartsRelationGraphProps {
   onSelectNode: (nodeName: string | null) => void;
@@ -9,13 +10,100 @@ interface EChartsRelationGraphProps {
 export function EChartsRelationGraph({ onSelectNode, activeNode }: EChartsRelationGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
+  const [graphData, setGraphData] = useState<{ nodes: any[]; links: any[] } | null>(null);
 
+  // Fetch graph data from backend
   useEffect(() => {
-    if (!containerRef.current) return;
+    let active = true;
+    const fetchData = async () => {
+      try {
+        const res = await api.getDashboardGraph();
+        if (active && res) {
+          setGraphData(res);
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard graph:", err);
+      }
+    };
+    fetchData();
+    // Poll every 5 seconds for simulation updates
+    const interval = setInterval(fetchData, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
-    // Initialize ECharts instance
-    const chart = echarts.init(containerRef.current);
+  // Dispose chart on unmount
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.dispose();
+      }
+    };
+  }, []);
+
+  // Update chart when graphData changes
+  useEffect(() => {
+    if (!containerRef.current || !graphData) return;
+
+    const chart = chartRef.current || echarts.init(containerRef.current);
     chartRef.current = chart;
+
+    const categories = [
+      { name: "题材板块" },
+      { name: "热门个股" },
+      { name: "AI智能体" },
+    ];
+
+    const formattedNodes = graphData.nodes.map((node: any) => {
+      let category = 1;
+      let symbolSize = 26;
+      let defaultColor = "#ff3366";
+      let borderColor = "rgba(255,51,102,0.4)";
+      let borderWidth = 3;
+
+      if (node.categoryName === "题材板块") {
+        category = 0;
+        symbolSize = 34;
+        defaultColor = "#e5a93c";
+        borderColor = "rgba(229,169,60,0.4)";
+        borderWidth = 4;
+      } else if (node.categoryName === "AI智能体") {
+        category = 2;
+        symbolSize = 30;
+        defaultColor = "#00e5ff";
+        borderColor = "rgba(0,229,255,0.4)";
+        borderWidth = 4;
+      }
+
+      return {
+        id: node.id,
+        name: node.name,
+        value: node.value || "",
+        category,
+        categoryName: node.categoryName,
+        symbolSize,
+        itemStyle: {
+          color: node.itemStyle?.color || defaultColor,
+          borderColor,
+          borderWidth,
+        }
+      };
+    });
+
+    const formattedLinks = graphData.links.map((link: any) => {
+      const isAgent = link.source.includes("yuzi") || link.source.includes("beixiang") || link.source.includes("bull") || link.source.includes("bear") || link.source.includes("pm") || link.source.includes("conductor") || link.source.includes("analyst");
+      return {
+        source: link.source,
+        target: link.target,
+        lineStyle: {
+          width: (link.weight || 0.5) * 3,
+          type: isAgent ? "dashed" : "solid",
+          color: isAgent ? "rgba(0,229,255,0.6)" : "rgba(255,51,102,0.6)"
+        }
+      };
+    });
 
     const option: any = {
       backgroundColor: "transparent",
@@ -27,7 +115,7 @@ export function EChartsRelationGraph({ onSelectNode, activeNode }: EChartsRelati
             return `<div style="background:#11111e;border:1px solid #333344;padding:8px;border-radius:4px;color:#fff;font-size:11px;">
               <span style="font-weight:bold;color:${data.itemStyle?.color || '#00e5ff'}">${data.name}</span><br/>
               类型: ${data.categoryName}<br/>
-              资金流: ${data.value}
+              详情: ${data.value || "无数据"}
             </div>`;
           }
           return "";
@@ -58,127 +146,9 @@ export function EChartsRelationGraph({ onSelectNode, activeNode }: EChartsRelati
             edgeLength: 75,
             gravity: 0.1,
           },
-          categories: [
-            { name: "题材板块" },
-            { name: "热门个股" },
-            { name: "AI智能体" },
-          ],
-          nodes: [
-            {
-              id: "low-alt",
-              name: "低空经济",
-              value: "主买+3.4亿",
-              category: 0,
-              categoryName: "题材板块",
-              symbolSize: 34,
-              itemStyle: {
-                color: "#e5a93c",
-                borderColor: "rgba(229,169,60,0.4)",
-                borderWidth: 4,
-              },
-            },
-            {
-              id: "ai-count",
-              name: "AI算力",
-              value: "主买+4.1亿",
-              category: 0,
-              categoryName: "题材板块",
-              symbolSize: 34,
-              itemStyle: {
-                color: "#e5a93c",
-                borderColor: "rgba(229,169,60,0.4)",
-                borderWidth: 4,
-              },
-            },
-            {
-              id: "wanfeng",
-              name: "万丰奥威",
-              value: "净流入+1.2亿",
-              category: 1,
-              categoryName: "热门个股",
-              symbolSize: 26,
-              itemStyle: {
-                color: "#ff3366",
-                borderColor: "rgba(255,51,102,0.4)",
-                borderWidth: 3,
-              },
-            },
-            {
-              id: "ningde",
-              name: "宁德时代",
-              value: "净流入+2.8亿",
-              category: 1,
-              categoryName: "热门个股",
-              symbolSize: 26,
-              itemStyle: {
-                color: "#ff3366",
-                borderColor: "rgba(255,51,102,0.4)",
-                borderWidth: 3,
-              },
-            },
-            {
-              id: "byd",
-              name: "比亚迪",
-              value: "净流出-4500万",
-              category: 1,
-              categoryName: "热门个股",
-              symbolSize: 26,
-              itemStyle: {
-                color: "#00ff88",
-                borderColor: "rgba(0,255,136,0.4)",
-                borderWidth: 3,
-              },
-            },
-            {
-              id: "fulan",
-              name: "工业富联",
-              value: "净流入+1.9亿",
-              category: 1,
-              categoryName: "热门个股",
-              symbolSize: 26,
-              itemStyle: {
-                color: "#ff3366",
-                borderColor: "rgba(255,51,102,0.4)",
-                borderWidth: 3,
-              },
-            },
-            {
-              id: "yuzi",
-              name: "游资·游侠",
-              value: "多头倾向",
-              category: 2,
-              categoryName: "AI智能体",
-              symbolSize: 30,
-              itemStyle: {
-                color: "#00e5ff",
-                borderColor: "rgba(0,229,255,0.4)",
-                borderWidth: 4,
-              },
-            },
-            {
-              id: "beixiang",
-              name: "北向资金",
-              value: "做多动向",
-              category: 2,
-              categoryName: "AI智能体",
-              symbolSize: 30,
-              itemStyle: {
-                color: "#00e5ff",
-                borderColor: "rgba(0,229,255,0.4)",
-                borderWidth: 4,
-              },
-            },
-          ],
-          links: [
-            { source: "low-alt", target: "wanfeng", lineStyle: { width: 3, color: "rgba(255,51,102,0.6)" } },
-            { source: "low-alt", target: "ningde", lineStyle: { width: 2, color: "rgba(255,51,102,0.4)" } },
-            { source: "low-alt", target: "byd", lineStyle: { width: 1.5, color: "rgba(0,255,136,0.3)" } },
-            { source: "ai-count", target: "fulan", lineStyle: { width: 3, color: "rgba(255,51,102,0.6)" } },
-            { source: "yuzi", target: "wanfeng", lineStyle: { width: 2.5, type: "dashed", color: "rgba(0,229,255,0.6)" } },
-            { source: "yuzi", target: "low-alt", lineStyle: { width: 2, type: "dashed", color: "rgba(0,229,255,0.5)" } },
-            { source: "beixiang", target: "ningde", lineStyle: { width: 2.5, type: "dashed", color: "rgba(0,229,255,0.6)" } },
-            { source: "beixiang", target: "byd", lineStyle: { width: 1.5, type: "dashed", color: "rgba(0,229,255,0.4)" } },
-          ],
+          categories,
+          nodes: formattedNodes,
+          links: formattedLinks,
           label: {
             show: true,
             position: "bottom",
@@ -206,7 +176,6 @@ export function EChartsRelationGraph({ onSelectNode, activeNode }: EChartsRelati
 
     chart.setOption(option);
 
-    // Click handler
     chart.on("click", (params: any) => {
       if (params.dataType === "node") {
         onSelectNode(params.data.id);
@@ -220,10 +189,9 @@ export function EChartsRelationGraph({ onSelectNode, activeNode }: EChartsRelati
     window.addEventListener("resize", handleResize);
 
     return () => {
-      chart.dispose();
       window.removeEventListener("resize", handleResize);
     };
-  }, [onSelectNode]);
+  }, [graphData, onSelectNode]);
 
   // Handle activeNode highlighting externally
   useEffect(() => {

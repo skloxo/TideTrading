@@ -56,6 +56,7 @@
 
 ## 📰 News
 
+- **2026-07-02** 🧬 **v0.1.10-s4 — 共享数据大底座与本地客户端零延迟冷启动**：实装了全新的双层数据库路由架构，将多租户私有层（自选股/回测记录）与共享公开层（历史 K 线/财务基本面）彻底解耦，保障高并发回测安全隔离。实装通达信（TDX）本地二进制行情高速导入器（WAL 模式写入速度达每秒 2.8 万条，全大盘回填 550 万条历史日线），支持沪深、北交所（BJ）以及概念板块指数（DS）全币种全交易所数据。同时，i18n 优化了新访客自动识别拦截器，首屏 100% 默认展现中文化看板界面。
 - **2026-06-26** 🛡️ **v0.1.10-s3 — 多租户隔离加固与局域网Host头自动安全提权**：在多租户环境中实现了更严格的文件与执行沙箱隔离（限制于租户私有目录且常规租户强制关闭 BashTool 以防提权与目录遍历逃逸）。引入了基于 HTTP `Host` 请求头的局域网/本地环境可信自动提权机制，杜绝公网端口转发下的伪造提权；为飞书多通道及配置视图提供完整双向支持。
 - **2026-06-23** 🛡️ **本地 API CSRF 加固**：恶意网页不再能对环回（loopback）API 发起不安全的跨站请求（POST/PUT/DELETE）——CORS 只挡响应读取、挡不住副作用，因此环回 dev-mode 信任现在会在放行**之前**先对不安全方法应用既有的跨站防护。安全方法与本地 CLI / 非浏览器上传不受影响（[#293](https://github.com/HKUDS/Vibe-Trading/pull/293)，感谢 @Hinotoi-agent）。
 - **2026-06-22** 🔧 **Live 授权 OAuth 修复 + Alpha Zoo 标题修复**：`connector authorize` 现在能在长达数分钟的券商登录期间保持 OAuth 握手不断开（可通过 `VIBE_LIVE_AUTHORIZE_TIMEOUT_SECONDS` 调整），且重试时不再另起一个抢占式回调服务器，token 终于能正确保存（[#281](https://github.com/HKUDS/Vibe-Trading/pull/281)，关闭 [#259](https://github.com/HKUDS/Vibe-Trading/issues/259)，感谢 @Robin1987China）。Alpha Zoo 页面不再把 alpha 数量渲染两次（[#287](https://github.com/HKUDS/Vibe-Trading/pull/287)，关闭 [#286](https://github.com/HKUDS/Vibe-Trading/issues/286)，感谢 @digger-yu）。定时研究也补上了端到端使用文档（[#288](https://github.com/HKUDS/Vibe-Trading/pull/288)）。

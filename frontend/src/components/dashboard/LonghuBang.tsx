@@ -7,13 +7,19 @@ interface LonghuItem {
   yuziSeat: string; // 知名买入席位
 }
 
-export function LonghuBang() {
-  const items: LonghuItem[] = [
+interface LonghuBangProps {
+  data?: LonghuItem[];
+}
+
+export function LonghuBang({ data }: LonghuBangProps) {
+  const defaultItems: LonghuItem[] = [
     { code: "301550", name: "万丰奥威", reason: "三日涨幅达20%", netAmount: 18500, instBuyCount: 2, yuziSeat: "中信证券西安朱雀大街" },
     { code: "601138", name: "工业富联", reason: "日涨幅偏离值达7%", netAmount: 12400, instBuyCount: 3, yuziSeat: "国泰君安上海分公司" },
     { code: "000063", name: "中兴通讯", reason: "日涨幅偏离值达7%", netAmount: 8900, instBuyCount: 1, yuziSeat: "东方财富拉萨团结路" },
     { code: "300496", name: "中科创达", reason: "日跌幅偏离值达-7%", netAmount: -4200, instBuyCount: 0, yuziSeat: "申万宏源上海分公司" }
   ];
+
+  const items = data && data.length > 0 ? data : defaultItems;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">

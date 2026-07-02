@@ -4,17 +4,29 @@ interface StockItem {
   price: number;
   change: number;
   boardCount: number;
-  status: "limit_up" | "limit_down" | "normal";
+  status?: "limit_up" | "limit_down" | "normal";
 }
 
-export function LimitUpBoard() {
-  const stockList: StockItem[] = [
-    { code: "300750", name: "宁德时代", price: 218.40, change: 20.00, boardCount: 2, status: "limit_up" },
-    { code: "600519", name: "贵州茅台", price: 1650.00, change: 10.02, boardCount: 1, status: "limit_up" },
-    { code: "301550", name: "万丰奥威", price: 16.28, change: 10.00, boardCount: 3, status: "limit_up" },
-    { code: "601138", name: "工业富联", price: 24.75, change: 10.01, boardCount: 1, status: "limit_up" },
-    { code: "000063", name: "中兴通讯", price: 29.81, change: 10.00, boardCount: 1, status: "limit_up" },
+interface LimitUpBoardProps {
+  data?: any[];
+}
+
+export function LimitUpBoard({ data }: LimitUpBoardProps) {
+  const defaultStockList: StockItem[] = [
+    { code: "300750", name: "宁德时代", price: 218.40, change: 20.00, boardCount: 2 },
+    { code: "600519", name: "贵州茅台", price: 1650.00, change: 10.02, boardCount: 1 },
+    { code: "301550", name: "万丰奥威", price: 16.28, change: 10.00, boardCount: 3 },
+    { code: "601138", name: "工业富联", price: 24.75, change: 10.01, boardCount: 1 },
+    { code: "000063", name: "中兴通讯", price: 29.81, change: 10.00, boardCount: 1 },
   ];
+
+  const stockList: StockItem[] = data && data.length > 0 ? data.map((item: any) => ({
+    code: item.code,
+    name: item.name,
+    price: item.price,
+    change: item.change,
+    boardCount: item.count || 1
+  })) : defaultStockList;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 flex flex-col h-full overflow-hidden rounded shadow-sm dark:shadow-none">

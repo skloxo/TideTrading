@@ -385,6 +385,18 @@ def run_worker(
     artifact_dir = run_dir / "artifacts" / agent_id
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
+    # Initialize Graph Manager and Report Logger for ReACT Dashboard integration
+    from src.config.paths import active_tenant_var
+    from src.swarm.report_logger import ReportLogger
+    from src.swarm.simulation_graph import SimulationGraphManager
+    tenant = active_tenant_var.get()
+    report_logger = ReportLogger(tenant)
+    graph_manager = SimulationGraphManager(tenant)
+    report_logger.clear_logs()
+    
+    # Register the agent itself in the graph nodes
+    graph_manager.add_node(agent_id, agent_spec.name or agent_id, "AI智能体", value=f"模型: {agent_spec.model_name or 'default'}", color="#00e5ff")
+
     t0 = time.monotonic()
     iteration = 0
     summary = ""
@@ -608,11 +620,20 @@ def run_worker(
 
         consecutive_content_filter_count = 0
 
+        # Log thought to ReACT Dashboard ReportLogger
+        if response.reasoning_content:
+            report_logger.log_thought(response.reasoning_content, section_title=agent_spec.name)
+        elif response.content:
+            report_logger.log_thought(response.content, section_title=agent_spec.name)
+
         # If no tool calls, this is the final response
         if not response.has_tool_calls:
             summary = response.content or last_assistant_content or "(no summary)"
             summary = _resolve_summary(artifact_dir, summary)
             _write_summary(artifact_dir, summary)
+            
+            # Log final decision to ReACT Dashboard ReportLogger
+            report_logger.log_decision(summary, section_title=agent_spec.name)
             reason = _classify_deliverable(
                 summary,
                 is_data_agent=_is_data_agent(agent_spec),
@@ -659,6 +680,17 @@ def run_worker(
         # Execute each tool call — inject run_dir so tools write inside artifact_dir
         for tc in response.tool_calls:
             mcp_meta = _remote_tool_metadata(registry, tc.name)
+            
+            # Log tool call to ReACT Dashboard ReportLogger
+            report_logger.log_tool_call(tc.name, tc.arguments, section_title=agent_spec.name)
+            
+            # Dynamic graph node and edge injection
+            symbol = tc.arguments.get("symbol") or tc.arguments.get("ticker")
+            if symbol and isinstance(symbol, str):
+                symbol_clean = symbol.strip().upper()
+                graph_manager.add_node(symbol_clean, symbol_clean, "热门个股", value=f"工具分析: {tc.name}", color="#00ff88")
+                graph_manager.add_link(agent_id, symbol_clean, weight=0.8)
+
             _emit(
                 event_callback, "tool_call", agent_id, task_id,
                 {"tool": tc.name, "iteration": iteration,
@@ -687,6 +719,10 @@ def run_worker(
                 emit=_on_heartbeat,
             ):
                 result = registry.execute(tc.name, args)
+            
+            # Log observation to ReACT Dashboard ReportLogger
+            report_logger.log_observation(str(result)[:1000], section_title=agent_spec.name)
+
             if tc.name != "load_skill" and not _is_error_result(result):
                 data_tool_calls += 1
             tc_elapsed = time.monotonic() - tc_start

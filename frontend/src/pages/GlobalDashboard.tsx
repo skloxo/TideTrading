@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { 
   Cpu, Terminal, Settings, Check, Lock, Unlock, Grid
 } from "lucide-react";
-import RGL, { Responsive } from "react-grid-layout";
+import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import { api } from "@/lib/api";
 
 import "react-grid-layout/css/styles.css";
@@ -26,7 +26,7 @@ import { EChartsRelationGraph } from "@/components/dashboard/EChartsRelationGrap
 import { ReActTimeline } from "@/components/dashboard/ReActTimeline";
 import { AgentChatConsole } from "@/components/dashboard/AgentChatConsole";
 
-const ResponsiveGridLayout = (RGL as any).WidthProvider(Responsive);
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 interface TerminalLog {
   time: string;
@@ -101,6 +101,28 @@ export function GlobalDashboard() {
       });
     return () => { alive = false; };
   }, [currentTenant]);
+
+  const [marketData, setMarketData] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchMarket = async () => {
+      try {
+        const res = await api.getDashboardMarketData();
+        if (active && res) {
+          setMarketData(res);
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard market data:", err);
+      }
+    };
+    fetchMarket();
+    const interval = setInterval(fetchMarket, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Map of tenant roles to allowed widgets
   const TENANT_WIDGETS: Record<string, string[]> = {
@@ -374,7 +396,7 @@ export function GlobalDashboard() {
           {enabledWidgets.watchlist && isWidgetAllowed("watchlist") && (
             <div key="watchlist" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <Watchlist />
+              <Watchlist data={marketData?.watchlist} />
             </div>
           )}
 
@@ -382,7 +404,7 @@ export function GlobalDashboard() {
           {enabledWidgets.limitUp && isWidgetAllowed("limitUp") && (
             <div key="limitUp" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <LimitUpBoard />
+              <LimitUpBoard data={marketData?.limitup} />
             </div>
           )}
 
@@ -398,7 +420,7 @@ export function GlobalDashboard() {
           {enabledWidgets.popular && isWidgetAllowed("popular") && (
             <div key="popular" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <PopularStocks />
+              <PopularStocks data={marketData?.watchlist} />
             </div>
           )}
 
@@ -406,7 +428,7 @@ export function GlobalDashboard() {
           {enabledWidgets.sentiment && isWidgetAllowed("sentiment") && (
             <div key="sentiment" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <MarketSentiment />
+              <MarketSentiment score={marketData?.sentiment?.score} description={marketData?.sentiment?.description} />
             </div>
           )}
 
@@ -414,7 +436,7 @@ export function GlobalDashboard() {
           {enabledWidgets.fundFlows && isWidgetAllowed("fundFlows") && (
             <div key="fundFlows" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <FundFlows />
+              <FundFlows data={marketData?.sectors} />
             </div>
           )}
 
@@ -422,7 +444,7 @@ export function GlobalDashboard() {
           {enabledWidgets.concepts && isWidgetAllowed("concepts") && (
             <div key="concepts" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <ConceptRotation />
+              <ConceptRotation data={marketData?.sectors} />
             </div>
           )}
 
@@ -430,7 +452,7 @@ export function GlobalDashboard() {
           {enabledWidgets.longhu && isWidgetAllowed("longhu") && (
             <div key="longhu" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <LonghuBang />
+              <LonghuBang data={marketData?.longhu} />
             </div>
           )}
 

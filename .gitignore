@@ -121,3 +121,12 @@ get_cookie.py
 REPOSITORIES_STATUS.md
 
 
+
+# === Data Governance DB Rules ===
+# Runtime databases (Docker volume, never commit)
+*.db
+!data/stocks_seed.db
+
+# Ensure data/ seed file is tracked normally
+!data/
+!data/.gitkeep

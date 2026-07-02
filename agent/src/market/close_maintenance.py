@@ -84,52 +84,90 @@ class CloseDataMaintenanceService:
                 await asyncio.sleep(60)
 
     async def _execute_maintenance(self):
-        logger.info("[CloseMaintenance] 开始扫描各租户数据库，执行收盘数据全量维护与对账任务...")
-        from src.config.paths import get_runtime_root
-        
-        runtime_root = get_runtime_root()
-        db_files = list(runtime_root.glob("stocks_*.db"))
-        
-        if not db_files:
-            logger.info("[CloseMaintenance] 未发现 stocks_*.db 租户数据库，将对默认租户 default 进行维护")
-            db_files = [runtime_root / "stocks_default.db"]
-            
-        loop = asyncio.get_running_loop()
-        for db_file in db_files:
-            tenant_id = db_file.stem.replace("stocks_", "")
-            logger.info(f"[CloseMaintenance] 启动租户 {tenant_id} 的同步对账自愈...")
-            # Run the synchronization in the thread executor to avoid blocking the event loop
-            await loop.run_in_executor(None, self._run_sync_script_with_retry, tenant_id)
+        logger.info("[CloseMaintenance] 开始执行收盘数据全量维护（公共市场数据层）...")
+        from src.config.paths import get_market_db_path
 
-    def _run_sync_script_with_retry(self, tenant_id: str) -> bool:
+        market_db = get_market_db_path()
+        logger.info(f"[CloseMaintenance] 共享市场数据库: {market_db}")
+
+        # 市场数据是全租户共享的，只需维护一次 stocks_market.db
+        # 不再按租户循环（原设计错误：重复拉取相同公开数据）
+        loop = asyncio.get_running_loop()
+
+        # ① 每日：全市场 K线 + 估值 + 资金流（增量，~60-90分钟）
+        logger.info("[CloseMaintenance] 启动全市场日线/估值/资金流同步（stocks_market.db）...")
+        await loop.run_in_executor(None, self._run_sync_script_with_retry, "default", "daily")
+
+        # ② 每日：情绪面（龙虎榜 + 涨停板 + 北向，~20分钟）
+        await loop.run_in_executor(None, self._run_sync_script_with_retry, "default", "sentiment")
+
+        # ③ 每周日：基本面（财务指标 + 分红 + 股东，~3-4小时）
+        now = datetime.now()
+        if now.weekday() == 6:  # Sunday
+            logger.info("[CloseMaintenance] 今日为周日，启动基本面深度同步（stocks_market.db）...")
+            await loop.run_in_executor(None, self._run_sync_script_with_retry, "default", "weekly")
+
+
+
+    def _run_sync_script_with_retry(self, tenant_id: str, mode: str = "daily") -> bool:
+        """
+        Run data sync for a given tenant.
+
+        mode:
+          'daily'      — Full market kline/valuation/capital_flow (all ~5300 stocks, incremental)
+          'weekly'     — Full market fundamentals (financial indicators, dividends, shareholders)
+          'sentiment'  — Full market sentiment (longhu, limit-up, northbound)
+        """
         script_path = Path(__file__).parent.parent.parent / "scripts" / "initialize_history_data.py"
         max_attempts = 3
         delay = 5.0
-        
+
+        # Build arguments based on mode
+        base_args = [sys.executable, str(script_path), "--tenant", tenant_id, "--years", "1", "--all"]
+        if mode == "daily":
+            # Daily: kline + valuation + capital_flow for all stocks (incremental, fast per-stock)
+            cmd_args = base_args  # default: no --fundamentals, no --sentiment
+        elif mode == "weekly":
+            # Weekly: fundamentals (ROE/margins/dividends/shareholders) — slower, runs Sunday nights
+            cmd_args = base_args + ["--skip-kline", "--fundamentals"]
+        elif mode == "sentiment":
+            # Sentiment: longhu + limit-up + northbound — runs every evening too
+            cmd_args = base_args + ["--skip-kline", "--sentiment"]
+        else:
+            cmd_args = base_args
+
         for attempt in range(1, max_attempts + 1):
             try:
-                logger.info(f"[CloseMaintenance] 运行数据同步脚本 (租户: {tenant_id}, 尝试: {attempt}/{max_attempts})...")
-                # Run script with tenant arg and backfill 1 year for daily maintenance
+                logger.info(
+                    f"[CloseMaintenance] 运行数据同步脚本 "
+                    f"(租户: {tenant_id}, 模式: {mode}, 尝试: {attempt}/{max_attempts}) "
+                    f"覆盖全市场 ~5300 只股票..."
+                )
                 result = subprocess.run(
-                    [sys.executable, str(script_path), "--tenant", tenant_id, "--years", "1"],
+                    cmd_args,
                     capture_output=True,
-                    text=True
+                    text=True,
+                    timeout=7200,  # 2-hour timeout for full market sync
                 )
                 if result.returncode == 0:
-                    logger.info(f"[CloseMaintenance] 租户 {tenant_id} 同步脚本在尝试 {attempt} 成功执行")
+                    logger.info(f"[CloseMaintenance] 租户 {tenant_id} [{mode}] 同步成功 (尝试 {attempt})")
                     return True
                 else:
-                    logger.error(f"[CloseMaintenance] 租户 {tenant_id} 同步脚本失败 (错误码: {result.returncode}):\n{result.stderr}")
+                    logger.error(
+                        f"[CloseMaintenance] 租户 {tenant_id} [{mode}] 同步失败 "
+                        f"(错误码: {result.returncode}):\n{result.stderr[-2000:]}"
+                    )
+            except subprocess.TimeoutExpired:
+                logger.error(f"[CloseMaintenance] 租户 {tenant_id} [{mode}] 同步超时 (>2h)")
             except Exception as e:
-                logger.exception(f"[CloseMaintenance] 执行租户 {tenant_id} 同步脚本发生异常: %s", e)
-                
+                logger.exception(f"[CloseMaintenance] 执行租户 {tenant_id} [{mode}] 同步脚本发生异常: %s", e)
+
             if attempt < max_attempts:
                 wait_time = delay * (2 ** (attempt - 1))
                 logger.info(f"[CloseMaintenance] 将在 {wait_time:.1f} 秒后重试...")
                 time.sleep(wait_time)
-                
-        # Send Feishu Webhook Alert if all attempts failed
-        logger.error(f"[CloseMaintenance] 租户 {tenant_id} 的收盘同步任务连续 {max_attempts} 次失败，触发报警！")
+
+        logger.error(f"[CloseMaintenance] 租户 {tenant_id} [{mode}] 连续 {max_attempts} 次失败，触发报警！")
         self._send_feishu_alert(tenant_id)
         return False
 

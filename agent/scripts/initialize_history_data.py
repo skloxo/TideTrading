@@ -266,6 +266,177 @@ CREATE_TABLES_SQL = {
             margin_short_balance REAL,
             UNIQUE(code, date)
         );
+    """,
+    "company_profile": """
+        CREATE TABLE IF NOT EXISTS company_profile (
+            code TEXT PRIMARY KEY,
+            full_name TEXT,
+            english_name TEXT,
+            chairman TEXT,
+            secretary TEXT,
+            registered_capital REAL,
+            employees INTEGER,
+            main_business TEXT,
+            business_scope TEXT,
+            province TEXT,
+            city TEXT,
+            address TEXT,
+            phone TEXT,
+            website TEXT,
+            listing_date TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    """,
+    "financial_income": """
+        CREATE TABLE IF NOT EXISTS financial_income (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            period TEXT NOT NULL,
+            report_type TEXT,
+            revenue REAL,
+            gross_profit REAL,
+            op_profit REAL,
+            net_profit REAL,
+            net_profit_excl REAL,
+            eps REAL,
+            yoy_revenue REAL,
+            yoy_profit REAL,
+            UNIQUE(code, period)
+        );
+    """,
+    "financial_balance": """
+        CREATE TABLE IF NOT EXISTS financial_balance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            period TEXT NOT NULL,
+            total_assets REAL,
+            total_liab REAL,
+            equity REAL,
+            cash REAL,
+            receivable REAL,
+            inventory REAL,
+            fixed_assets REAL,
+            UNIQUE(code, period)
+        );
+    """,
+    "financial_cashflow": """
+        CREATE TABLE IF NOT EXISTS financial_cashflow (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            period TEXT NOT NULL,
+            op_cashflow REAL,
+            inv_cashflow REAL,
+            fin_cashflow REAL,
+            net_cashflow REAL,
+            free_cashflow REAL,
+            UNIQUE(code, period)
+        );
+    """,
+    "financial_indicator": """
+        CREATE TABLE IF NOT EXISTS financial_indicator (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            period TEXT NOT NULL,
+            roe REAL,
+            roa REAL,
+            gross_margin REAL,
+            net_margin REAL,
+            debt_ratio REAL,
+            current_ratio REAL,
+            quick_ratio REAL,
+            asset_turnover REAL,
+            eps REAL,
+            bvps REAL,
+            UNIQUE(code, period)
+        );
+    """,
+    "top10_shareholders": """
+        CREATE TABLE IF NOT EXISTS top10_shareholders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            period TEXT NOT NULL,
+            rank INTEGER NOT NULL,
+            holder_name TEXT,
+            hold_shares REAL,
+            hold_ratio REAL,
+            holder_type TEXT,
+            change_type TEXT,
+            UNIQUE(code, period, rank)
+        );
+    """,
+    "dividend_records": """
+        CREATE TABLE IF NOT EXISTS dividend_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            announce_date TEXT,
+            record_date TEXT,
+            ex_div_date TEXT,
+            div_per_share REAL,
+            bonus_share_ratio REAL,
+            allotment_ratio REAL,
+            allotment_price REAL,
+            UNIQUE(code, ex_div_date)
+        );
+    """,
+    "longhu_records": """
+        CREATE TABLE IF NOT EXISTS longhu_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            name TEXT,
+            date TEXT NOT NULL,
+            reason TEXT,
+            net_buy REAL,
+            buy_amount REAL,
+            sell_amount REAL,
+            top_buyer_1 TEXT,
+            top_buyer_2 TEXT,
+            top_seller_1 TEXT,
+            top_seller_2 TEXT,
+            UNIQUE(code, date)
+        );
+    """,
+    "limit_up_records": """
+        CREATE TABLE IF NOT EXISTS limit_up_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            name TEXT,
+            date TEXT NOT NULL,
+            board_count INTEGER,
+            open_count INTEGER,
+            limit_time TEXT,
+            last_open_time TEXT,
+            turnover_rate REAL,
+            free_float_mv REAL,
+            reason TEXT,
+            UNIQUE(code, date)
+        );
+    """,
+    "north_bound_flow": """
+        CREATE TABLE IF NOT EXISTS north_bound_flow (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            date TEXT NOT NULL,
+            hold_shares REAL,
+            hold_ratio REAL,
+            hold_mv REAL,
+            net_buy REAL,
+            UNIQUE(code, date)
+        );
+    """,
+    "block_trade": """
+        CREATE TABLE IF NOT EXISTS block_trade (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            name TEXT,
+            date TEXT NOT NULL,
+            price REAL,
+            volume REAL,
+            amount REAL,
+            buyer TEXT,
+            seller TEXT,
+            discount_pct REAL,
+            UNIQUE(code, date, buyer, seller)
+        );
     """
 }
 
@@ -278,7 +449,19 @@ CREATE_INDEXES_SQL = [
     "CREATE INDEX IF NOT EXISTS idx_theme_code ON theme_mapping(code);",
     "CREATE INDEX IF NOT EXISTS idx_theme_name ON theme_mapping(theme_name);",
     "CREATE INDEX IF NOT EXISTS idx_capital_flow_code_date ON capital_flow(code, date);",
-    "CREATE INDEX IF NOT EXISTS idx_margin_code_date ON margin_trading(code, date);"
+    "CREATE INDEX IF NOT EXISTS idx_margin_code_date ON margin_trading(code, date);",
+    "CREATE INDEX IF NOT EXISTS idx_fin_income_code ON financial_income(code, period);",
+    "CREATE INDEX IF NOT EXISTS idx_fin_balance_code ON financial_balance(code, period);",
+    "CREATE INDEX IF NOT EXISTS idx_fin_cashflow_code ON financial_cashflow(code, period);",
+    "CREATE INDEX IF NOT EXISTS idx_fin_indicator_code ON financial_indicator(code, period);",
+    "CREATE INDEX IF NOT EXISTS idx_top10_holder_code ON top10_shareholders(code, period);",
+    "CREATE INDEX IF NOT EXISTS idx_dividend_code ON dividend_records(code);",
+    "CREATE INDEX IF NOT EXISTS idx_longhu_code_date ON longhu_records(code, date);",
+    "CREATE INDEX IF NOT EXISTS idx_longhu_date ON longhu_records(date);",
+    "CREATE INDEX IF NOT EXISTS idx_limitup_code_date ON limit_up_records(code, date);",
+    "CREATE INDEX IF NOT EXISTS idx_limitup_date ON limit_up_records(date);",
+    "CREATE INDEX IF NOT EXISTS idx_northbound_code_date ON north_bound_flow(code, date);",
+    "CREATE INDEX IF NOT EXISTS idx_blocktrade_code_date ON block_trade(code, date);",
 ]
 
 def init_db(db_path: str):
@@ -365,22 +548,145 @@ def backfill_trade_calendar(db_path: str, start_date: str, end_date: str):
     except Exception as e:
         logger.error(f"Failed to backfill trade calendar: {e}")
 
-def get_active_stocks() -> List[Dict[str, str]]:
-    """Get all active A-share stocks using a stable Sina endpoint."""
-    logger.info("Fetching active A-share stock list...")
+def get_active_stocks(db_path: str = None) -> List[Dict[str, str]]:
+    """
+    Get all active A-share stocks. Uses a multi-source fallback chain:
+      0. TDX local file (tdx_a_shares.json) — parsed from local 通达信 software, zero network needed
+      1. mootdx TCP (direct server IP, avoids auto-discovery ping failure in Docker)
+      2. AKShare SH + SZ spot APIs (separate endpoints)
+      3. AKShare stock_info_a_code_name (needs SZSE access)
+      4. Extract from local theme_mapping table (guaranteed fallback if market data available)
+    """
+    logger.info("Fetching active A-share stock list (multi-source fallback)...")
+
+    # Source 0: TDX local file (pre-generated from local 通达信/同花顺 software)
+    # This file contains 5156 A-shares parsed from shs.tnf + szs.tnf — no network required.
+    # File is generated by: scripts/update_tdx_stock_list.py
+    try:
+        import json as _json
+        _tdx_candidates = [
+            Path.home() / ".vibe-trading-cnx" / "tdx_a_shares.json",
+            Path(__file__).parent.parent / "data" / "tdx_a_shares.json",
+        ]
+        for _tdx_path in _tdx_candidates:
+            if _tdx_path.exists():
+                with open(_tdx_path, 'r', encoding='utf-8') as _f:
+                    _tdx_data = _json.load(_f)
+                _stocks = _tdx_data.get('stocks', [])
+                if len(_stocks) > 1000:
+                    logger.info(f"[Source 0 TDX] Loaded {len(_stocks)} A-shares from local TDX file: {_tdx_path}")
+                    return [{'code': s['code'], 'name': s['name']} for s in _stocks]
+    except Exception as _e:
+        logger.debug(f"TDX local file source failed: {_e}")
+
+    # Source 1: mootdx with direct server IP (avoids factory() auto-discovery)
+    MOOTDX_SERVERS = [
+        ('119.147.212.81', 7709),
+        ('121.14.110.194', 7709),
+        ('114.80.149.11',  7709),
+        ('202.108.253.130', 7709),
+    ]
+    for server_ip, server_port in MOOTDX_SERVERS:
+        try:
+            from mootdx.quotes import StdQuotes
+            client = StdQuotes(server=server_ip, port=server_port, timeout=10)
+            stocks = []
+            for market_id in [0, 1]:  # 0=SZ, 1=SH
+                try:
+                    count = client.count(market=market_id)
+                    if not count or count < 100:
+                        continue
+                    for start in range(0, min(count, 10000), 1000):
+                        items = client.stocks(market=market_id, offset=start, count=1000)
+                        if items is not None:
+                            for item in items:
+                                code = str(item.get('code', '')).strip().zfill(6)
+                                name = str(item.get('name', '')).strip()
+                                if code and name and code.isdigit():
+                                    stocks.append({'code': code, 'name': name})
+                except Exception:
+                    pass
+            client.close()
+            if len(stocks) > 100:
+                seen = set()
+                unique = []
+                for s in stocks:
+                    if s['code'] not in seen:
+                        seen.add(s['code'])
+                        unique.append(s)
+                logger.info(f"mootdx ({server_ip}): Found {len(unique)} A-share stocks.")
+                return unique
+        except Exception as e:
+            logger.debug(f"mootdx {server_ip} failed: {e}")
+    logger.warning("All mootdx servers failed, trying HTTP sources...")
+
+
+
+    # Source 2: AKShare SH + SZ spot (separate endpoints, avoid szse.cn)
+    try:
+        stocks = []
+        for fn_name in ['stock_sh_a_spot_em', 'stock_sz_a_spot_em']:
+            try:
+                fn = getattr(ak, fn_name, None)
+                if fn is None:
+                    continue
+                df = fetch_with_retry(fn)
+                if df is not None and not df.empty:
+                    code_col = '代码' if '代码' in df.columns else df.columns[0]
+                    name_col = '名称' if '名称' in df.columns else df.columns[1]
+                    for _, row in df.iterrows():
+                        code = str(row[code_col]).strip().zfill(6)
+                        name = str(row[name_col]).strip()
+                        if code.isdigit():
+                            stocks.append({'code': code, 'name': name})
+            except Exception as ex:
+                logger.debug(f"AKShare {fn_name} failed: {ex}")
+        if len(stocks) > 100:
+            seen = set()
+            unique = [s for s in stocks if s['code'] not in seen and not seen.add(s['code'])]  # type: ignore[func-returns-value]
+            logger.info(f"AKShare SH+SZ: Found {len(unique)} A-share stocks.")
+            return unique
+    except Exception as e:
+        logger.debug(f"AKShare SH+SZ source failed: {e}")
+
+    # Source 3: AKShare combined (may timeout in Docker due to szse.cn block)
     try:
         df = fetch_with_retry(ak.stock_info_a_code_name)
-        if df is not None and not df.empty:
-            stocks = []
-            for _, row in df.iterrows():
-                code = str(row['code']).strip().zfill(6)
-                name = str(row['name']).strip()
-                stocks.append({"code": code, "name": name})
-            logger.info(f"Found {len(stocks)} active A-share stocks.")
+        if df is not None and not df.empty and len(df) > 100:
+            stocks = [
+                {'code': str(row['code']).strip().zfill(6), 'name': str(row['name']).strip()}
+                for _, row in df.iterrows()
+            ]
+            logger.info(f"AKShare combined: Found {len(stocks)} A-share stocks.")
             return stocks
     except Exception as e:
-        logger.error(f"Failed to fetch active stock list: {e}")
+        logger.debug(f"AKShare combined source failed: {e}")
+
+    # Source 4: Extract unique codes from local theme_mapping DB (guaranteed fallback)
+    if db_path and os.path.exists(db_path):
+        try:
+            conn = sqlite3.connect(db_path)
+            rows = conn.execute(
+                "SELECT DISTINCT code FROM theme_mapping WHERE LENGTH(code)=6 ORDER BY code"
+            ).fetchall()
+            conn.close()
+            if rows:
+                # Get names from stock_meta if available
+                conn2 = sqlite3.connect(db_path)
+                meta = {r[0]: r[1] for r in conn2.execute("SELECT code, name FROM stock_meta").fetchall()}
+                conn2.close()
+                stocks = [{'code': r[0], 'name': meta.get(r[0], f'股票{r[0]}')} for r in rows]
+                logger.info(f"DB theme_mapping fallback: Found {len(stocks)} unique stock codes.")
+                return stocks
+        except Exception as e:
+            logger.error(f"DB fallback failed: {e}")
+
+    logger.error("All stock list sources exhausted. Cannot get full market list.")
     return []
+
+
+
+
 
 def calculate_ma(df: pd.DataFrame, window: int) -> pd.Series:
     """Calculate moving average."""
@@ -853,6 +1159,295 @@ def backfill_all_theme_mappings(db_path: str):
     except Exception as e:
         logger.error(f"Failed to run global theme mapping: {e}")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# NEW DATA FETCH FUNCTIONS (Phase 1 P0/P1 expansion)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def backfill_company_profile(db_path: str, code: str) -> None:
+    """Fetch and store company profile from AKShare (东财个股信息)."""
+    try:
+        df = fetch_with_retry(ak.stock_individual_info_em, symbol=code)
+        if df is None or df.empty:
+            return
+        info = {row['item']: row['value'] for _, row in df.iterrows()}
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """INSERT OR REPLACE INTO company_profile
+               (code, full_name, chairman, employees, main_business, province, listing_date, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+            (
+                code,
+                info.get('股票简称') or info.get('公司名称'),
+                info.get('法人代表') or info.get('董事长'),
+                int(str(info.get('员工人数', 0)).replace(',', '') or 0) if info.get('员工人数') else None,
+                info.get('主营业务') or info.get('经营范围'),
+                info.get('所属省份') or info.get('省份'),
+                info.get('上市时间'),
+            )
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"[{code}] Company profile saved.")
+    except Exception as e:
+        logger.warning(f"[{code}] Failed to fetch company profile: {e}")
+
+
+def backfill_financial_indicator(db_path: str, code: str) -> None:
+    """Fetch core financial indicators (ROE/ROA/margins) from AKShare."""
+    try:
+        df = fetch_with_retry(ak.stock_financial_analysis_indicator, symbol=code)
+        if df is None or df.empty:
+            return
+        conn = sqlite3.connect(db_path)
+        records = []
+        for _, row in df.iterrows():
+            period = str(row.get('日期', '')).strip()[:10]
+            if not period:
+                continue
+            records.append((
+                code, period,
+                _safe_float(row.get('加权净资产收益率(%)')),
+                _safe_float(row.get('总资产净利润率(%)')),
+                _safe_float(row.get('销售毛利率(%)')),
+                _safe_float(row.get('销售净利率(%)')),
+                _safe_float(row.get('资产负债率(%)')),
+                _safe_float(row.get('流动比率')),
+                _safe_float(row.get('速动比率')),
+                _safe_float(row.get('总资产周转率(次)')),
+                _safe_float(row.get('基本每股收益(元)')),
+                _safe_float(row.get('每股净资产(元)')),
+            ))
+        conn.executemany(
+            """INSERT OR REPLACE INTO financial_indicator
+               (code, period, roe, roa, gross_margin, net_margin,
+                debt_ratio, current_ratio, quick_ratio, asset_turnover, eps, bvps)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            records
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"[{code}] Financial indicators: {len(records)} periods saved.")
+    except Exception as e:
+        logger.warning(f"[{code}] Failed to fetch financial indicators: {e}")
+
+
+def backfill_dividends(db_path: str, code: str) -> None:
+    """Fetch dividend history from AKShare (CNINFO source)."""
+    try:
+        df = fetch_with_retry(ak.stock_dividend_cninfo, symbol=code)
+        if df is None or df.empty:
+            return
+        conn = sqlite3.connect(db_path)
+        records = []
+        for _, row in df.iterrows():
+            ex_date = str(row.get('除权除息日', '') or row.get('股权登记日', '')).strip()[:10]
+            if not ex_date or ex_date == 'nan':
+                continue
+            records.append((
+                code,
+                str(row.get('公告日期', '')).strip()[:10],
+                str(row.get('股权登记日', '')).strip()[:10],
+                ex_date,
+                _safe_float(row.get('每股派息(税前)(元)') or row.get('每股现金红利(元)')),
+                _safe_float(row.get('每股送股(股)')),
+                _safe_float(row.get('每股转增(股)')),
+                _safe_float(row.get('配股价格(元)')),
+            ))
+        conn.executemany(
+            """INSERT OR IGNORE INTO dividend_records
+               (code, announce_date, record_date, ex_div_date,
+                div_per_share, bonus_share_ratio, allotment_ratio, allotment_price)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            records
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"[{code}] Dividends: {len(records)} records saved.")
+    except Exception as e:
+        logger.warning(f"[{code}] Failed to fetch dividend records: {e}")
+
+
+def backfill_top10_shareholders(db_path: str, code: str) -> None:
+    """Fetch top-10 float shareholders from AKShare (东财)."""
+    try:
+        df = fetch_with_retry(ak.stock_gdfx_free_top_10_em, symbol=code)
+        if df is None or df.empty:
+            return
+        conn = sqlite3.connect(db_path)
+        records = []
+        for _, row in df.iterrows():
+            period = str(row.get('报告期', '')).strip()[:10]
+            rank = int(row.get('名次', 0) or 0)
+            if not period or rank == 0:
+                continue
+            records.append((
+                code, period, rank,
+                str(row.get('股东名称', '')).strip(),
+                _safe_float(row.get('持股数量')),
+                _safe_float(row.get('持股比例')),
+                str(row.get('股东性质', '') or '').strip(),
+                str(row.get('增减', '') or '').strip(),
+            ))
+        conn.executemany(
+            """INSERT OR REPLACE INTO top10_shareholders
+               (code, period, rank, holder_name, hold_shares, hold_ratio, holder_type, change_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            records
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"[{code}] Top-10 shareholders: {len(records)} records saved.")
+    except Exception as e:
+        logger.warning(f"[{code}] Failed to fetch top-10 shareholders: {e}")
+
+
+def backfill_longhu_for_stock(db_path: str, code: str, start_date: str, end_date: str) -> None:
+    """Fetch dragon-tiger board (龙虎榜) history for a specific stock."""
+    try:
+        df = fetch_with_retry(
+            ak.stock_lhb_stock_statistic_um,
+            symbol=code,
+            start_date=start_date.replace('-', ''),
+            end_date=end_date.replace('-', '')
+        )
+        if df is None or df.empty:
+            return
+        conn = sqlite3.connect(db_path)
+        records = []
+        for _, row in df.iterrows():
+            date_str = str(row.get('上榜日期', '') or row.get('日期', '')).strip()[:10]
+            if not date_str or date_str == 'nan':
+                continue
+            records.append((
+                code,
+                str(row.get('股票名称', '') or '').strip(),
+                date_str,
+                str(row.get('上榜原因', '') or '').strip(),
+                _safe_float(row.get('净买入额')),
+                _safe_float(row.get('买入额')),
+                _safe_float(row.get('卖出额')),
+                str(row.get('买方机构1', '') or '').strip(),
+                str(row.get('买方机构2', '') or '').strip(),
+                str(row.get('卖方机构1', '') or '').strip(),
+                str(row.get('卖方机构2', '') or '').strip(),
+            ))
+        conn.executemany(
+            """INSERT OR REPLACE INTO longhu_records
+               (code, name, date, reason, net_buy, buy_amount, sell_amount,
+                top_buyer_1, top_buyer_2, top_seller_1, top_seller_2)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            records
+        )
+        conn.commit()
+        conn.close()
+        if records:
+            logger.info(f"[{code}] Longhu records: {len(records)} entries saved.")
+    except Exception as e:
+        logger.warning(f"[{code}] Failed to fetch longhu records: {e}")
+
+
+def backfill_limit_up_by_date_range(db_path: str, start_date: str, end_date: str) -> None:
+    """Backfill daily limit-up board data across a date range (全市场按日期抓取)."""
+    try:
+        import akshare as ak
+        conn = sqlite3.connect(db_path)
+        # Iterate over trading days in range
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        # Only fetch last 90 days (API often has limits on historical data)
+        cutoff_dt = end_dt - timedelta(days=90)
+        actual_start = max(start_dt, cutoff_dt)
+        current = actual_start
+        total_saved = 0
+        while current <= end_dt:
+            date_str = current.strftime('%Y%m%d')
+            try:
+                df = ak.stock_zt_pool_em(date=date_str)
+                if df is not None and not df.empty:
+                    records = []
+                    for _, row in df.iterrows():
+                        code = str(row.get('代码', '') or '').strip().zfill(6)
+                        if not code or not code.isdigit():
+                            continue
+                        records.append((
+                            code,
+                            str(row.get('名称', '') or '').strip(),
+                            current.strftime('%Y-%m-%d'),
+                            int(row.get('连板数', 1) or 1),
+                            int(row.get('打开次数', 0) or 0),
+                            str(row.get('涨停时间', '') or '').strip(),
+                            str(row.get('最后封板时间', '') or '').strip(),
+                            _safe_float(row.get('换手率')),
+                            _safe_float(row.get('流通市值')),
+                            str(row.get('涨停原因类别', '') or row.get('原因类别', '') or '').strip(),
+                        ))
+                    if records:
+                        conn.executemany(
+                            """INSERT OR IGNORE INTO limit_up_records
+                               (code, name, date, board_count, open_count,
+                                limit_time, last_open_time, turnover_rate, free_float_mv, reason)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            records
+                        )
+                        conn.commit()
+                        total_saved += len(records)
+            except Exception:
+                pass  # Skip days with no data or API errors
+            current += timedelta(days=1)
+            time.sleep(0.2)
+        conn.close()
+        logger.info(f"Limit-up records backfill complete: {total_saved} rows saved.")
+    except Exception as e:
+        logger.error(f"Failed to backfill limit-up records: {e}")
+
+
+def backfill_north_bound(db_path: str, code: str, start_date: str, end_date: str) -> None:
+    """Fetch northbound (沪深股通) capital flow for a specific stock."""
+    try:
+        df = fetch_with_retry(ak.stock_hsgt_hist_em, symbol=code)
+        if df is None or df.empty:
+            return
+        conn = sqlite3.connect(db_path)
+        records = []
+        for _, row in df.iterrows():
+            date_str = str(row.get('日期', '')).strip()[:10]
+            if not date_str or date_str < start_date or date_str > end_date:
+                continue
+            records.append((
+                code, date_str,
+                _safe_float(row.get('持股数量')),
+                _safe_float(row.get('持股比例')),
+                _safe_float(row.get('持股市值')),
+                _safe_float(row.get('当日增减')),
+            ))
+        conn.executemany(
+            """INSERT OR REPLACE INTO north_bound_flow
+               (code, date, hold_shares, hold_ratio, hold_mv, net_buy)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            records
+        )
+        conn.commit()
+        conn.close()
+        if records:
+            logger.info(f"[{code}] Northbound flow: {len(records)} records saved.")
+    except Exception as e:
+        logger.warning(f"[{code}] Failed to fetch northbound flow: {e}")
+
+
+def _safe_float(val) -> Optional[float]:
+    """Safely convert a value to float, returning None on failure."""
+    try:
+        if val is None or str(val).strip() in ('', 'nan', 'None', '-', '--'):
+            return None
+        return float(str(val).replace(',', '').replace('%', '').strip())
+    except (ValueError, TypeError):
+        return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
+
 def main():
     default_years = int(os.getenv("BACKFILL_YEARS", "5"))
     
@@ -862,6 +1457,9 @@ def main():
     parser.add_argument("--years", type=int, default=default_years, help=f"Number of years of history to backfill (default: {default_years}).")
     parser.add_argument("--db", type=str, help="Custom path to the SQLite database.")
     parser.add_argument("--tenant", type=str, default="default", help="Tenant ID to initialize database for (default: default).")
+    parser.add_argument("--skip-kline", action="store_true", help="Skip K-line backfill (faster run for metadata-only update).")
+    parser.add_argument("--fundamentals", action="store_true", help="Also backfill financial indicators, dividends, shareholders.")
+    parser.add_argument("--sentiment", action="store_true", help="Also backfill longhu, limit-up, northbound flow.")
     
     args = parser.parse_args()
     
@@ -869,11 +1467,16 @@ def main():
         db_path = args.db
     else:
         tenant = args.tenant
-        from src.config.paths import active_tenant_var, get_runtime_root
+        from src.config.paths import active_tenant_var, get_market_db_path
         active_tenant_var.set(tenant)
-        db_path = str(get_runtime_root() / f"stocks_{tenant}.db")
-        
+        # All market data (K-line, fundamentals, capital flow, etc.) goes to the SHARED
+        # public market database (stocks_market.db), NOT the per-tenant database.
+        # The per-tenant database only stores Watchlist, AlertRules, and user-private data.
+        db_path = str(get_market_db_path())
+        logger.info(f"[Architecture] Writing market data to shared DB: {db_path}")
+
     init_db(db_path)
+
     
     # 1. Backfill Trade Calendar
     end_date = datetime.now().strftime('%Y-%m-%d')
@@ -898,9 +1501,9 @@ def main():
 
     # 3. Resolve Stock Codes
     if args.all:
-        stocks = get_active_stocks()
+        stocks = get_active_stocks(db_path=db_path)
         if not stocks:
-            logger.error("Could not fetch active stocks list. Exiting.")
+            logger.error("Could not fetch active stocks list from any source. Exiting.")
             sys.exit(1)
         logger.info(f"Running backfill for ALL {len(stocks)} A-share stocks. This may take a long time!")
     elif args.code:
@@ -955,16 +1558,38 @@ def main():
                     logger.info(f"[{code}] Listing date updated: {list_date}")
         
         # Valuation, Capital Flow, Margin
-        backfill_valuation(db_path, code, adjusted_start, end_date, ts_pro)
-        backfill_capital_flow(db_path, code, adjusted_start, end_date)
-        backfill_margin_trading(db_path, code, adjusted_start, end_date, ts_pro)
-        
+        if not args.skip_kline:
+            backfill_valuation(db_path, code, adjusted_start, end_date, ts_pro)
+            backfill_capital_flow(db_path, code, adjusted_start, end_date)
+            backfill_margin_trading(db_path, code, adjusted_start, end_date, ts_pro)
+
+        # Company profile (always run - fast, low-rate-limit risk)
+        backfill_company_profile(db_path, code)
+
+        # Fundamentals: financial indicators, dividends, shareholders
+        if args.fundamentals:
+            logger.info(f"[{code}] Fetching fundamentals (indicators/dividends/shareholders)...")
+            backfill_financial_indicator(db_path, code)
+            backfill_dividends(db_path, code)
+            backfill_top10_shareholders(db_path, code)
+
+        # Sentiment: longhu, northbound
+        if args.sentiment:
+            logger.info(f"[{code}] Fetching sentiment data (longhu/northbound)...")
+            backfill_longhu_for_stock(db_path, code, adjusted_start, end_date)
+            backfill_north_bound(db_path, code, adjusted_start, end_date)
+
         time.sleep(0.3)
         
     conn.close()
 
     # 5. Backfill Theme Mapping (Optimized Global Run)
     backfill_all_theme_mappings(db_path)
+
+    # 6. Sentiment: Limit-up board history (全市场按日期，不按股票)
+    if args.sentiment:
+        logger.info("Backfilling limit-up board history (last 90 days)...")
+        backfill_limit_up_by_date_range(db_path, start_date, end_date)
 
     logger.info("All backfill tasks completed successfully!")
 

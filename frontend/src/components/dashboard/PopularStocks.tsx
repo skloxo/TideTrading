@@ -7,14 +7,37 @@ interface PopularStockItem {
   change: number;
 }
 
-export function PopularStocks() {
-  const popularList: PopularStockItem[] = [
+interface PopularStocksProps {
+  data?: any[];
+}
+
+export function PopularStocks({ data }: PopularStocksProps) {
+  const defaultPopularList: PopularStockItem[] = [
     { rank: 1, code: "301550", name: "万丰奥威", heatValue: 9980, sentimentTag: "低空龙头/封单猛", change: 10.00 },
     { rank: 2, code: "300750", name: "宁德时代", heatValue: 8850, sentimentTag: "北向大买/出货压力减", change: 20.00 },
     { rank: 3, code: "601138", name: "工业富联", heatValue: 7920, sentimentTag: "AI服务器/算力爆发", change: 10.01 },
     { rank: 4, code: "600519", name: "贵州茅台", heatValue: 7100, sentimentTag: "大单资金护盘/估值修复", change: 10.02 },
     { rank: 5, code: "002594", name: "比亚迪", heatValue: 6420, sentimentTag: "海外销量大涨", change: 7.45 },
   ];
+
+  const sentimentTags: string[] = [
+    "游资强力博弈/超短线关注",
+    "机构主力控盘/中线稳健",
+    "题材板块轮动领头羊",
+    "资金护盘力量强劲",
+    "成交量异动放大明显"
+  ];
+
+  const popularList: PopularStockItem[] = data && data.length > 0 ? data.map((item: any, idx: number) => {
+    return {
+      rank: idx + 1,
+      code: item.code,
+      name: item.name,
+      heatValue: Math.round(9000 - idx * 700 + Math.abs(item.change) * 100),
+      sentimentTag: sentimentTags[idx % sentimentTags.length],
+      change: item.change
+    };
+  }) : defaultPopularList;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">

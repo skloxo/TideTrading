@@ -4,6 +4,10 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import en from "./locales/en.json";
 import zhCN from "./locales/zh-CN.json";
 
+if (typeof window !== "undefined" && !localStorage.getItem("i18nextLng")) {
+  localStorage.setItem("i18nextLng", "zh-CN");
+}
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -12,13 +16,14 @@ i18n
       en: { translation: en },
       "zh-CN": { translation: zhCN },
     },
-    // Default to English for everyone on first visit; only an explicit toggle
-    // (persisted to localStorage) switches to Chinese. We intentionally do NOT
-    // read `navigator` so a zh browser is not auto-switched away from English.
-    fallbackLng: "en",
+    // Default to Chinese (zh-CN) for all new visitors.
+    // If the user explicitly switches to English via the language toggle,
+    // that choice is persisted to localStorage and respected on return visits.
+    fallbackLng: "zh-CN",
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage"],
+      lookupLocalStorage: "i18nextLng",
       caches: ["localStorage"],
     },
   });

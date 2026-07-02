@@ -3675,6 +3675,179 @@ async def update_dashboard_layout(payload: dict):
         raise HTTPException(status_code=500, detail=f"Failed to save layout: {e}")
 
 
+@app.get(
+    "/settings/dashboard/graph",
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_dashboard_graph():
+    """Load ECharts relation graph topology for the active tenant."""
+    from src.config.paths import active_tenant_var
+    from src.swarm.simulation_graph import SimulationGraphManager
+    tenant = active_tenant_var.get()
+    try:
+        manager = SimulationGraphManager(tenant)
+        return manager.load()
+    except Exception as e:
+        logger.error("Failed to load dashboard graph for tenant %s: %s", tenant, e)
+        return {"nodes": [], "links": []}
+
+
+@app.get(
+    "/settings/dashboard/react-logs",
+    dependencies=[Depends(require_event_stream_auth)],
+)
+async def get_dashboard_react_logs(request: Request, stream: bool = True):
+    """Get ReACT logs for the active tenant. Supports optional SSE streaming."""
+    from src.config.paths import active_tenant_var
+    tenant = active_tenant_var.get()
+    log_path = AGENT_DIR / "runs" / f"agent_log_{tenant}.jsonl"
+
+    if not stream:
+        logs = []
+        if log_path.exists():
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            logs.append(json.loads(line.strip()))
+            except Exception as e:
+                logger.warning("Failed to read ReACT logs array for tenant %s: %s", tenant, e)
+        return logs
+
+    # SSE Streaming mode
+    from fastapi.responses import StreamingResponse
+    import asyncio
+
+    async def event_generator():
+        # Yield existing log lines first
+        if log_path.exists():
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            yield f"data: {line.strip()}\n\n"
+            except Exception:
+                pass
+        
+        # Poll for new additions
+        last_size = log_path.stat().st_size if log_path.exists() else 0
+        while True:
+            if await request.is_disconnected():
+                break
+            if log_path.exists():
+                curr_size = log_path.stat().st_size
+                if curr_size > last_size:
+                    try:
+                        with open(log_path, "r", encoding="utf-8") as f:
+                            f.seek(last_size)
+                            for line in f:
+                                if line.strip():
+                                    yield f"data: {line.strip()}\n\n"
+                        last_size = curr_size
+                    except Exception:
+                        pass
+            await asyncio.sleep(1)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post(
+    "/settings/dashboard/agent-chat",
+    dependencies=[Depends(require_auth)],
+)
+async def dashboard_agent_chat(payload: dict):
+    """Direct NLP chat with specific Swarm Agent presets."""
+    agent_id = payload.get("agent_id", "")
+    message = payload.get("message", "")
+    if not agent_id or not message:
+        raise HTTPException(status_code=400, detail="agent_id and message are required")
+
+    AGENT_PERSONAS = {
+        "yuzi": "你是游资·游侠，热衷于超短线交易和炒作题材（如低空经济、AI算力）。你言辞犀利、行动迅速，极度关注涨停板和资金流入。请用大字报风格和黑客终端语气分析万丰奥威或其它股票，必须包含具体的阻力位、买入点 and 游资博弈心理。",
+        "beixiang": "你是北向资金（机构投资者代表），倾向于长线价值投资与宏观配置。你行事稳健，注重筹码分布、基本面估值以及ETF异动，用理性、专业、机构视角的语气来分析市场和个股的估值水平及资金安全垫。",
+        "SwarmConductor": "你是多智能体投研管线的指挥官（SwarmConductor），负责汇总技术面、基本面和风控面的辩论共识。用全面、不偏不倚的分析语气，客观权衡板块题材机会与回撤风险，给出综合结论。"
+    }
+
+    persona = AGENT_PERSONAS.get(agent_id, AGENT_PERSONAS["SwarmConductor"])
+    
+    from src.providers.chat import ChatLLM
+    try:
+        llm = ChatLLM()
+        messages = [
+            {"role": "system", "content": persona},
+            {"role": "user", "content": message}
+        ]
+        response = llm.chat(messages)
+        return {"response": response.content or "(无回复)"}
+    except Exception as e:
+        logger.error("Agent chat failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"LLM chat call failed: {e}")
+
+
+@app.get(
+    "/settings/dashboard/market-data",
+    dependencies=[Depends(require_local_or_auth)],
+)
+def get_dashboard_market_data():
+    """Load real-time market data (watchlist, sectors, longhubang, limitup) for A-shares."""
+    from src.swarm.market_board import (
+        fetch_tencent_quotes,
+        fetch_eastmoney_sectors,
+        fetch_eastmoney_longhu,
+        fetch_eastmoney_limitup
+    )
+    from src.config.paths import active_tenant_var, get_runtime_root
+    import sqlite3
+    
+    tenant = active_tenant_var.get() or "default"
+    db_path = get_runtime_root() / f"stocks_{tenant}.db"
+    
+    watchlist_symbols = []
+    if db_path.exists():
+        try:
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Watchlist'")
+            if cursor.fetchone():
+                cursor.execute("SELECT code FROM Watchlist")
+                watchlist_symbols = [row["code"] for row in cursor.fetchall()]
+            conn.close()
+        except Exception as e:
+            logger.error("Failed to query Watchlist from DB: %s", e)
+            
+    if watchlist_symbols:
+        cleaned_symbols = [s.split(".")[0].strip() for s in watchlist_symbols]
+        cleaned_symbols = list(filter(None, dict.fromkeys(cleaned_symbols)))
+    else:
+        cleaned_symbols = ["300750", "600519", "002594", "301550", "601398"]
+
+    try:
+        watchlist = fetch_tencent_quotes(cleaned_symbols)
+        sectors = fetch_eastmoney_sectors()
+        longhu = fetch_eastmoney_longhu()
+        limitup = fetch_eastmoney_limitup()
+        
+        sentiment_score = 50
+        up_count = sum(1 for s in sectors if s["change"] > 0)
+        if sectors:
+            sentiment_score = int((up_count / len(sectors)) * 100)
+            
+        return {
+            "watchlist": watchlist,
+            "sectors": sectors,
+            "longhu": longhu,
+            "limitup": limitup,
+            "sentiment": {
+                "score": sentiment_score,
+                "description": "多头偏强" if sentiment_score > 60 else "空头偏强" if sentiment_score < 40 else "震荡平衡"
+            }
+        }
+    except Exception as e:
+        logger.error("Failed to load dashboard market data: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Liveness probe."""
