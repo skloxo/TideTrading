@@ -32,6 +32,6 @@ def _version_from_pyproject() -> str:
         return "unknown"
 
 
-__version__: Final[str] = "0.1.10.cnx.1.4"
+__version__: Final[str] = "0.1.10.cnx.1.7.0"
 
 __all__ = ["__version__"]

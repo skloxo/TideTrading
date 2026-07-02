@@ -61,7 +61,7 @@ export function Home() {
         
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-semibold">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v0.1.10.cnx.1.6 Stable</span>
+          <span>v0.1.10.cnx.1.7.0 Stable</span>
         </div>
 
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-primary via-orange-500 to-amber-500 bg-clip-text text-transparent">
@@ -340,9 +340,16 @@ export function Home() {
               <div className="relative pl-4 border-l-2 border-primary/20">
                 <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background animate-pulse" />
                 <h4 className="text-xs font-semibold flex items-center gap-1.5">
-                  v0.1.10.cnx.1.6
+                  v0.1.10.cnx.1.7.0
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-normal">{isZh ? "已上线" : "Stable"}</span>
                 </h4>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影，仿真控制台亮色/暗色主题完美适配；开发本地 SQLite 库个股占位名（如 Stock/股票/代码 加上数字）一键清洗脚本，打通腾讯行情分批 API 抓取解决超长 URL 失败故障。" : "Rebuilt layout cards to premium glassmorphic widgets with zero nested borders. Added dark/light theme adaptation for emulator console. Implemented automatic SQLite stock name sanitization and batched Tencent quotes retrieval to handle large watchlists."}
+                </p>
+              </div>
+              <div className="relative pl-4 border-l-2 border-primary/20">
+                <span className="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full bg-primary/40 border-2 border-background" />
+                <h4 className="text-xs font-semibold text-muted-foreground">v0.1.10.cnx.1.6</h4>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   {isZh ? "行情网关启动自愈预检（秒拔 mootdx BESTIP 损坏），Git 远程多参考仓库动态追踪大看板与每日增量对账日志，跨仓库 CLI 贡献 SOP 确立。" : "Gateway self-healing preflight check, dynamic reference repositories status board with daily logs, and GitHub CLI contribution SOP."}
                 </p>
