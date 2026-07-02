@@ -90,7 +90,7 @@ export function Home() {
         {/* Version badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold backdrop-blur-sm shadow-sm shadow-primary/10">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v1.7.1 Stable</span>
+          <span>v1.7.2 Stable</span>
           <span className="w-px h-3 bg-primary/30" />
           <span className="text-emerald-400 font-normal">{isZh ? "运行中" : "Live"}</span>
         </div>

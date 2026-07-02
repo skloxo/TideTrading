@@ -1,3 +1,78 @@
+Metadata-Version: 2.4
+Name: tide-trading-ai
+Version: 0.1.10
+Summary: A-Share & HK Equities Focus Quantitative Trading Workstation powered by Multi-Agent Swarms
+Author-email: HKUDS <hkuds@connect.hku.hk>
+License-Expression: MIT
+Project-URL: Homepage, https://vibetrading.wiki/
+Project-URL: Documentation, https://vibetrading.wiki/docs/
+Project-URL: Repository, https://github.com/skloxo/Vibe-Trading-CNX
+Project-URL: Issues, https://github.com/skloxo/Vibe-Trading-CNX/issues
+Keywords: finance,trading,backtesting,agent,swarm,quantitative
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Financial and Insurance Industry
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Office/Business :: Financial :: Investment
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE
+Requires-Dist: rich>=13.0.0
+Requires-Dist: pyyaml>=6.0.0
+Requires-Dist: langchain<2,>=1.3.9
+Requires-Dist: langchain-core<2,>=1.3.9
+Requires-Dist: langchain-openai<2,>=1.0.0
+Requires-Dist: langgraph<2,>=1.2.4
+Requires-Dist: langgraph-checkpoint<5,>=2.1.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: httpx>=0.28.0
+Requires-Dist: defusedxml>=0.7.1
+Requires-Dist: oauth-cli-kit>=0.1.3
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: openpyxl>=3.1.0
+Requires-Dist: python-docx>=1.1.0
+Requires-Dist: python-pptx>=0.6.23
+Requires-Dist: pypdfium2>=4.0.0
+Requires-Dist: Pillow>=10.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: duckdb>=1.2.0
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: joblib>=1.3.0
+Requires-Dist: smartmoneyconcepts>=0.0.1
+Requires-Dist: tushare>=1.2.89
+Requires-Dist: requests>=2.31.0
+Requires-Dist: yfinance>=0.2.30
+Requires-Dist: akshare>=1.12.0
+Requires-Dist: ccxt>=4.0.0
+Requires-Dist: fastapi>=0.104.0
+Requires-Dist: uvicorn[standard]>=0.24.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: python-multipart>=0.0.18
+Requires-Dist: sse-starlette>=1.6.0
+Requires-Dist: fastmcp>=2.14.0
+Requires-Dist: ddgs>=6.0.0
+Requires-Dist: jinja2>=3.1.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: weasyprint>=60.0
+Requires-Dist: prompt_toolkit>=3.0.0
+Requires-Dist: lark-oapi>=1.6.8
+Requires-Dist: mootdx
+Provides-Extra: ibkr
+Requires-Dist: ib_async>=2.0; extra == "ibkr"
+Provides-Extra: deepseek
+Requires-Dist: langchain-deepseek<2,>=1.0.0; extra == "deepseek"
+Provides-Extra: ashare
+Requires-Dist: baostock>=0.8.8; extra == "ashare"
+Provides-Extra: harmonic
+Requires-Dist: pyharmonics>=1.5.0; extra == "harmonic"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: pytest-socket>=0.7.0; extra == "dev"
+Dynamic: license-file
+
 <p align="center">
   <img src="assets/icon.png" width="120" alt="TideTrading Logo"/>
 </p>
@@ -24,31 +99,18 @@
 > [!NOTE]
 > **TideTrading** 是专注 **A股与港股** 市场的开源独立智能投研工作站，于 2026-07 正式从上游社区独立。在整合技术指标与量化回测的同时，重点强化了**多维度市场特征提取**（如雪球网与主流社交媒体监控、舆情情绪面量化、大单资金流向监测、行业基本面复盘）与**多通道即插即用推送**（微信 iLink / 飞书），并实现了多租户安全沙箱隔离机制与本地 API 可信授权。向开源社区 [TideTrading](https://github.com/HKUDS/TideTrading) 致谢。
 
-## 📰 最新动态
-
-- **2026-07-02** 🚀 **v1.7.2 — i18n 品牌双语统一 · 首页视觉全面升级（蓝图视觉规范落地）**：
-  - **i18n 品牌命名分层统一**：全平台严格落实「常用名 / 英文名」双语分层规范。中文模式（`zh-CN`）下，侧边栏、首页英雄区、大屏 Header、仿真终端、Footer 版权等所有用户可见位置统一展示**潮汐投研**；切换英文模式后自动切换为 **TideTrading**，彻底消除混合展示状态。
-  - **首页视觉全面升级（蓝图视觉规范落地）**：依据 `docs/tide_trading_grand_roadmap.md` 中 §2 界面视觉设计规范，对首页进行全量视觉重构：
-    - **英雄区**：超大渐变标题（橙→琥珀），三色霓虹光晕背景装饰（橙/青/粉），双 CTA 按钮（主级 + 次级量化大屏入口），新增**实时行情 Ticker** 展示 A 股核心标的涨跌行情（宁德时代、茅台、比亚迪等），绿涨红跌符合 A 股配色铁律。
-    - **特性卡片**：全部重构为玻璃态容器（`backdrop-blur-sm`），四张卡片各赋独立霓虹主题色（青色/橙色/品红/琥珀），Hover 时触发角落发光特效。
-    - **LLM 编排步骤**：四步骤采用霓虹彩色数字圆环区分，整体置于毛玻璃背景卡片中。
-    - **A/H 数据链卡片**：A股卡片采用玫瑰红霓虹主题（符合 A 股涨跌铁律），港股风控链卡片采用青色霓虹主题（赛博朋克科幻风），两卡片均带 Hover 发光阴影。
-    - **引导向导 & 路线图**：步骤大号霓虹数字水印 + 发光时间线节点（`animate-pulse`），双栏已完成/规划蓝图对照布局。
-  - **大屏 Header 品牌双语**：数据大屏顶部 Header 主标题中文模式显示「潮汐投研 · 量化工作站」，副标题「实时多智能体量化看板」；英文模式自动切回「TIDETRADING QUANT STATION」。
-
-<details>
-<summary>更早的更新</summary>
-
-- **2026-07-02** 🚀 **v1.7.1 — 共享数据底座、大屏全卡片玻璃态重构与数据清洗自愈版本发布**：
+<p align="center">
+  <a href="#-最新动态"- **2026-07-02** 🚀 **v1.7.1 — 共享数据底座、大屏全卡片玻璃态重构与数据清洗自愈版本发布**：
   - **大屏卡片玻璃态去重重构**：全面清理了所有面板子组件（自选股、涨停板、游资、持仓、舆情监控、思考时间轴、智能终端等）自身的冗余白底及独立边框。将背景、圆角、遮罩与悬浮发光样式统一收拢至 ReactGridLayout 外层父容器中（亮色模式下使用自适应 `bg-card/90 border-slate-200/80 rounded-xl`），根除了浅色模式下组件双重框线及边缘黑三角裁切泄露问题。
   - **实时仿真控制台双色主题适配**：对控制台日志区域进行明暗双模配色适配。亮色模式下改用护眼灰色底背景并强化状态栏及日志等级文本的高对比度，彻底摆脱之前浅色模式下黑块突兀的视觉毛病。
-  - **本地 SQLite 数据库占位符一键清洗**：编写并集成了 SQLite 数据库清洗脚本。直接对容器及主机端的 SQLite 文件中的 `Watchlist` 和 `stock_meta` 两个关键表进行大洗牌，将占位名称全部替换为真实中文股票简称，实现本地数据层自愈。
-  - **腾讯实时行情分批（Chunk）抓取**：优化 API 行情拉取，将大容量自选股列表自动切分为 50 只个股为一组的分批请求，规避超长 URL 超时问题。
-  - **共享/私有双层数据库路由解耦**：股票基础元数据、全市场历史 K 线数据统归于共享库 `stocks_market.db`，用户自选股与回测轨迹严格物理隔离于租户库 `stocks_<tenant_id>.db`。
-  - **通达信二进制行情高速冷启动导入**：编写本地 `.day` 二进制行情文件导入器，以 SQLite WAL 模式实现平均每秒 2.8 万条的高速增量回填，累计注入 **510 万+ 条** 历史日线数据。
-  - **写锁防死锁保护机制**：冷启动写入期间并发读请求遇到 `database is locked` 时自动跳过，保证大屏和回测服务全天候可用。
-  - **首屏 i18n 中文默认拦截**：首次访问自动预设 `zh-CN`，确保 100% 呈现中文看板大屏。
-  - ⚠️ **独立正名**：项目正式从上游 Fork 独立，版本号切换至 `vx.y.z` 标准语义化版本体系。
+  - **本地 SQLite 数据库占位符一键清洗**：编写并集成了 SQLite 数据库清洗脚本 [repair_local_db_names.py](file:///home/skloxo/aho/openclaw/project/TideTrading/agent/scripts/repair_local_db_names.py)。直接对容器及主机端的 SQLite 文件（如 `stocks_default.db`, `stocks_market.db`）中的 `Watchlist` 和 `stock_meta` 两个关键表的数据进行大洗牌，将 `Stock xxx`、`股票xxxxxx`、`代码 xxxxxx` 或者是纯数字代码等临时占位名称全部匹配 `tdx_a_shares.json` 替换为真实中文股票简称，实现本地数据层自愈。
+  - **腾讯实时行情分批（Chunk）抓取**：优化 API 行情拉取，将大容量自选股列表自动切分为 50 只个股为一组的分批请求。完美规避了自选股数量过多（如 `COUNT: 289`）导致请求 URL 字符超长被服务器拒绝或超时的异常，保证秒级折线图与变动率完美刷新。
+  - **共享/私有双层数据库路由解耦**：将多租户隔离层与共享公开层彻底分离。股票基础元数据、全市场历史K线数据统归于共享库 `stocks_market.db`（回测与盘中实时读取强制设为只读模式以防止锁竞争），用户的自选股（`watchlist`）和回测运行轨迹则严格物理隔离于租户库 `stocks_<tenant_id>.db`。
+  - **通达信二进制行情高速冷启动导入**：编写本地 `.day` 二进制行情文件导入器，摆脱外网限流与IP封禁，在容器内以 SQLite WAL 模式实现平均每秒 2.8 万条的高速增量回填，累计为量化底座注入 **510 万+ 条** 历史日线数据；新增对北交所股票（`bj`）和概念题材板块指数（`ds`）数据的全套支持。
+  - **写锁防死锁保护机制**：实现导入期高并发保护。在后台向 `stocks_market.db` 进行千万级冷启动写入期间，盘中看板或回测对同一数据库发起的并发读请求遇到短暂的 `database is locked` 锁碰撞时，导入器会自动跳过当次写冲突并维持导入与读取流程两不误，保证大屏和回测服务全天候可用。
+  - **首屏 i18n 中文默认拦截**：在 i18n 配置中增加首次访问劫持。若用户为首次打开（localStorage 内没有 i18n 语言项），则主动将其拦截并强制预设为 `zh-CN`，确保首屏加载时 100% 呈现中文看板大屏卡片，同时保留对右上角手动语言切换在后续访问中被记住的支持。
+  - ⚠️ **独立正名**：项目正式从上游 Fork 独立，版本号切换至 `vx.y.z` 标准语义化版本体系（历史版本对照：`v0.1.10.cnx.1.x` → `v1.x.0`）。
+
 
 - **2026-07-01** 🚀 **v1.6.0 — 行情网关自愈预检、多参考仓库对账看板与 GitHub CLI SOP 版本发布**：
   - **行情网关启动自愈预检**：新增 `_check_mootdx_and_heal` 预检机制。服务启动时自动检查 `mootdx` 缓存配置文件完整性，秒级捕获并清除 `BESTIP` 损坏导致的 `ValueError` 异常，自动重新测速生成最佳 HQ 主站配置，彻底根治公网环境下的 A股 实时数据查询失败。
@@ -83,6 +145,9 @@
   - **安全与跨域加固（CORS）**：更新 CORS 环回检测，使配置的 `API_ALLOWED_HOSTS` 公网/局域网可信 IP 允许执行不安全的 POST/PUT/DELETE 请求，解决异地登录时修改设置报 `Cross-site request denied` 拦截问题。
   - **Docker 容器向前兼容**：添加了 `/home/vibe/.tide` -> `/home/vibe/.tide` 的软链接守护，确保生产环境存量用户无缝升级，旧有历史数据及会话记录百分百兼容。
   - **统一的 GitHub CLI 跨仓库贡献 SOP**：明确在 `AGENTS.md` 中固化了向官方上游贡献通用代码的 `gh pr create` 命令行流程，确保 CNX 本地隔离代码不会污染上游 Pull Request。
+
+<details>
+<summary>更早的更新</summary>
 
 - **2026-06-23** 🛡️ **本地 API CSRF 加固**：恶意网页不再能对环回（loopback）API 发起不安全的跨站请求（POST/PUT/DELETE）——CORS 只挡响应读取、挡不住副作用，因此环回 dev-mode 信任现在会在放行**之前**先对不安全方法应用既有的跨站防护。安全方法与本地 CLI / 非浏览器上传不受影响（[#293](https://github.com/HKUDS/TideTrading/pull/293)，感谢 @Hinotoi-agent）。
 - **2026-06-22** 🔧 **Live 授权 OAuth 修复 + Alpha Zoo 标题修复**：`connector authorize` 现在能在长达数分钟的券商登录期间保持 OAuth 握手不断开（可通过 `VIBE_LIVE_AUTHORIZE_TIMEOUT_SECONDS` 调整），且重试时不再另起一个抢占式回调服务器，token 终于能正确保存（[#281](https://github.com/HKUDS/TideTrading/pull/281)，关闭 [#259](https://github.com/HKUDS/TideTrading/issues/259)，感谢 @Robin1987China）。Alpha Zoo 页面不再把 alpha 数量渲染两次（[#287](https://github.com/HKUDS/TideTrading/pull/287)，关闭 [#286](https://github.com/HKUDS/TideTrading/issues/286)，感谢 @digger-yu）。定时研究也补上了端到端使用文档（[#288](https://github.com/HKUDS/TideTrading/pull/288)）。

@@ -1,0 +1,3 @@
+[console_scripts]
+tide = cli:main
+tide-mcp = mcp_server:main
