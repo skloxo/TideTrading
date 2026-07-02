@@ -412,7 +412,7 @@ export function GlobalDashboard() {
           {enabledWidgets.yuzi && isWidgetAllowed("yuzi") && (
             <div key="yuzi" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <YuziMovement />
+              <YuziMovement data={marketData?.yuzi} />
             </div>
           )}
 
@@ -538,7 +538,7 @@ export function GlobalDashboard() {
                 </div>
 
                 <div className="h-20 flex items-end gap-1.5 pt-2">
-                  {[12, 18, 35, 65, 88, 75, 50, 30, 15, 8].map((h, i) => {
+                  {(marketData?.lattice || [12, 18, 35, 65, 88, 75, 50, 30, 15, 8]).map((h: number, i: number) => {
                     const isHigh = h > 40;
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -559,7 +559,7 @@ export function GlobalDashboard() {
           {enabledWidgets.kol && isWidgetAllowed("kol") && (
             <div key="kol" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <KolOpinions />
+              <KolOpinions data={marketData?.kol} />
             </div>
           )}
 
@@ -567,7 +567,7 @@ export function GlobalDashboard() {
           {enabledWidgets.alerts && isWidgetAllowed("alerts") && (
             <div key="alerts" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <MobileAlerts />
+              <MobileAlerts data={marketData?.alerts} />
             </div>
           )}
 
@@ -575,7 +575,7 @@ export function GlobalDashboard() {
           {enabledWidgets.portfolio && isWidgetAllowed("portfolio") && (
             <div key="portfolio" className="bg-[#10101a]/80 border border-slate-200 dark:border-[#222233] rounded overflow-hidden shadow-sm dark:shadow-none">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
-              <Portfolio />
+              <Portfolio data={marketData?.portfolio} netAsset={marketData?.netAsset} />
             </div>
           )}
 

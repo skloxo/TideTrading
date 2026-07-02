@@ -8,8 +8,12 @@ interface KolItem {
   timestamp: string;
 }
 
-export function KolOpinions() {
-  const opinions: KolItem[] = [
+interface KolOpinionsProps {
+  data?: KolItem[];
+}
+
+export function KolOpinions({ data }: KolOpinionsProps) {
+  const fallbackOpinions: KolItem[] = [
     { 
       author: "量化复盘大师", 
       stockName: "万丰奥威", 
@@ -39,6 +43,8 @@ export function KolOpinions() {
     }
   ];
 
+  const opinions = data && data.length > 0 ? data : fallbackOpinions;
+
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">
       <div className="flex justify-between items-center border-b border-slate-200 dark:border-[#222233] pb-1.5">
@@ -67,8 +73,8 @@ export function KolOpinions() {
               </div>
               <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-normal font-sans">{item.content}</p>
               
-              <div className="flex justify-between items-center text-[8px] text-slate-500 dark:text-slate-600 mt-1.5 font-mono">
-                <span>相关: <span className="text-slate-600 dark:text-slate-500 font-sans">{item.stockName}</span> ({item.code})</span>
+              <div className="flex justify-between items-center text-[8px] text-slate-500 dark:text-slate-650 mt-1.5 font-mono">
+                <span>相关: <span className="text-slate-600 dark:text-slate-450 font-sans">{item.stockName}</span> ({item.code})</span>
                 <span>{item.timestamp}</span>
               </div>
             </div>

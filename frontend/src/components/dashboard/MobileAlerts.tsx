@@ -8,13 +8,19 @@ interface AlertItem {
   message: string;
 }
 
-export function MobileAlerts() {
-  const alerts: AlertItem[] = [
+interface MobileAlertsProps {
+  data?: AlertItem[];
+}
+
+export function MobileAlerts({ data }: MobileAlertsProps) {
+  const fallbackAlerts: AlertItem[] = [
     { time: "14:28:12", stockName: "万丰奥威", code: "301550", type: "breakout", message: "突破 5 日高点压力位 16.10 元" },
     { time: "14:27:04", stockName: "宁德时代", code: "300750", type: "volume", message: "盘中出现机构大单主买成交 1.5 亿" },
     { time: "14:25:30", stockName: "大盘情绪", code: "INDEX", type: "warning", message: "情绪温度冲高回落至 82%，防范炸板风险" },
     { time: "14:22:15", stockName: "工业富联", code: "601138", type: "breakout", message: "封板率突破 90%，买单挂盘超 12 万手" }
   ];
+
+  const alerts = data && data.length > 0 ? data : fallbackAlerts;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">

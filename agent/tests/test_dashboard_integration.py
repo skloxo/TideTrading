@@ -93,3 +93,20 @@ def test_dashboard_api_endpoints(client: TestClient):
     body = response.json()
     assert "response" in body
     assert body["response"] == "Mocked Agent response"
+
+    # Test Market Data GET endpoint
+    response = client.get("/settings/dashboard/market-data")
+    assert response.status_code == 200
+    body = response.json()
+    assert "watchlist" in body
+    assert "sectors" in body
+    assert "longhu" in body
+    assert "limitup" in body
+    assert "yuzi" in body
+    assert "portfolio" in body
+    assert "netAsset" in body
+    assert "kol" in body
+    assert "alerts" in body
+    assert "lattice" in body
+    assert "sentiment" in body
+

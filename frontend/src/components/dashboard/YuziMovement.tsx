@@ -9,14 +9,20 @@ interface YuziItem {
   type: string; // 游资流派
 }
 
-export function YuziMovement() {
-  const yuziList: YuziItem[] = [
+interface YuziMovementProps {
+  data?: YuziItem[];
+}
+
+export function YuziMovement({ data }: YuziMovementProps) {
+  const fallbackList: YuziItem[] = [
     { name: "宁波解放路", stockName: "万丰奥威", stockCode: "301550", action: "buy", amount: 1.25, type: "一线游资" },
     { name: "呼家楼", stockName: "宁德时代", stockCode: "300750", action: "buy", amount: 2.80, type: "顶级席位" },
     { name: "小鳄鱼", stockName: "工业富联", stockCode: "601138", action: "buy", amount: 0.95, type: "新生代游资" },
     { name: "温州帮", stockName: "中兴通讯", stockCode: "000063", action: "sell", amount: -0.68, type: "庄股游资" },
     { name: "上海分公司", stockName: "比亚迪", stockCode: "002594", action: "buy", amount: 1.40, type: "量化大本营" }
   ];
+
+  const yuziList = data && data.length > 0 ? data : fallbackList;
 
   return (
     <div className="border border-slate-200 dark:border-[#222233] bg-white dark:bg-[#10101a]/80 p-3 flex flex-col gap-2 h-full rounded shadow-sm dark:shadow-none">

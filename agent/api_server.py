@@ -3794,7 +3794,11 @@ def get_dashboard_market_data():
         fetch_tencent_quotes,
         fetch_eastmoney_sectors,
         fetch_eastmoney_longhu,
-        fetch_eastmoney_limitup
+        fetch_eastmoney_limitup,
+        fetch_dynamic_yuzi,
+        fetch_dynamic_portfolio,
+        fetch_dynamic_kol_and_alerts,
+        fetch_dynamic_lattice
     )
     from src.config.paths import active_tenant_var, get_runtime_root
     import sqlite3
@@ -3828,6 +3832,12 @@ def get_dashboard_market_data():
         longhu = fetch_eastmoney_longhu()
         limitup = fetch_eastmoney_limitup()
         
+        # Freshly added dynamic dashboard datasets
+        yuzi = fetch_dynamic_yuzi()
+        portfolio_data = fetch_dynamic_portfolio(tenant)
+        kol_and_alerts = fetch_dynamic_kol_and_alerts(cleaned_symbols)
+        lattice = fetch_dynamic_lattice()
+        
         sentiment_score = 50
         up_count = sum(1 for s in sectors if s["change"] > 0)
         if sectors:
@@ -3838,6 +3848,12 @@ def get_dashboard_market_data():
             "sectors": sectors,
             "longhu": longhu,
             "limitup": limitup,
+            "yuzi": yuzi,
+            "portfolio": portfolio_data.get("positions", []),
+            "netAsset": portfolio_data.get("netAsset", 0.0),
+            "kol": kol_and_alerts.get("opinions", []),
+            "alerts": kol_and_alerts.get("alerts", []),
+            "lattice": lattice,
             "sentiment": {
                 "score": sentiment_score,
                 "description": "多头偏强" if sentiment_score > 60 else "空头偏强" if sentiment_score < 40 else "震荡平衡"
