@@ -1830,10 +1830,24 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
     from src.config.paths import active_tenant_var
     tenant = active_tenant_var.get()
 
+    is_custom = True
+    if tenant != "default":
+        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        if not tenant_env.exists():
+            is_custom = False
+        else:
+            tenant_vals = _read_env_values(tenant_env)
+            is_custom = "LANGCHAIN_PROVIDER" in tenant_vals
+
     if is_public and tenant != "default":
         env_values = values if values is not None else (_read_env_values(ENV_PATH) if ENV_PATH.exists() else {})
     else:
         env_values = values if values is not None else _read_settings_env_values()
+
+    if tenant != "default" and not is_custom:
+        # For non-admin tenants who have not configured a custom LLM, do not expose
+        # the admin's global configurations in form values. Return standard default values instead.
+        env_values = {}
 
     provider_name = env_values.get("LANGCHAIN_PROVIDER", "openai").strip().lower()
     provider = LLM_PROVIDER_BY_NAME.get(provider_name, LLM_PROVIDER_BY_NAME["openai"])
@@ -1852,16 +1866,6 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
     else:
         if api_key_configured and not is_public:
             api_key_hint = mask_api_keys(api_key)
-
-
-    is_custom = True
-    if tenant != "default":
-        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
-        if not tenant_env.exists():
-            is_custom = False
-        else:
-            tenant_vals = _read_env_values(tenant_env)
-            is_custom = "LANGCHAIN_PROVIDER" in tenant_vals
 
     return LLMSettingsResponse(
         provider=provider.name,
