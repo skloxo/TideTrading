@@ -31,7 +31,7 @@ def query_db_stock_names(codes: List[str]) -> Dict[str, str]:
                 placeholders = ",".join("?" for _ in codes)
                 cursor.execute(f"SELECT code, name FROM stock_meta WHERE code IN ({placeholders})", codes)
                 for code, name in cursor.fetchall():
-                    if code not in results:
+                    if code not in results and name and not name.startswith("Stock "):
                         results[code] = name
                 conn.close()
             except Exception:
@@ -75,7 +75,8 @@ def fetch_tencent_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                 symbols
             )
             for code, name in cursor.fetchall():
-                local_names[code] = name
+                if name and not name.startswith("Stock "):
+                    local_names[code] = name
             conn.close()
         except Exception:
             pass
@@ -96,7 +97,7 @@ def fetch_tencent_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                     missing
                 )
                 for code, name in cursor.fetchall():
-                    if code not in local_names and name:
+                    if code not in local_names and name and not name.startswith("Stock "):
                         local_names[code] = name
             # Query last close prices from daily kline
             for code in symbols:
