@@ -171,7 +171,7 @@ export function Layout() {
         <div className={cn("border-b", isCollapsed ? "p-2 flex justify-center" : "p-4")}>
           <Link to="/" className={cn("flex items-center font-bold text-base tracking-tight", isCollapsed ? "justify-center" : "gap-2")}>
             <img src="/logo.png" className="h-5 w-5 rounded-md object-contain shrink-0" alt="Logo" />
-            {!isCollapsed && "Vibe-Trading-CNX"}
+            {!isCollapsed && "TideTrading"}
           </Link>
         </div>
 
@@ -350,7 +350,7 @@ export function Layout() {
         <header className="flex h-14 items-center justify-between border-b bg-card px-4 md:hidden shrink-0">
           <Link to="/" className="flex items-center font-bold text-base tracking-tight gap-2">
             <BarChart3 className="h-5 w-5 text-primary shrink-0" />
-            Vibe-Trading
+            TideTrading
           </Link>
           <button 
             onClick={() => setMobileOpen(!mobileOpen)}

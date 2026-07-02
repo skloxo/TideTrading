@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Vibe-Trading CLI for natural-language finance research and backtesting.
+"""TideTrading CLI for natural-language finance research and backtesting.
 
 Usage:
-    vibe-trading                           Interactive mode (default)
-    vibe-trading -p "Backtest AAPL MACD"   Single run
-    vibe-trading serve --port 8899         Start API server
-    vibe-trading chat                      Interactive mode
-    vibe-trading list                      List runs
-    vibe-trading show <run_id>             Show run details
+    tide                           Interactive mode (default)
+    tide -p "Backtest AAPL MACD"   Single run
+    tide serve --port 8899         Start API server
+    tide chat                      Interactive mode
+    tide list                      List runs
+    tide show <run_id>             Show run details
 """
 
 from __future__ import annotations
@@ -788,7 +788,7 @@ class _RunDashboard:
             body.add_row("")
             body.add_row(Panel(Text(latest, style="dim"), title="Latest answer", border_style="dim", padding=(0, 1)))
 
-        return Panel(body, title="Vibe-Trading", border_style="cyan", padding=(1, 1 if compact else 2))
+        return Panel(body, title="TideTrading", border_style="cyan", padding=(1, 1 if compact else 2))
 
 
 from cli.ui.rail import RailRunDashboard as _RunDashboard  # noqa: E402,F811
@@ -1315,9 +1315,9 @@ def _print_result(result: dict, elapsed: float, *, no_rich: bool = False) -> Non
         actions = Table(box=None, show_header=False, padding=(0, 1))
         actions.add_column(style="cyan", no_wrap=True)
         actions.add_column(style="dim")
-        actions.add_row(f"vibe-trading show {rid}", "details")
-        actions.add_row(f"vibe-trading code {rid}", "generated Python")
-        actions.add_row(f"vibe-trading continue {rid} \"...\"", "refine this run")
+        actions.add_row(f"tide show {rid}", "details")
+        actions.add_row(f"tide code {rid}", "generated Python")
+        actions.add_row(f"tide continue {rid} \"...\"", "refine this run")
         panels.append(Panel(actions, border_style="dim", title="Next", padding=(0, 1)))
 
     if _terminal_width() < 104:
@@ -1504,7 +1504,7 @@ def _build_welcome_panel(term_width: Optional[int] = None) -> Panel:
     content_width = widths["content"]
 
     header_lines: list[Text] = []
-    title = f"Vibe-Trading v{_VERSION}"
+    title = f"TideTrading v{_VERSION}"
     subtitle = "finance agent CLI"
     if term_width < 78:
         header_lines.append(Text(title, style="bold cyan"))
@@ -1630,7 +1630,7 @@ def _build_welcome_panel(term_width: Optional[int] = None) -> Panel:
     body.add_row("")
     body.add_row(Text(_clip_inline("Example: analyze AAPL momentum with risk controls", content_width), style="dim"))
 
-    return Panel(body, title="[bold cyan]Vibe-Trading[/bold cyan]", border_style="cyan", padding=(1, 1))
+    return Panel(body, title="[bold cyan]TideTrading[/bold cyan]", border_style="cyan", padding=(1, 1))
 
 
 def _print_welcome() -> None:
@@ -1727,7 +1727,7 @@ def _show_settings() -> None:
             console.print(panel)
     else:
         console.print(Columns(panels, expand=True, equal=True))
-    console.print("[dim]Edit configuration in ~/.vibe-trading/.env, or run vibe-trading init.[/dim]")
+    console.print("[dim]Edit configuration in ~/.tide/.env, or run tide init.[/dim]")
 
 
 def _handle_slash_command(input_str: str, *, max_iter: int) -> None:
@@ -2737,7 +2737,7 @@ def cmd_provider_login(provider: str) -> int:
 # reachable from the agent loop / tool registry. There is deliberately NO
 # `live commit` verb — committing a mandate happens only through the consent
 # flow's `POST /mandate/commit`, never a CLI command (the CLI cannot create or
-# widen a mandate). The public CLI surface is `vibe-trading connector ...`;
+# widen a mandate). The public CLI surface is `tide connector ...`;
 # `cmd_live_*` helpers remain only as the broker-runtime implementation behind
 # connector profiles.
 # ---------------------------------------------------------------------------
@@ -2891,7 +2891,7 @@ def _print_missing_live_channel_config(key: str) -> None:
 
     console.print(
         f"[red]No live channel configured for '{key}'.[/red] "
-        "Add the broker's mcpServers entry to ~/.vibe-trading/agent.json first."
+        "Add the broker's mcpServers entry to ~/.tide/agent.json first."
     )
 
 
@@ -2969,7 +2969,7 @@ def cmd_live_authorize(broker: str) -> int:
     )
     console.print(
         "[dim]The channel is read-only until you commit a mandate and enable "
-        "order tools. Use `vibe-trading connector status` to check state.[/dim]"
+        "order tools. Use `tide connector status` to check state.[/dim]"
     )
     return EXIT_SUCCESS
 
@@ -3186,7 +3186,7 @@ def cmd_live_halt(broker: Optional[str] = None) -> int:
 
     With no broker, trips the global switch (halts all brokers); with a broker,
     trips only that broker's sentinel. The gate rejects all order attempts until
-    the switch is cleared with ``vibe-trading connector resume``.
+    the switch is cleared with ``tide connector resume``.
 
     Args:
         broker: Broker key, or ``None`` for the global switch.
@@ -3201,7 +3201,7 @@ def cmd_live_halt(broker: Optional[str] = None) -> int:
     scope = target or "ALL brokers"
     console.print(f"[bold red]Live trading halted[/bold red] for {scope}.")
     console.print(f"[dim]Sentinel: {path}[/dim]")
-    console.print("[dim]Run `vibe-trading connector resume` to re-enable.[/dim]")
+    console.print("[dim]Run `tide connector resume` to re-enable.[/dim]")
     return EXIT_SUCCESS
 
 
@@ -3303,13 +3303,13 @@ def cmd_live_start(broker: Optional[str] = None) -> int:
     if result.get("status") == "error":
         console.print(f"[red]Could not start the live runner:[/red] {result.get('error')}")
         console.print(
-            "[dim]Is the API server running? Start it with `vibe-trading serve`.[/dim]"
+            "[dim]Is the API server running? Start it with `tide serve`.[/dim]"
         )
         return EXIT_RUN_FAILED
 
     runner_id = result.get("runner_id") or _runner_id_for(key)
     console.print(f"[green]Live runner started[/green] for {key} [dim]({runner_id})[/dim].")
-    console.print("[dim]Check it with `vibe-trading connector status`.[/dim]")
+    console.print("[dim]Check it with `tide connector status`.[/dim]")
     return EXIT_SUCCESS
 
 
@@ -3331,7 +3331,7 @@ def cmd_live_stop(broker: Optional[str] = None) -> int:
     if result.get("status") == "error":
         console.print(f"[red]Could not stop the live runner:[/red] {result.get('error')}")
         console.print(
-            "[dim]Is the API server running? Start it with `vibe-trading serve`.[/dim]"
+            "[dim]Is the API server running? Start it with `tide serve`.[/dim]"
         )
         return EXIT_RUN_FAILED
 
@@ -3363,7 +3363,7 @@ def cmd_live_run(broker: Optional[str] = None) -> int:
     if result.get("status") == "error":
         console.print(f"[red]Could not start the live runner:[/red] {result.get('error')}")
         console.print(
-            "[dim]Is the API server running? Start it with `vibe-trading serve`.[/dim]"
+            "[dim]Is the API server running? Start it with `tide serve`.[/dim]"
         )
         return EXIT_RUN_FAILED
 
@@ -3450,7 +3450,7 @@ def cmd_connector_list() -> int:
             ", ".join(profile.capabilities),
         )
     console.print(table)
-    console.print("[dim]Use `vibe-trading connector use <profile>` to set the default profile.[/dim]")
+    console.print("[dim]Use `tide connector use <profile>` to set the default profile.[/dim]")
     return EXIT_SUCCESS
 
 
@@ -3514,7 +3514,7 @@ def cmd_connector_configure(
     )
     path = save_config(cfg)
     console.print(f"[green]Configured[/green] {profile.id} [dim]({path})[/dim]")
-    console.print(f"[dim]Run `vibe-trading connector check {profile.id}` to verify it.[/dim]")
+    console.print(f"[dim]Run `tide connector check {profile.id}` to verify it.[/dim]")
     return EXIT_SUCCESS
 
 
@@ -4023,7 +4023,7 @@ def _dispatch_connector(args: argparse.Namespace) -> int:
         return cmd_connector_resume(args.profile)
     if sub == "revoke":
         return cmd_connector_revoke(args.profile)
-    console.print("[red]connector requires a subcommand.[/red] Try: vibe-trading connector list")
+    console.print("[red]connector requires a subcommand.[/red] Try: tide connector list")
     return EXIT_USAGE_ERROR
 
 
@@ -4033,8 +4033,8 @@ def _dispatch_connector(args: argparse.Namespace) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser with subcommands and compatibility flags."""
-    parser = argparse.ArgumentParser(description="Vibe-Trading CLI")
-    parser.add_argument("--version", action="version", version=f"vibe-trading {_VERSION}")
+    parser = argparse.ArgumentParser(description="TideTrading CLI")
+    parser.add_argument("--version", action="version", version=f"tide {_VERSION}")
     parser.add_argument("-p", "--prompt", type=str, help="Prompt text")
     parser.add_argument("-f", "--prompt-file", type=Path, help="Read prompt text from a file")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON output")
@@ -4089,7 +4089,7 @@ def _build_parser() -> argparse.ArgumentParser:
     chat_parser = subparsers.add_parser("chat", help="Interactive chat mode")
     chat_parser.add_argument("--max-iter", dest="chat_max_iter", type=int, default=50, help="Maximum agent iterations")
 
-    subparsers.add_parser("init", help="Interactive setup: create ~/.vibe-trading/.env")
+    subparsers.add_parser("init", help="Interactive setup: create ~/.tide/.env")
 
     # Cross-platform frontend setup. See cmd_setup() for details.
     setup_parser = subparsers.add_parser(
@@ -4270,7 +4270,7 @@ def _handle_prompt_command(
     return cmd_run(resolved_prompt, max_iter, json_mode=json_mode, no_rich=no_rich)
 
 
-_INIT_ENV_PATH = Path.home() / ".vibe-trading" / ".env"
+_INIT_ENV_PATH = Path.home() / ".tide" / ".env"
 
 _PROVIDER_CHOICES: list[dict[str, str | None]] = [
     {
@@ -4517,7 +4517,7 @@ def cmd_memory_show(name: str, *, memory_dir: Optional[Path] = None) -> int:
     entry = pm.find(name)
     if entry is None:
         console.print(f"[red]Memory not found:[/red] {rich_escape(name)}")
-        console.print("[dim]Run `vibe-trading memory list` to see available titles.[/dim]")
+        console.print("[dim]Run `tide memory list` to see available titles.[/dim]")
         return EXIT_USAGE_ERROR
 
     style = _MEMORY_TYPE_STYLES.get(entry.memory_type, "white")
@@ -4593,8 +4593,8 @@ def cmd_memory_forget(name: str, *, yes: bool = False, memory_dir: Optional[Path
 
 
 def cmd_init() -> int:
-    """Interactive setup: create ~/.vibe-trading/.env."""
-    console.print(Panel("[bold cyan]Vibe-Trading setup[/bold cyan]\n[dim]Configure the default LLM provider and data tokens.[/dim]", border_style="cyan"))
+    """Interactive setup: create ~/.tide/.env."""
+    console.print(Panel("[bold cyan]TideTrading setup[/bold cyan]\n[dim]Configure the default LLM provider and data tokens.[/dim]", border_style="cyan"))
 
     if _INIT_ENV_PATH.exists():
         console.print(f"[yellow]Config already exists:[/yellow] {_INIT_ENV_PATH}")
@@ -4652,7 +4652,7 @@ def cmd_init() -> int:
             )
     elif provider == "openai-codex":
         console.print("[dim]OpenAI Codex uses ChatGPT OAuth, not an API key.[/dim]")
-        console.print("[dim]After setup, run: vibe-trading provider login openai-codex[/dim]")
+        console.print("[dim]After setup, run: tide provider login openai-codex[/dim]")
     else:
         console.print("[dim]Ollama does not require an API key.[/dim]")
 
@@ -4687,9 +4687,9 @@ def cmd_init() -> int:
     next_steps.add_column(width=10, style="dim")
     next_steps.add_column(ratio=1)
     next_steps.add_row("Config", f"[cyan]{_INIT_ENV_PATH}[/cyan]")
-    next_steps.add_row("Run", "[bold]vibe-trading[/bold]")
+    next_steps.add_row("Run", "[bold]tide[/bold]")
     if provider == "openai-codex":
-        next_steps.add_row("OAuth", "[bold]vibe-trading provider login openai-codex[/bold]")
+        next_steps.add_row("OAuth", "[bold]tide provider login openai-codex[/bold]")
     console.print(Panel(next_steps, title="Setup complete", border_style="green", padding=(0, 1)))
     return 0
 
@@ -4799,7 +4799,7 @@ def cmd_setup(frontend_dir: Path) -> int:
     """
     console.print(
         Panel(
-            f"[bold cyan]Vibe-Trading frontend setup[/bold cyan]\n"
+            f"[bold cyan]TideTrading frontend setup[/bold cyan]\n"
             f"[dim]{frontend_dir}[/dim]",
             border_style="cyan",
             padding=(0, 1),
@@ -4843,7 +4843,7 @@ def cmd_setup(frontend_dir: Path) -> int:
         Panel(
             "[green]Frontend built.[/green]\n"
             f"  Artifacts: [cyan]{frontend_dir / 'dist'}[/cyan]\n"
-            "[dim]Run [bold]vibe-trading serve[/bold] to serve everything on one port.[/dim]",
+            "[dim]Run [bold]tide serve[/bold] to serve everything on one port.[/dim]",
             border_style="green",
             padding=(0, 1),
         )
@@ -4899,7 +4899,7 @@ def cmd_dev(
 
     console.print(
         Panel(
-            f"[bold cyan]Vibe-Trading dev[/bold cyan]\n"
+            f"[bold cyan]TideTrading dev[/bold cyan]\n"
             f"  Backend  → [cyan]http://127.0.0.1:{backend_port}[/cyan]  "
             f"(cwd: {AGENT_DIR})\n"
             f"  Frontend → [cyan]http://localhost:{frontend_port}[/cyan]  "
@@ -4995,7 +4995,7 @@ def main(argv: list[str] | None = None) -> int:
             return cmd_provider_login(args.provider)
         if args.provider_command == "doctor":
             return cmd_provider_doctor()
-        console.print("[red]provider requires a subcommand.[/red] Try: vibe-trading provider doctor")
+        console.print("[red]provider requires a subcommand.[/red] Try: tide provider doctor")
         return EXIT_USAGE_ERROR
     if args.command == "run":
         return _handle_prompt_command(
@@ -5028,7 +5028,7 @@ def main(argv: list[str] | None = None) -> int:
             return _coerce_exit_code(cmd_memory_search(args.query, args.memory_limit))
         if args.memory_command == "forget":
             return _coerce_exit_code(cmd_memory_forget(args.name, yes=args.yes))
-        console.print("[red]memory requires a subcommand.[/red] Try: vibe-trading memory list")
+        console.print("[red]memory requires a subcommand.[/red] Try: tide memory list")
         return EXIT_USAGE_ERROR
 
     if args.list:

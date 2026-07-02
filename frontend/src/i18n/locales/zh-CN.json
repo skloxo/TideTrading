@@ -122,8 +122,8 @@
     "disconnected": "连接已断开"
   },
   "welcome": {
-    "title": "Vibe-Trading-CNX",
-    "subtitle": "与你的专业金融智能体团队一起进行 vibe trading",
+    "title": "潮汐投研 TideTrading",
+    "subtitle": "与您的专业金融智能体团队一起，洞察市场情绪潮汐",
     "describePrompt": "描述一个交易策略即可开始。",
     "tryExample": "试试示例：",
     "categories": {

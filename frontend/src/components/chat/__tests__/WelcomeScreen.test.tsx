@@ -9,7 +9,7 @@ describe("WelcomeScreen", () => {
 
   it("renders the title", () => {
     render(<WelcomeScreen onExample={onExample} />);
-    expect(screen.getByText("Vibe-Trading-CNX")).toBeInTheDocument();
+    expect(screen.getByText("TideTrading")).toBeInTheDocument();
   });
 
   it("renders capability chips", () => {

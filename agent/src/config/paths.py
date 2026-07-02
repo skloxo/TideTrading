@@ -47,7 +47,7 @@ def get_tenant_env_values(tenant: str) -> dict[str, str]:
     if tenant == "default":
         return {}
     # Use standard tenant path structure derived from home
-    tenant_dir = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant
+    tenant_dir = _get_active_runtime_dir() / "tenants" / tenant
     env_path = tenant_dir / ".env"
     if not env_path.exists():
         return {}
@@ -93,10 +93,24 @@ _orig_getenv = os.getenv
 
 
 def tenant_getenv(key: str, default: str | None = None) -> str | None:
-    val = _get_tenant_env(key)
-    if val is not _NOT_FOUND:
-        return val  # type: ignore
-    return _orig_getenv(key, default)
+    # Support both prefixes (TT_ and VIBE_TRADING_)
+    mapped_keys = [key]
+    if key.startswith("VIBE_TRADING_"):
+        mapped_keys.insert(0, key.replace("VIBE_TRADING_", "TT_", 1))
+    elif key.startswith("TT_"):
+        mapped_keys.append(key.replace("TT_", "VIBE_TRADING_", 1))
+
+    for k in mapped_keys:
+        val = _get_tenant_env(k)
+        if val is not _NOT_FOUND:
+            return val  # type: ignore
+
+    for k in mapped_keys:
+        val = _orig_getenv(k, _NOT_FOUND)
+        if val is not _NOT_FOUND:
+            return val  # type: ignore
+
+    return default
 
 
 os.getenv = tenant_getenv
@@ -111,24 +125,60 @@ _orig_copy = os.environ.__class__.copy
 
 
 def tenant_getitem(self, key: str) -> str:
-    val = _get_tenant_env(key)
-    if val is not _NOT_FOUND:
-        return val  # type: ignore
-    return _orig_getitem(self, key)
+    mapped_keys = [key]
+    if key.startswith("VIBE_TRADING_"):
+        mapped_keys.insert(0, key.replace("VIBE_TRADING_", "TT_", 1))
+    elif key.startswith("TT_"):
+        mapped_keys.append(key.replace("TT_", "VIBE_TRADING_", 1))
+
+    for k in mapped_keys:
+        val = _get_tenant_env(k)
+        if val is not _NOT_FOUND:
+            return val  # type: ignore
+
+    for k in mapped_keys:
+        try:
+            return _orig_getitem(self, k)
+        except KeyError:
+            continue
+            
+    raise KeyError(key)
 
 
 def tenant_get(self, key: str, default: str | None = None) -> str | None:
-    val = _get_tenant_env(key)
-    if val is not _NOT_FOUND:
-        return val  # type: ignore
-    return _orig_get(self, key, default)
+    mapped_keys = [key]
+    if key.startswith("VIBE_TRADING_"):
+        mapped_keys.insert(0, key.replace("VIBE_TRADING_", "TT_", 1))
+    elif key.startswith("TT_"):
+        mapped_keys.append(key.replace("TT_", "VIBE_TRADING_", 1))
+
+    for k in mapped_keys:
+        val = _get_tenant_env(k)
+        if val is not _NOT_FOUND:
+            return val  # type: ignore
+
+    for k in mapped_keys:
+        val = _orig_get(self, k, _NOT_FOUND)
+        if val is not _NOT_FOUND:
+            return val  # type: ignore
+
+    return default
 
 
 def tenant_contains(self, key: str) -> bool:
-    val = _get_tenant_env(key)
-    if val is not _NOT_FOUND:
-        return True
-    return _orig_contains(self, key)
+    mapped_keys = [key]
+    if key.startswith("VIBE_TRADING_"):
+        mapped_keys.insert(0, key.replace("VIBE_TRADING_", "TT_", 1))
+    elif key.startswith("TT_"):
+        mapped_keys.append(key.replace("TT_", "VIBE_TRADING_", 1))
+
+    for k in mapped_keys:
+        val = _get_tenant_env(k)
+        if val is not _NOT_FOUND:
+            return True
+        if _orig_contains(self, k):
+            return True
+    return False
 
 
 def tenant_iter(self):
@@ -175,6 +225,13 @@ os.environ.__class__.__len__ = tenant_len
 os.environ.__class__.copy = tenant_copy
 
 
+def _get_active_runtime_dir() -> Path:
+    old_dir = Path.home() / ".vibe-trading-cnx"
+    new_dir = Path.home() / ".tide-trading"
+    if not new_dir.exists() and old_dir.exists():
+        return old_dir
+    return new_dir
+
 def get_runtime_root(config_path: Path | None = None) -> Path:
     """Return the runtime root directory for user-level agent state.
 
@@ -184,15 +241,16 @@ def get_runtime_root(config_path: Path | None = None) -> Path:
 
     Returns:
         The directory containing the explicit structured config file when one
-        is provided, otherwise the default ``~/.vibe-trading-cnx`` runtime root,
-        or a tenant-specific root under ``~/.vibe-trading-cnx/tenants/<tenant>``.
+        is provided, otherwise the default ``~/.tide-trading`` runtime root,
+        or a tenant-specific root under ``~/.tide-trading/tenants/<tenant>``.
     """
     if config_path is not None:
         return config_path.expanduser().parent
     tenant = active_tenant_var.get()
+    base = _get_active_runtime_dir()
     if tenant == "default":
-        return Path.home() / ".vibe-trading-cnx"
-    return Path.home() / ".vibe-trading-cnx" / "tenants" / tenant
+        return base
+    return base / "tenants" / tenant
 
 
 def get_market_db_path() -> Path:
@@ -209,7 +267,7 @@ def get_market_db_path() -> Path:
     There is ONE instance of this file regardless of how many tenants exist.
     Always lives under the default runtime root (~/.vibe-trading-cnx/).
     """
-    base = Path.home() / ".vibe-trading-cnx"
+    base = _get_active_runtime_dir()
     base.mkdir(parents=True, exist_ok=True)
     return base / "stocks_market.db"
 
@@ -226,9 +284,9 @@ def get_tenant_db_path(tenant_id: str | None = None) -> Path:
     """
     tid = tenant_id or active_tenant_var.get() or "default"
     if tid == "default":
-        root = Path.home() / ".vibe-trading-cnx"
+        root = _get_active_runtime_dir()
     else:
-        root = Path.home() / ".vibe-trading-cnx" / "tenants" / tid
+        root = _get_active_runtime_dir() / "tenants" / tid
     root.mkdir(parents=True, exist_ok=True)
     return root / f"stocks_{tid}.db"
 

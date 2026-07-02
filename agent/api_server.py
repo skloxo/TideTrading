@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vibe-Trading API Server - RESTful API for finance research and backtesting.
+"""TideTrading API Server - RESTful API for finance research and backtesting.
 
 V5: ReAct Agent + async /run + CORS env + SSE tool events.
 """
@@ -74,15 +74,15 @@ def _get_uploads_dir() -> Path:
 
 class _DynamicEnvPath(type(Path())):
     def __new__(cls):
-        return super().__new__(cls, Path.home() / ".vibe-trading-cnx" / ".env")
+        return super().__new__(cls, Path.home() / ".tide" / ".env")
 
     @property
     def _actual(self) -> Path:
         from src.config.paths import active_tenant_var
         tenant = active_tenant_var.get()
         if tenant == "default":
-            return Path.home() / ".vibe-trading-cnx" / ".env"
-        return Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
+            return Path.home() / ".tide" / ".env"
+        return Path.home() / ".tide" / "tenants" / tenant / ".env"
 
     def exists(self) -> bool:
         return self._actual.exists()
@@ -172,8 +172,8 @@ XUEQIU_COMBOS_CACHE = {}  # {tenant_id: (mtime, timestamp, details)}
 
 
 def _load_tenant_keys() -> list[dict]:
-    """Load tenant API keys from ~/.vibe-trading-cnx/tenants/tenant_keys.json."""
-    path = Path.home() / ".vibe-trading-cnx" / "tenants" / "tenant_keys.json"
+    """Load tenant API keys from ~/.tide/tenants/tenant_keys.json."""
+    path = Path.home() / ".tide" / "tenants" / "tenant_keys.json"
     if not path.exists():
         return []
     try:
@@ -184,8 +184,8 @@ def _load_tenant_keys() -> list[dict]:
 
 
 def _save_tenant_keys(keys: list[dict]) -> None:
-    """Save tenant API keys to ~/.vibe-trading-cnx/tenants/tenant_keys.json."""
-    path = Path.home() / ".vibe-trading-cnx" / "tenants" / "tenant_keys.json"
+    """Save tenant API keys to ~/.tide/tenants/tenant_keys.json."""
+    path = Path.home() / ".tide" / "tenants" / "tenant_keys.json"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(keys, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -696,7 +696,7 @@ class LiveHaltRequest(BaseModel):
 class LiveAuthorizeRequest(BaseModel):
     """Kick off (or describe) the OAuth bootstrap for a live broker (C2).
 
-    Vibe-Trading never holds funds and never operates a venue, so the OAuth
+    TideTrading never holds funds and never operates a venue, so the OAuth
     bootstrap runs through the broker's own user-authorized device flow on the
     client (CLI / desktop MCP), not a server-side redirect. This endpoint is the
     web on-ramp: it tells a Web UI user exactly how to discover/start the flow.
@@ -781,8 +781,8 @@ class LiveStatusResponse(BaseModel):
 # ============================================================================
 
 app = FastAPI(
-    title="Vibe-Trading API",
-    description="Vibe-Trading API: natural-language finance research, backtesting, and swarm workflows",
+    title="TideTrading API",
+    description="TideTrading API: natural-language finance research, backtesting, and swarm workflows",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -951,7 +951,7 @@ def _get_feishu_channels_json_path() -> Path:
     tenant = active_tenant_var.get()
     if tenant == "default":
         return FEISHU_CHANNELS_JSON
-    return Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / "feishu_channels.json"
+    return Path.home() / ".tide" / "tenants" / tenant / "feishu_channels.json"
 
 
 def _load_feishu_channels() -> list[dict[str, Any]]:
@@ -1006,7 +1006,7 @@ def _save_feishu_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-WECHAT_CHANNELS_JSON = Path.home() / ".vibe-trading-cnx" / "wechat_channels.json"
+WECHAT_CHANNELS_JSON = Path.home() / ".tide" / "wechat_channels.json"
 
 def _get_wechat_channels_json_path() -> Path:
     """Get path to the WeChat channels persistent JSON file based on active tenant."""
@@ -1014,7 +1014,7 @@ def _get_wechat_channels_json_path() -> Path:
     tenant = active_tenant_var.get()
     if tenant == "default":
         return WECHAT_CHANNELS_JSON
-    return Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / "wechat_channels.json"
+    return Path.home() / ".tide" / "tenants" / tenant / "wechat_channels.json"
 
 
 def _load_wechat_channels() -> list[dict[str, Any]]:
@@ -1659,7 +1659,7 @@ def _ensure_agent_env_file() -> Path:
     """Ensure the project-local agent/.env exists."""
     ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
     if not ENV_PATH.exists():
-        ENV_PATH.write_text("# Created by Vibe-Trading Web UI settings.\n", encoding="utf-8")
+        ENV_PATH.write_text("# Created by TideTrading Web UI settings.\n", encoding="utf-8")
     return ENV_PATH
 
 
@@ -1698,7 +1698,7 @@ def _read_settings_env_values() -> Dict[str, str]:
     if not isinstance(ENV_PATH, _DynamicEnvPath):
         admin_env = ENV_PATH
     else:
-        admin_env = Path.home() / ".vibe-trading-cnx" / ".env"
+        admin_env = Path.home() / ".tide" / ".env"
         if not admin_env.exists():
             admin_env = AGENT_DIR / ".env"
 
@@ -1856,7 +1856,7 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
 
     is_custom = True
     if tenant != "default":
-        tenant_env = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
+        tenant_env = Path.home() / ".tide" / "tenants" / tenant / ".env"
         if not tenant_env.exists():
             is_custom = False
         else:
@@ -1933,7 +1933,7 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
     fred_api_key_hint = None
     ths_cookie_hint = None
     if tenant != "default" and not is_public:
-        tenant_env = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
+        tenant_env = Path.home() / ".tide" / "tenants" / tenant / ".env"
         tenant_vals = {}
         if tenant_env.exists():
             tenant_vals = _read_env_values(tenant_env)
@@ -1949,7 +1949,7 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
 
     is_custom = True
     if tenant != "default":
-        tenant_env = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
+        tenant_env = Path.home() / ".tide" / "tenants" / tenant / ".env"
         if not tenant_env.exists():
             is_custom = False
         else:
@@ -2478,7 +2478,7 @@ async def register_tenant(payload: CreateTenantKeyRequest):
     _save_tenant_keys(keys)
     
     # 4. 创建隔离目录
-    tenant_dir = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant_id
+    tenant_dir = Path.home() / ".tide" / "tenants" / tenant_id
     tenant_dir.mkdir(parents=True, exist_ok=True)
     
     # 初始化专属的配置说明文件
@@ -2524,7 +2524,7 @@ async def create_tenant_key(payload: CreateTenantKeyRequest):
     keys.append(new_key)
     _save_tenant_keys(keys)
     
-    tenant_dir = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant_id
+    tenant_dir = Path.home() / ".tide" / "tenants" / tenant_id
     tenant_dir.mkdir(parents=True, exist_ok=True)
     
     return TenantKeyItem(**new_key)
@@ -2614,8 +2614,8 @@ async def get_system_version(request: Request):
             import urllib.request
             import json
             req = urllib.request.Request(
-                "https://api.github.com/repos/skloxo/Vibe-Trading-CNX/releases/latest",
-                headers={"User-Agent": "Vibe-Trading-CNX"}
+                "https://api.github.com/repos/skloxo/TideTrading/releases/latest",
+                headers={"User-Agent": "TideTrading"}
             )
             with urllib.request.urlopen(req, timeout=3) as response:
                 if response.status == 200:
@@ -2868,7 +2868,7 @@ async def update_llm_settings(request: Request, payload: UpdateLLMSettingsReques
     tenant = active_tenant_var.get()
     tenant_vals = {}
     if tenant != "default":
-        tenant_env = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
+        tenant_env = Path.home() / ".tide" / "tenants" / tenant / ".env"
         if tenant_env.exists():
             tenant_vals = _read_env_values(tenant_env)
     else:
@@ -2936,7 +2936,7 @@ async def update_data_source_settings(request: Request, payload: UpdateDataSourc
     tenant = active_tenant_var.get()
     tenant_vals = {}
     if tenant != "default":
-        tenant_env = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant / ".env"
+        tenant_env = Path.home() / ".tide" / "tenants" / tenant / ".env"
         if tenant_env.exists():
             tenant_vals = _read_env_values(tenant_env)
     else:
@@ -3869,7 +3869,7 @@ async def health_check():
     """Liveness probe."""
     return HealthResponse(
         status="healthy",
-        service="Vibe-Trading API",
+        service="TideTrading API",
         timestamp=datetime.now().isoformat()
     )
 
@@ -4491,7 +4491,7 @@ async def shutdown_local_api(
     background_tasks.add_task(_terminate_current_process)
     return {
         "status": "shutting-down",
-        "service": "Vibe-Trading API",
+        "service": "TideTrading API",
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -4515,7 +4515,7 @@ async def list_skills():
 async def api_info():
     """Service metadata."""
     return {
-        "service": "Vibe-Trading API",
+        "service": "TideTrading API",
         "version": APP_VERSION,
         "docs": "/docs",
         "health": "/health",
@@ -5040,7 +5040,7 @@ async def get_shadow_report(shadow_id: str, format: str = "html"):
     if format not in ("html", "pdf"):
         raise HTTPException(status_code=400, detail="format must be html or pdf")
 
-    reports_dir = Path.home() / ".vibe-trading-cnx" / "shadow_reports"
+    reports_dir = Path.home() / ".tide" / "shadow_reports"
     path = reports_dir / f"{shadow_id}.{format}"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Shadow report not found: {shadow_id}.{format}")
@@ -5782,7 +5782,7 @@ async def live_status_endpoint(broker: Optional[str] = Query(None, max_length=64
 async def live_authorize_endpoint(payload: LiveAuthorizeRequest):
     """Describe the OAuth bootstrap on-ramp for a live broker (C2 web on-ramp).
 
-    Vibe-Trading holds no funds and runs no venue: the OAuth flow happens on the
+    TideTrading holds no funds and runs no venue: the OAuth flow happens on the
     broker's own user-authorized device channel (CLI / desktop MCP), never a
     server-side redirect. A Web UI user reaches this endpoint to DISCOVER how to
     start the flow. It performs no authorization itself and never returns a token.
@@ -5803,7 +5803,7 @@ async def live_authorize_endpoint(payload: LiveAuthorizeRequest):
         "instruction": (
             f"Run `vibe-trading connector authorize {connector_profile}` "
             "from the device that will hold the broker session. This opens the "
-            "broker's own OAuth consent flow; Vibe-Trading never holds funds and "
+            "broker's own OAuth consent flow; TideTrading never holds funds and "
             "only relays intent once you authorize."
         ),
         "note": (
@@ -6271,7 +6271,7 @@ def serve_main(argv: list[str] | None = None) -> int:
                     raise
                 return await super().get_response("index.html", scope)
 
-    parser = argparse.ArgumentParser(description="Vibe-Trading Server")
+    parser = argparse.ArgumentParser(description="TideTrading Server")
     parser.add_argument("--port", type=int, default=8000, help="Listen port (default 8000)")
     parser.add_argument("--host", default="0.0.0.0", help="Bind address")
     parser.add_argument("--dev", action="store_true", help="Dev mode: spawn Vite on :5173")
@@ -6304,7 +6304,7 @@ def serve_main(argv: list[str] | None = None) -> int:
         print("[warn] Run: cd frontend && npm run build")
 
     print("=" * 50)
-    print("  Vibe-Trading Server")
+    print("  TideTrading Server")
     print(f"  http://127.0.0.1:{args.port}")
     print("=" * 50)
 

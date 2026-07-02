@@ -250,8 +250,8 @@ def _build_keybindings(state: _CtrlCState) -> KeyBindings:
 
 
 def _default_history_path() -> Path:
-    """Where ``~/.vibe-trading-cnx/history`` lives by default."""
-    home = Path.home() / ".vibe-trading-cnx"
+    """Where ``~/.tide/history`` lives by default."""
+    home = Path.home() / ".tide"
     return home / "history"
 
 
@@ -260,7 +260,7 @@ def make_session(history_path: Optional[Path] = None) -> PromptSession:
 
     Args:
         history_path: Override for the persistent history file. ``None``
-            uses ``~/.vibe-trading/history``.
+            uses ``~/.tide/history``.
 
     Returns:
         A ready-to-use ``PromptSession`` wired to the slash completer,

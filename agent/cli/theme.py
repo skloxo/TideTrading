@@ -1,4 +1,4 @@
-"""Centralised Rich Style table for the Vibe-Trading CLI.
+"""Centralised Rich Style table for the TideTrading CLI.
 
 All visible colour decisions for the CLI live here so the look stays consistent
 with the web app (see ``frontend/src/index.css`` design tokens). The brand
@@ -212,7 +212,7 @@ class Theme:
 
     Example:
         >>> from cli.theme import Theme, get_console
-        >>> get_console().print("Vibe-Trading", style=Theme.primary)
+        >>> get_console().print("TideTrading", style=Theme.primary)
     """
 
     primary: Final[Style] = _styles.primary

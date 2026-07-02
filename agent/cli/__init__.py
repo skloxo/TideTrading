@@ -1,4 +1,4 @@
-"""Vibe-Trading CLI package.
+"""TideTrading CLI package.
 
 The legacy single-file CLI has been preserved verbatim as
 ``cli/_legacy.py`` and is the source of truth for non-interactive
@@ -10,7 +10,7 @@ built on :mod:`cli.input`, :mod:`cli.completer`, and
 ``_legacy.main``.
 
 The console-script entry in ``pyproject.toml``
-(``vibe-trading = "cli:main"``) points at the ``main`` callable exported
+(``tide = "cli:main"``) points at the ``main`` callable exported
 here.
 
 Compatibility note: tests and downstream callers historically reached

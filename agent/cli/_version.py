@@ -1,6 +1,6 @@
 """Single source of truth for the CLI version string.
 
-Reads ``vibe-trading-ai``'s installed package metadata when available
+Reads ``tide-trading-ai``'s installed package metadata when available
 (``pip install -e .`` is enough). For an un-installed checkout (e.g. running
 straight from a clone with ``PYTHONPATH=agent``) it falls back to reading the
 version straight out of ``pyproject.toml`` — so ``pyproject.toml`` is the one
@@ -32,6 +32,13 @@ def _version_from_pyproject() -> str:
         return "unknown"
 
 
-__version__: Final[str] = "1.7.1"
+try:
+    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+    try:
+        __version__: Final[str] = _pkg_version("tide-trading-ai")
+    except PackageNotFoundError:
+        __version__ = _version_from_pyproject()
+except ImportError:
+    __version__ = _version_from_pyproject()
 
 __all__ = ["__version__"]

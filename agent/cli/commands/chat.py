@@ -59,7 +59,7 @@ def cmd_model(ctx: Any = None, *args: str) -> int:  # noqa: ARG001 — ctx unuse
     console.print()
     console.print(
         Text(
-            "Run `vibe-trading init` to switch provider, model, or credentials.",
+            "Run `tide init` to switch provider, model, or credentials.",
             style="dim",
         )
     )

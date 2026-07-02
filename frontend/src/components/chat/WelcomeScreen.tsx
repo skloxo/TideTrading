@@ -182,7 +182,7 @@ export function WelcomeScreen({ onExample }: Props) {
         <img
           src="/logo.png"
           className="h-16 w-16 mx-auto rounded-2xl shadow-lg object-cover"
-          alt="Vibe-Trading-CNX Logo"
+          alt="TideTrading Logo"
         />
         <div>
           <h2 className="text-2xl font-bold tracking-tight">{t('welcome.title')}</h2>

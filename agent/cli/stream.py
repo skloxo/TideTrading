@@ -4,7 +4,7 @@ Single-agent mode (the only mode demoed in Parcel α): a short-lived
 ``Rich.Live`` with ``transient=True`` drives the spinner while the model
 thinks; tool events and the final answer are emitted as *static* prints so
 they persist on screen after the live area is erased. This avoids the
-"ghost re-paint" bug that plagued Vibe-Trading's earlier Live-based
+"ghost re-paint" bug that plagued TideTrading's earlier Live-based
 dashboards (nanobot lesson, design proposal §3.5).
 
 Swarm mode is a stub: callers should fall through to the legacy Rich Live

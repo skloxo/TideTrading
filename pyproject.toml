@@ -1,5 +1,5 @@
 [project]
-name = "vibe-trading-cnx-ai"
+name = "tide-trading-ai"
 version = "0.1.10"
 description = "A-Share & HK Equities Focus Quantitative Trading Workstation powered by Multi-Agent Swarms"
 requires-python = ">=3.11"
@@ -67,8 +67,8 @@ Repository = "https://github.com/skloxo/Vibe-Trading-CNX"
 Issues = "https://github.com/skloxo/Vibe-Trading-CNX/issues"
 
 [project.scripts]
-vibe-trading-cnx = "cli:main"
-vibe-trading-cnx-mcp = "mcp_server:main"
+tide = "cli:main"
+tide-mcp = "mcp_server:main"
 
 [tool.setuptools]
 package-dir = {"" = "agent"}

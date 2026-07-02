@@ -76,6 +76,6 @@ def print_banner(
         console.print(rendered)
 
     meta = Text(pad)
-    meta.append(f"vibe-trading v{version}  ·  {mode}  ·  {model}", style=Theme.muted)
+    meta.append(f"tide v{version}  ·  {mode}  ·  {model}", style=Theme.muted)
     console.print(meta)
     console.print()

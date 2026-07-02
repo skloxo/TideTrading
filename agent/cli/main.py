@@ -1,8 +1,8 @@
-"""Interactive CLI front door for Vibe-Trading.
+"""Interactive CLI front door for TideTrading.
 
 Responsibilities:
 
-1. Detect whether ``~/.vibe-trading/.env`` exists; if missing, run the
+1. Detect whether ``~/.tide/.env`` exists; if missing, run the
    onboarding wizard (:mod:`cli.onboard`) before doing anything else.
 2. Render the startup banner (:mod:`cli.intro`) on interactive entry.
 3. For interactive entry (no subcommand, or ``chat``) drive the REPL
@@ -13,7 +13,7 @@ Responsibilities:
    long tail of ``serve``, ``run``, ``mcp``, ``sessions``, ``swarm`` etc.
    keeps working without regression.
 
-The console script entry in ``pyproject.toml`` (``vibe-trading = "cli:main"``)
+The console script entry in ``pyproject.toml`` (``tide = "cli:main"``)
 hits :func:`main`.
 """
 
@@ -84,7 +84,7 @@ def _register_live_slash_commands() -> None:
 
 _register_live_slash_commands()
 
-_ENV_PATH = Path.home() / ".vibe-trading-cnx" / ".env"
+_ENV_PATH = Path.home() / ".tide" / ".env"
 # Best-effort fallbacks used only when the probe genuinely fails (missing
 # dependency, broken install). The numbers track the actual bundled counts
 # so a probe failure still shows a plausible banner rather than "0 loaded".
@@ -133,7 +133,7 @@ def _probe_skill_count() -> int:
 
     Reads ``SkillsLoader.skills`` directly — that is the authoritative list
     populated by :meth:`SkillsLoader._load` from bundled ``agent/skills/``
-    plus ``~/.vibe-trading-cnx/skills/user/``.
+    plus ``~/.tide/skills/user/``.
     """
     try:
         from src.agent.skills import SkillsLoader
@@ -146,7 +146,7 @@ def _probe_skill_count() -> int:
 
 def _probe_session_count() -> int:
     """Count recorded sessions from the SQLite store."""
-    db_path = Path.home() / ".vibe-trading-cnx" / "sessions.db"
+    db_path = Path.home() / ".tide" / "sessions.db"
     if not db_path.exists():
         return 0
     try:
@@ -277,7 +277,7 @@ def _show_banner() -> None:
     console.print(
         "  [dim]Live trading (opt-in, read-only by default): "
         "[/dim][bold]/connector[/bold][dim] in chat · "
-        "[/dim][bold]vibe-trading connector --help[/bold][dim] · "
+        "[/dim][bold]tide connector --help[/bold][dim] · "
         "[/dim][bold]/halt[/bold][dim] = kill switch.[/dim]"
     )
     console.print()
@@ -364,7 +364,7 @@ def _new_session(prompt_preview: str) -> Optional[str]:
 
     Dual-writes to the filesystem :class:`SessionStore` (canonical JSONL
     log under ``agent/sessions/``) *and* to the SQLite FTS5 search index
-    (``~/.vibe-trading-cnx/sessions.db``) so cross-session search via
+    (``~/.tide/sessions.db``) so cross-session search via
     :class:`SessionSearchIndex` finds turns recorded from the interactive
     loop. Matches the pattern in :class:`SessionService`.
     """
@@ -697,7 +697,7 @@ def _run_one_turn(user_input: str, ctx: InteractiveContext) -> None:
             dashboard.finish(result, time.perf_counter() - start)
     except (KeyboardInterrupt, BrokenPipeError):
         dashboard.close()
-        # BrokenPipe: caller did ``vibe-trading chat | head`` and the
+        # BrokenPipe: caller did ``tide chat | head`` and the
         # downstream pipe closed mid-render. Print may itself fail on
         # the closed fd, so swallow that defensively too.
         try:
@@ -820,7 +820,7 @@ def _trip_halt_from_repl(console: Any, *, reason: str) -> None:
         return
     console.print(
         "[bold red]Live trading halted[/bold red] — all live order tools are now "
-        "disabled until you run [bold]/resume[/bold] or [bold]vibe-trading connector resume[/bold]."
+        "disabled until you run [bold]/resume[/bold] or [bold]tide connector resume[/bold]."
     )
     console.print(f"[dim]HALT sentinel: {path}[/dim]")
 
@@ -830,7 +830,7 @@ def _clear_halt_from_repl(console: Any) -> None:
 
     Clearing the halt is a privileged surface action — an explicit re-enable,
     never an agent tool (SPEC.md Consent §4). It is intercepted in the input
-    path so the model never performs it. Mirrors ``vibe-trading connector resume``
+    path so the model never performs it. Mirrors ``tide connector resume``
     with no broker (the global scope).
 
     Args:
@@ -854,7 +854,7 @@ def _clear_halt_from_repl(console: Any) -> None:
 def _run_connector_command_from_repl(console: Any, args: list[str]) -> None:
     """Run a ``/connector ...`` subcommand from the REPL via the dispatcher.
 
-    ``/connector`` is a thin in-REPL bridge to the ``vibe-trading connector``
+    ``/connector`` is a thin in-REPL bridge to the ``tide connector``
     subcommand group (SPEC.md §9 Decision 1): ``/connector status``,
     ``/connector start``, ``/connector stop``, ``/connector halt``, etc. It parses the
     arguments through the same argparse surface as the non-interactive CLI and
@@ -1076,7 +1076,7 @@ def _interactive_loop(max_iter: int, resume_session_id: Optional[str] = None) ->
     ctx = InteractiveContext(max_iter=max_iter)
 
     if resume_session_id:
-        # Resume a specific session by ID (``vibe-trading resume <session-id>``).
+        # Resume a specific session by ID (``tide resume <session-id>``).
         try:
             store = _session_store()
             session = store.get_session(resume_session_id)
@@ -1194,7 +1194,7 @@ def _interactive_loop(max_iter: int, resume_session_id: Optional[str] = None) ->
     console.print("[dim]Goodbye[/dim]")
     if ctx.session_id:
         console.print(
-            f"[dim]To resume this session:[/dim] [bold]vibe-trading resume {ctx.session_id}[/bold]"
+            f"[dim]To resume this session:[/dim] [bold]tide resume {ctx.session_id}[/bold]"
         )
     return 0
 
@@ -1235,7 +1235,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         max_iter = _extract_max_iter(raw_argv, default=50)
         return _interactive_loop(max_iter)
 
-    # Handle ``vibe-trading resume <session-id>`` — enter the interactive
+    # Handle ``tide resume <session-id>`` — enter the interactive
     # loop with a specific session loaded, bypassing the legacy dispatcher.
     if len(raw_argv) == 2 and raw_argv[0] == "resume":
         max_iter = _extract_max_iter(raw_argv, default=50)
@@ -1297,7 +1297,7 @@ def _build_typer_app():  # type: ignore[no-untyped-def]
     app = typer.Typer(
         add_completion=False,
         no_args_is_help=False,
-        help="Vibe-Trading — natural-language finance research agent.",
+        help="TideTrading — natural-language finance research agent.",
         rich_markup_mode=None,
     )
 
