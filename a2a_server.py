@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vibe-Trading A2A Server (v0.3 Protobuf + JSON-RPC) — production edition.
+"""TideTrading A2A Server (v0.3 Protobuf + JSON-RPC) — production edition.
 
 Start:  python a2a_server.py
 Health: curl http://0.0.0.0:19997/health
@@ -52,7 +52,7 @@ from a2a.server.routes import create_agent_card_routes
 
 VT_HOST = "0.0.0.0"
 VT_PORT = 19997
-VT_BIN = os.path.expanduser("/home/skloxo/aho/vibe-trading/.venv/bin/vibe-trading")
+VT_BIN = os.path.expanduser("/home/skloxo/aho/tide-trading/.venv/bin/tide-trading")
 VT_SKILLS = [
     "backtest", "alpha-zoo", "factor-research", "data-source",
     "risk-analysis", "macro-analysis", "options-strategy", "trade-journal",
@@ -70,18 +70,18 @@ def build_agent_card() -> AgentCard:
         AgentSkill(
             id=s,
             name=s.replace("-", " ").title(),
-            description=f"Vibe-Trading {s} capability",
+            description=f"TideTrading {s} capability",
             tags=["finance", "quantitative"],
             examples=[],
         )
         for s in VT_SKILLS
     ]
     return AgentCard(
-        name="Vibe-Trading Agent",
+        name="TideTrading Agent",
         description="69 specialist skills, 50 tools, 7 data sources — backtesting, factor research, options pricing, risk audits, and research reports.",
-        provider=AgentProvider(organization="Vibe-Trading", url="https://github.com/vibe-trading"),
+        provider=AgentProvider(organization="TideTrading", url="https://github.com/tide-trading"),
         version="1.0.0",
-        documentation_url="https://github.com/vibe-trading/docs",
+        documentation_url="https://github.com/tide-trading/docs",
         supported_interfaces=[
             AgentInterface(protocol_binding="jsonrpc", url="http://0.0.0.0:19997/")
         ],
@@ -89,7 +89,7 @@ def build_agent_card() -> AgentCard:
         default_output_modes=["text/plain", "application/json"],
         capabilities=AgentCapabilities(streaming=False, push_notifications=False),
         skills=skills,
-        icon_url="https://raw.githubusercontent.com/vibe-trading/docs/main/icon.png",
+        icon_url="https://raw.githubusercontent.com/tide-trading/docs/main/icon.png",
     )
 
 AGENT_CARD = build_agent_card()
@@ -97,7 +97,7 @@ AGENT_CARD = build_agent_card()
 # ─── Agent Executor ─────────────────────────────────────────────────────────
 
 class VTAgentExecutor(AgentExecutor):
-    """Calls `vibe-trading -p "prompt" --no-rich` and streams back output."""
+    """Calls `tide-trading -p "prompt" --no-rich` and streams back output."""
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         logger.info('VTAgentExecutor.execute')
@@ -117,7 +117,7 @@ class VTAgentExecutor(AgentExecutor):
         )
         await task_updater.update_status(
             state=TaskState.TASK_STATE_WORKING,
-            message=new_text_message('Processing request via Vibe-Trading...'),
+            message=new_text_message('Processing request via TideTrading...'),
         )
 
         # 3. Extract user text and invoke vt CLI
@@ -180,7 +180,7 @@ def create_app() -> Starlette:
 
     routes.append(Route("/health", health, methods=["GET"]))
 
-    logger.info(f"Vibe-Trading A2A Server: {agent_card.name} v{agent_card.version}, "
+    logger.info(f"TideTrading A2A Server: {agent_card.name} v{agent_card.version}, "
                 f"skills={[s.id for s in agent_card.skills]}")
     return Starlette(routes=routes)
 

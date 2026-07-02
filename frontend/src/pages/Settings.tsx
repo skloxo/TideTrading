@@ -1844,9 +1844,9 @@ export function Settings() {
                     <span className="transition group-open:rotate-180">▼</span>
                   </summary>
                   <div className="p-3 pt-0 text-xs text-muted-foreground space-y-2 border-t border-border/30">
-                    <p className="font-medium text-foreground">双向同步：同花顺 ⇄ Vibe-Trading</p>
+                    <p className="font-medium text-foreground">双向同步：同花顺 ⇄ TideTrading</p>
                     <ul className="space-y-1 pl-2">
-                      <li>• 在 Vibe-Trading 新增/删除自选股 → 自动推送到同花顺云端</li>
+                      <li>• 在 TideTrading 新增/删除自选股 → 自动推送到同花顺云端</li>
                       <li>• 在同花顺 App/网页修改自选股 → 自动同步到本地</li>
                     </ul>
                     <p className="font-medium text-foreground pt-1">轮询频率</p>
