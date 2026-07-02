@@ -19,7 +19,9 @@ agent/vibe_trading_ai.egg-info/
 agent/__pycache__/
 
 # Runtime data (generated at runtime, not in repo)
-data/
+data/*
+!data/stocks_seed.db*
+!data/.gitkeep
 agent/runs/
 agent/sessions/
 agent/.swarm/runs/
