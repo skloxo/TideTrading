@@ -96,7 +96,15 @@ export function CorrelationMatrix({ labels, matrix, names = {}, height = 500 }: 
         top: "center",
         textStyle: { color: t.textColor, fontSize: 11 },
         inRange: {
-          color: ["#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#f7f7f7", "#fddbc7", "#f4a582", "#d6604d", "#b2182b"],
+          color: [
+            "#047857", // -1.0: Deep green (negative)
+            "#10b981", // -0.7: Green
+            "#a7f3d0", // -0.3: Light green
+            "#3b82f6", //  0.0: Blue (Neutral)
+            "#fecaca", //  0.3: Light red
+            "#f87171", //  0.7: Red
+            "#b91c1c"  //  1.0: Deep red (positive)
+          ],
         },
       },
       series: [
