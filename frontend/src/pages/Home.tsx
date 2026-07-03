@@ -95,12 +95,52 @@ export function Home() {
           <span className="text-emerald-400 font-normal">{isZh ? "运行中" : "Live"}</span>
         </div>
 
-        {/* Title */}
-        <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-none">
-          <span className="bg-gradient-to-r from-primary via-red-500 to-rose-900 bg-clip-text text-transparent drop-shadow-sm">
-            {isZh ? "潮汐投研" : "TideTrading"}
-          </span>
-        </h1>
+        {/* Title / Color Options Comparison */}
+        <div className="flex flex-col items-center gap-4 py-6 border border-border/40 rounded-2xl bg-card/40 backdrop-blur-sm px-6 max-w-3xl w-full shadow-lg shadow-black/10">
+          <p className="text-xs text-muted-foreground/80 font-mono uppercase tracking-widest">渐变配色方案对比 / Color Gradient Redesign Options</p>
+          
+          <div className="space-y-6 w-full text-center">
+            {/* Option 1: Purple to Deep Red */}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground/60 font-mono">方案 1：深邃星云紫红 (violet ➔ rose ➔ red)</span>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
+                <span className="bg-gradient-to-r from-violet-500 via-rose-500 to-red-900 bg-clip-text text-transparent drop-shadow-sm">
+                  {isZh ? "潮汐投研 TideTrading" : "TideTrading"}
+                </span>
+              </h1>
+            </div>
+
+            {/* Option 2: Pink/Rose to Deep Red */}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground/60 font-mono">方案 2：冷艳玫瑰粉红 (rose ➔ rose-deep)</span>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
+                <span className="bg-gradient-to-r from-rose-400 to-rose-950 bg-clip-text text-transparent drop-shadow-sm">
+                  {isZh ? "潮汐投研 TideTrading" : "TideTrading"}
+                </span>
+              </h1>
+            </div>
+
+            {/* Option 3: Cyan/Blue to Deep Red */}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground/60 font-mono">方案 3：极光冰蓝向深红 (cyan ➔ indigo ➔ rose-deep)</span>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
+                <span className="bg-gradient-to-r from-cyan-400 via-indigo-500 to-rose-950 bg-clip-text text-transparent drop-shadow-sm">
+                  {isZh ? "潮汐投研 TideTrading" : "TideTrading"}
+                </span>
+              </h1>
+            </div>
+
+            {/* Option 4: Gold to Deep Red */}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground/60 font-mono">方案 4：香槟金向暗红 (amber ➔ red ➔ rose-deep)</span>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
+                <span className="bg-gradient-to-r from-amber-200 via-red-500 to-rose-950 bg-clip-text text-transparent drop-shadow-sm">
+                  {isZh ? "潮汐投研 TideTrading" : "TideTrading"}
+                </span>
+              </h1>
+            </div>
+          </div>
+        </div>
 
         {/* Tagline */}
         <p className="max-w-2xl text-sm md:text-base text-muted-foreground leading-relaxed">
