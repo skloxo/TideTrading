@@ -207,8 +207,8 @@ class TestConnectorHaltResume:
         assert halt_flag_set("robinhood") is True
 
         out = capsys.readouterr().out
-        assert "vibe-trading connector resume" in out
-        assert "vibe-trading live" not in out
+        assert "tide connector resume" in out
+        assert "tide live" not in out
 
     def test_resume_without_profile_uses_selected_connector(
         self, live_root: Path, monkeypatch: pytest.MonkeyPatch

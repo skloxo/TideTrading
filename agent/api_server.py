@@ -43,7 +43,7 @@ for _s in ("stdout", "stderr"):
     if callable(_r):
         _r(encoding="utf-8", errors="replace")
 
-from src.config.paths import get_runs_dir, get_sessions_dir, get_uploads_dir
+from src.config.paths import get_runs_dir, get_sessions_dir, get_uploads_dir, get_runtime_root, _get_active_runtime_dir
 RUNS_DIR = get_runs_dir()
 SESSIONS_DIR = get_sessions_dir()
 UPLOADS_DIR = get_uploads_dir()
@@ -74,15 +74,14 @@ def _get_uploads_dir() -> Path:
 
 class _DynamicEnvPath(type(Path())):
     def __new__(cls):
-        return super().__new__(cls, Path.home() / ".tide-trading" / ".env")
+        from src.config.paths import get_runtime_root
+        return super().__new__(cls, get_runtime_root() / ".env")
 
     @property
     def _actual(self) -> Path:
+        from src.config.paths import get_runtime_root
         from src.config.paths import active_tenant_var
-        tenant = active_tenant_var.get()
-        if tenant == "default":
-            return Path.home() / ".tide-trading" / ".env"
-        return Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        return get_runtime_root() / ".env"
 
     def exists(self) -> bool:
         return self._actual.exists()
@@ -173,7 +172,7 @@ XUEQIU_COMBOS_CACHE = {}  # {tenant_id: (mtime, timestamp, details)}
 
 def _load_tenant_keys() -> list[dict]:
     """Load tenant API keys from ~/.tide/tenants/tenant_keys.json."""
-    path = Path.home() / ".tide-trading" / "tenants" / "tenant_keys.json"
+    path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
     if not path.exists():
         return []
     try:
@@ -185,7 +184,7 @@ def _load_tenant_keys() -> list[dict]:
 
 def _save_tenant_keys(keys: list[dict]) -> None:
     """Save tenant API keys to ~/.tide/tenants/tenant_keys.json."""
-    path = Path.home() / ".tide-trading" / "tenants" / "tenant_keys.json"
+    path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(keys, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -317,6 +316,16 @@ class ProfileResponse(BaseModel):
     tenant_id: str
     name: Optional[str] = None
     is_local: bool = False
+
+
+class AdminElevateRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 
 class TenantKeyItem(BaseModel):
@@ -952,7 +961,7 @@ def _get_feishu_channels_json_path() -> Path:
     tenant = active_tenant_var.get()
     if tenant == "default":
         return FEISHU_CHANNELS_JSON
-    return Path.home() / ".tide-trading" / "tenants" / tenant / "feishu_channels.json"
+    return get_runtime_root() / "feishu_channels.json"
 
 
 def _load_feishu_channels() -> list[dict[str, Any]]:
@@ -1007,7 +1016,7 @@ def _save_feishu_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-WECHAT_CHANNELS_JSON = Path.home() / ".tide-trading" / "wechat_channels.json"
+WECHAT_CHANNELS_JSON = _get_active_runtime_dir() / "wechat_channels.json"
 
 def _get_wechat_channels_json_path() -> Path:
     """Get path to the WeChat channels persistent JSON file based on active tenant."""
@@ -1015,7 +1024,7 @@ def _get_wechat_channels_json_path() -> Path:
     tenant = active_tenant_var.get()
     if tenant == "default":
         return WECHAT_CHANNELS_JSON
-    return Path.home() / ".tide-trading" / "tenants" / tenant / "wechat_channels.json"
+    return get_runtime_root() / "wechat_channels.json"
 
 
 def _load_wechat_channels() -> list[dict[str, Any]]:
@@ -1126,6 +1135,7 @@ async def _run_startup_preflight() -> None:
     """Run preflight checks on server startup."""
     from src.preflight import run_preflight
 
+    _init_admin_auth_db()
     run_preflight(console)
     _start_scheduled_research_executor()
 
@@ -1238,6 +1248,65 @@ async def _stop_scheduled_research_on_shutdown() -> None:
 # ============================================================================
 # API Key Authentication
 # ============================================================================
+
+import hashlib
+import secrets
+
+_ADMIN_SESSION_TOKENS: set[str] = set()
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100000
+    )
+    return f"pbkdf2_sha256$100000${salt}${key.hex()}"
+
+def verify_password(password: str, encoded: str) -> bool:
+    if not encoded:
+        return False
+    try:
+        algorithm, iterations, salt, hash_val = encoded.split('$', 3)
+        assert algorithm == 'pbkdf2_sha256'
+        iterations = int(iterations)
+        key = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            salt.encode('utf-8'),
+            iterations
+        )
+        return key.hex() == hash_val
+    except Exception:
+        return False
+
+def _init_admin_auth_db():
+    from src.config.paths import get_tenant_db_path
+    import sqlite3
+    db_path = get_tenant_db_path("default")
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admin_auth (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL
+            )
+        """)
+        cursor.execute("SELECT password_hash FROM admin_auth WHERE username = 'admin'")
+        row = cursor.fetchone()
+        if not row:
+            pwd_hash = hash_password("admin")
+            cursor.execute("INSERT INTO admin_auth (username, password_hash) VALUES ('admin', ?)", (pwd_hash,))
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error("Failed to initialize admin_auth table: %s", e)
+
+def _is_request_admin(request: Request) -> bool:
+    admin_token = request.headers.get("x-admin-token")
+    return bool(admin_token and admin_token in _ADMIN_SESSION_TOKENS)
 
 _security = HTTPBearer(auto_error=False)
 _API_KEY = os.getenv("API_AUTH_KEY")
@@ -1366,16 +1435,14 @@ def _require_shutdown_authorization(
     request: Request,
     cred: Optional[HTTPAuthorizationCredentials],
 ) -> None:
-    """Authorize the local shutdown control-plane action.
-
-    Loopback peer IP alone is not enough for this browser-reachable, destructive
-    action. When API_AUTH_KEY/KEYS is configured, require the Bearer token even for
-    loopback requests; otherwise preserve local dev-mode shutdown for direct
-    loopback clients while rejecting cross-site browser requests.
-    """
+    """Authorize the local shutdown control-plane action."""
     from src.config.paths import active_tenant_var
     _reject_cross_site_browser_request(request)
     
+    if _is_request_admin(request):
+        active_tenant_var.set("default")
+        return
+
     admin_keys = _configured_api_keys()
     tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
     has_keys = bool(admin_keys) or bool(tenant_keys)
@@ -1427,21 +1494,21 @@ def _validate_api_auth(
     allow_query: bool = False,
 ) -> None:
     """Validate configured auth, preserving loopback-only dev mode."""
-    # CORS protects response reads, not blind side effects. Reject unsafe
-    # browser-originated cross-site requests before honoring loopback dev-mode
-    # trust, otherwise a malicious page can drive local POST/PUT/DELETE routes.
     if request.method.upper() not in _SAFE_BROWSER_METHODS:
         _reject_cross_site_browser_request(request)
+
+    # 1. New: Check for Admin Session Token elevation
+    if _is_request_admin(request):
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
+        return
+
     admin_keys = _configured_api_keys()
     tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
     has_keys = bool(admin_keys) or bool(tenant_keys)
 
+    # 2. Original loopback dev-mode bypass
     if _is_local_or_lan_client(request):
-        if request.headers.get("x-vibe-scope") == "global":
-            from src.config.paths import active_tenant_var
-            active_tenant_var.set("default")
-            return
-
         token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
         if token:
             matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
@@ -1596,12 +1663,11 @@ async def require_local_or_auth(
     request: Request,
     cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
 ) -> None:
-    """Protect settings access when dev-mode auth is disabled.
-
-    If API_AUTH_KEY is configured, require the bearer token. If not, allow only
-    loopback clients so an API server bound to 0.0.0.0 cannot accept remote
-    credential reads or writes in dev mode.
-    """
+    """Protect settings access when dev-mode auth is disabled."""
+    if _is_request_admin(request):
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
+        return
     admin_keys = _configured_api_keys()
     tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
     if admin_keys or tenant_keys:
@@ -1627,13 +1693,24 @@ async def require_admin(
     cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
 ) -> None:
     """Require that the client has administrative privileges (default tenant)."""
-    await require_auth(request, cred)
-    from src.config.paths import active_tenant_var
-    if active_tenant_var.get() != "default" and not _is_local_or_lan_client(request):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
+    if _is_request_admin(request):
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
+        return
+
+    # Check if they authenticated with the admin API key
+    admin_keys = _configured_api_keys()
+    if admin_keys:
+        await require_auth(request, cred)
+        from src.config.paths import active_tenant_var
+        if active_tenant_var.get() == "default":
+            return
+
+    # Otherwise, they are NOT admin! Raise 403 Forbidden.
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Admin privileges required",
+    )
 
 
 # ============================================================================
@@ -1715,7 +1792,7 @@ def _read_settings_env_values() -> Dict[str, str]:
     if not isinstance(ENV_PATH, _DynamicEnvPath):
         admin_env = ENV_PATH
     else:
-        admin_env = Path.home() / ".tide-trading" / ".env"
+        admin_env = _get_active_runtime_dir() / ".env"
         if not admin_env.exists():
             admin_env = AGENT_DIR / ".env"
 
@@ -1849,7 +1926,7 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
 
     is_custom = True
     if tenant != "default":
-        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        tenant_env = get_runtime_root() / ".env"
         if not tenant_env.exists():
             is_custom = False
         else:
@@ -1861,7 +1938,7 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
     else:
         env_values = values if values is not None else _read_settings_env_values()
 
-    if tenant != "default" and not is_custom:
+    if tenant != "default" and not is_custom and is_public:
         # For non-admin tenants who have not configured a custom LLM, do not expose
         # the admin's global configurations in form values. Return standard default values instead.
         env_values = {}
@@ -1882,7 +1959,13 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
         api_key_hint = None
     else:
         if api_key_configured and not is_public:
-            api_key_hint = mask_api_keys(api_key)
+            if tenant != "default":
+                if not is_custom:
+                    api_key_hint = "********"
+                else:
+                    api_key_hint = None
+            else:
+                api_key_hint = mask_api_keys(api_key)
 
     return LLMSettingsResponse(
         provider=provider.name,
@@ -1954,7 +2037,7 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
     fred_api_key_hint = None
     ths_cookie_hint = None
     if tenant != "default" and not is_public:
-        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        tenant_env = get_runtime_root() / ".env"
         tenant_vals = {}
         if tenant_env.exists():
             tenant_vals = _read_env_values(tenant_env)
@@ -1970,7 +2053,7 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
 
     is_custom = True
     if tenant != "default":
-        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        tenant_env = get_runtime_root() / ".env"
         if not tenant_env.exists():
             is_custom = False
         else:
@@ -2449,15 +2532,34 @@ async def get_settings_profile(request: Request):
     """Return login identity and active workspace/tenant info."""
     from src.config.paths import active_tenant_var
     tenant = active_tenant_var.get()
-    role = "admin" if tenant == "default" else "tenant"
+    
+    is_admin = _is_request_admin(request)
+    
+    # Require explicit admin session elevation or admin API key auth for admin role
+    has_admin_api_key = False
+    admin_keys = _configured_api_keys()
+    if admin_keys:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            if token in admin_keys:
+                has_admin_api_key = True
+                
+    role = "admin" if (is_admin or has_admin_api_key) else "tenant"
     name = "Admin"
-    if tenant != "default":
+    
+    if tenant != "default" and not is_admin:
         for item in _load_tenant_keys():
             if item.get("tenant_id") == tenant:
                 name = item.get("name")
                 break
-    is_local = _is_local_or_lan_client(request)
-    return ProfileResponse(role=role, tenant_id=tenant, name=name, is_local=is_local)
+    
+    return ProfileResponse(
+        role=role,
+        tenant_id="default" if is_admin else tenant,
+        name=name,
+        is_local=is_admin or _is_local_or_lan_client(request)
+    )
 
 
 @app.post(
@@ -2499,7 +2601,7 @@ async def register_tenant(payload: CreateTenantKeyRequest):
     _save_tenant_keys(keys)
     
     # 4. 创建隔离目录
-    tenant_dir = Path.home() / ".tide-trading" / "tenants" / tenant_id
+    tenant_dir = _get_active_runtime_dir() / "tenants" / tenant_id
     tenant_dir.mkdir(parents=True, exist_ok=True)
     
     # 初始化专属的配置说明文件
@@ -2545,10 +2647,92 @@ async def create_tenant_key(payload: CreateTenantKeyRequest):
     keys.append(new_key)
     _save_tenant_keys(keys)
     
-    tenant_dir = Path.home() / ".tide-trading" / "tenants" / tenant_id
+    tenant_dir = _get_active_runtime_dir() / "tenants" / tenant_id
     tenant_dir.mkdir(parents=True, exist_ok=True)
     
     return TenantKeyItem(**new_key)
+
+
+@app.post("/settings/admin-elevate")
+async def admin_elevate(payload: AdminElevateRequest):
+    """Elevate request to admin status using username and password."""
+    if payload.username != "admin":
+        raise HTTPException(status_code=401, detail="用户名或密码不正确")
+    
+    from src.config.paths import get_tenant_db_path
+    import sqlite3
+    db_path = get_tenant_db_path("default")
+    
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM admin_auth WHERE username = 'admin'")
+        row = cursor.fetchone()
+        conn.close()
+    except Exception as e:
+        logger.error("Database query failed: %s", e)
+        raise HTTPException(status_code=500, detail="数据库查询失败")
+        
+    if not row:
+        raise HTTPException(status_code=500, detail="管理员账户未初始化")
+        
+    pwd_hash = row[0]
+    if not verify_password(payload.password, pwd_hash):
+        raise HTTPException(status_code=401, detail="用户名或密码不正确")
+        
+    token = secrets.token_hex(32)
+    _ADMIN_SESSION_TOKENS.add(token)
+    return {"status": "success", "admin_token": token}
+
+
+@app.post("/settings/admin-change-password")
+async def admin_change_password(request: Request, payload: AdminChangePasswordRequest):
+    """Change admin password."""
+    if not _is_request_admin(request):
+        raise HTTPException(status_code=403, detail="管理员权限不足")
+    
+    from src.config.paths import get_tenant_db_path
+    import sqlite3
+    db_path = get_tenant_db_path("default")
+    
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("SELECT password_hash FROM admin_auth WHERE username = 'admin'")
+        row = cursor.fetchone()
+    except Exception as e:
+        logger.error("Database query failed: %s", e)
+        raise HTTPException(status_code=500, detail="数据库查询失败")
+        
+    if not row:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=500, detail="管理员账户未初始化")
+        
+    pwd_hash = row[0]
+    if not verify_password(payload.old_password, pwd_hash):
+        conn.close()
+        raise HTTPException(status_code=400, detail="原密码不正确")
+        
+    try:
+        new_hash = hash_password(payload.new_password)
+        cursor.execute("UPDATE admin_auth SET password_hash = ? WHERE username = 'admin'", (new_hash,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error("Database update failed: %s", e)
+        raise HTTPException(status_code=500, detail="数据库更新失败")
+        
+    return {"status": "success", "detail": "密码修改成功"}
+
+
+@app.post("/settings/admin-deelevate")
+async def admin_deelevate(request: Request):
+    """Remove admin elevation token."""
+    token = request.headers.get("x-admin-token")
+    if token and token in _ADMIN_SESSION_TOKENS:
+        _ADMIN_SESSION_TOKENS.remove(token)
+    return {"status": "success"}
 
 
 @app.put(
@@ -2926,7 +3110,7 @@ async def get_monitor_logs(
 )
 async def get_llm_settings(request: Request):
     """Return project-local LLM settings for the Web UI."""
-    is_public = not _is_local_or_lan_client(request)
+    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
     return _build_llm_settings_response(is_public=is_public)
 
 
@@ -2935,7 +3119,7 @@ async def update_llm_settings(request: Request, payload: UpdateLLMSettingsReques
     """Persist project-local LLM settings and update the running process."""
     from src.config.paths import active_tenant_var
     tenant = active_tenant_var.get()
-    is_public = not _is_local_or_lan_client(request)
+    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
 
     if payload.use_default:
         if tenant != "default":
@@ -3010,7 +3194,7 @@ async def update_llm_settings(request: Request, payload: UpdateLLMSettingsReques
     tenant = active_tenant_var.get()
     tenant_vals = {}
     if tenant != "default":
-        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        tenant_env = get_runtime_root() / ".env"
         if tenant_env.exists():
             tenant_vals = _read_env_values(tenant_env)
     else:
@@ -3047,7 +3231,7 @@ async def update_llm_settings(request: Request, payload: UpdateLLMSettingsReques
 )
 async def get_data_source_settings(request: Request):
     """Return project-local data source credentials for the Web UI."""
-    is_public = not _is_local_or_lan_client(request)
+    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
     return _build_data_source_settings_response(is_public=is_public)
 
 
@@ -3060,7 +3244,7 @@ async def update_data_source_settings(request: Request, payload: UpdateDataSourc
     """Persist project-local data source credentials and update the running process."""
     from src.config.paths import active_tenant_var
     tenant = active_tenant_var.get()
-    is_public = not _is_local_or_lan_client(request)
+    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
 
     if payload.use_default:
         if tenant != "default":
@@ -3078,7 +3262,7 @@ async def update_data_source_settings(request: Request, payload: UpdateDataSourc
     tenant = active_tenant_var.get()
     tenant_vals = {}
     if tenant != "default":
-        tenant_env = Path.home() / ".tide-trading" / "tenants" / tenant / ".env"
+        tenant_env = get_runtime_root() / ".env"
         if tenant_env.exists():
             tenant_vals = _read_env_values(tenant_env)
     else:
@@ -5199,7 +5383,7 @@ async def get_shadow_report(shadow_id: str, format: str = "html"):
     if format not in ("html", "pdf"):
         raise HTTPException(status_code=400, detail="format must be html or pdf")
 
-    reports_dir = Path.home() / ".tide-trading" / "shadow_reports"
+    reports_dir = _get_active_runtime_dir() / "shadow_reports"
     path = reports_dir / f"{shadow_id}.{format}"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Shadow report not found: {shadow_id}.{format}")

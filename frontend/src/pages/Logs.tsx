@@ -38,7 +38,7 @@ export function Logs() {
   }, []);
 
   const fetchLogs = async () => {
-    if (paused || authLoading || !profile?.is_local) return;
+    if (paused || authLoading || profile?.role !== "admin") return;
     try {
       setLogsLoading(true);
       const data = await api.getMonitorLogs({ limit, level, keyword });
@@ -52,13 +52,13 @@ export function Logs() {
 
   // Fetch logs whenever filters change or on periodic interval
   useEffect(() => {
-    if (!authLoading && profile?.is_local) {
+    if (!authLoading && profile?.role === "admin") {
       fetchLogs();
     }
   }, [limit, level, keyword, paused, authLoading, profile]);
 
   useEffect(() => {
-    if (refreshInterval <= 0 || paused || authLoading || !profile?.is_local) return;
+    if (refreshInterval <= 0 || paused || authLoading || profile?.role !== "admin") return;
     const interval = setInterval(fetchLogs, refreshInterval);
     return () => clearInterval(interval);
   }, [refreshInterval, limit, level, keyword, paused, authLoading, profile]);
@@ -94,8 +94,8 @@ export function Logs() {
     );
   }
 
-  // 阻断非本地访问
-  if (!profile?.is_local) {
+  // 阻断非管理员访问
+  if (profile?.role !== "admin") {
     return (
       <div className="mx-auto max-w-md w-full p-8 mt-20 text-center space-y-4 rounded-xl border border-destructive/20 bg-destructive/5 shadow-lg">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
@@ -107,8 +107,8 @@ export function Logs() {
           </h2>
           <p className="text-sm text-muted-foreground">
             {isZh 
-              ? "系统实时运行日志属于高敏感度调试信息，仅限本地环回或内网调试环境访问。"
-              : "System runtime logs contain highly sensitive debug info. Access is restricted to local/internal debug mode only."}
+              ? "此页面属于系统运维管理功能，仅限系统管理员访问。请前往设置页面进行管理员提权。"
+              : "This page belongs to system administration functions and is restricted to system administrators. Please go to Settings to elevate your privileges."}
           </p>
         </div>
       </div>

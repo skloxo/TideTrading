@@ -1,6 +1,7 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { isAdminElevated } from "@/lib/apiAuth";
 
 const Home = lazy(() => import("@/pages/Home").then((m) => ({ default: m.Home })));
 const Agent = lazy(() => import("@/pages/Agent").then((m) => ({ default: m.Agent })));
@@ -41,7 +42,6 @@ const GlobalDashboard = lazy(() =>
   import("@/pages/GlobalDashboard").then((m) => ({ default: m.GlobalDashboard })),
 );
 
-
 function PageLoader() {
   return (
     <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
@@ -58,19 +58,30 @@ function wrap(Component: ComponentType) {
   );
 }
 
+/**
+ * Route guard for devops/admin pages (/dashboard, /monitor, /logs).
+ * Redirects to /settings (with a hint) if the user has not elevated to admin.
+ */
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  if (!isAdminElevated()) {
+    return <Navigate to="/settings" replace />;
+  }
+  return <>{children}</>;
+}
+
 export const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
       { path: "/", element: wrap(Home) },
-      { path: "/dashboard", element: wrap(GlobalDashboard) },
+      { path: "/dashboard", element: <AdminGuard>{wrap(GlobalDashboard)}</AdminGuard> },
       { path: "/agent", element: wrap(Agent) },
       { path: "/runtime", element: wrap(Runtime) },
       { path: "/reports", element: wrap(Reports) },
       { path: "/settings", element: wrap(Settings) },
       { path: "/xueqiu", element: wrap(Xueqiu) },
-      { path: "/monitor", element: wrap(Monitor) },
-      { path: "/logs", element: wrap(Logs) },
+      { path: "/monitor", element: <AdminGuard>{wrap(Monitor)}</AdminGuard> },
+      { path: "/logs", element: <AdminGuard>{wrap(Logs)}</AdminGuard> },
       { path: "/runs/:runId", element: wrap(RunDetail) },
       { path: "/compare", element: wrap(Compare) },
       { path: "/correlation", element: wrap(Correlation) },

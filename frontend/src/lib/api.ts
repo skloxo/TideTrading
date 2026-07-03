@@ -302,6 +302,20 @@ export const api = {
     request<{ status: string }>(`/admin/tenants/keys/${tenant_id}`, {
       method: "DELETE",
     }),
+  adminElevate: (body: any) =>
+    request<{ status: string; admin_token: string }>("/settings/admin-elevate", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  adminChangePassword: (body: any) =>
+    request<{ status: string; detail: string }>("/settings/admin-change-password", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  adminDeelevate: () =>
+    request<{ status: string }>("/settings/admin-deelevate", {
+      method: "POST",
+    }),
   registerTenant: (body: { name: string }) =>
     request<{ key: string; tenant_id: string; name: string }>("/settings/register", {
       method: "POST",

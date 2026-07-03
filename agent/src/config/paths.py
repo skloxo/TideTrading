@@ -122,6 +122,8 @@ _orig_contains = os.environ.__class__.__contains__
 _orig_iter = os.environ.__class__.__iter__
 _orig_len = os.environ.__class__.__len__
 _orig_copy = os.environ.__class__.copy
+_orig_pop = os.environ.__class__.pop
+_orig_delitem = os.environ.__class__.__delitem__
 
 
 def tenant_getitem(self, key: str) -> str:
@@ -217,15 +219,48 @@ def tenant_copy(self) -> dict[str, str]:
     return {k: self[k] for k in self}
 
 
+_SENTINEL = object()
+
+def tenant_pop(self, key, default=_SENTINEL):
+    val = self.get(key, _NOT_FOUND)
+    if val is not _NOT_FOUND:
+        try:
+            _orig_delitem(self, key)
+        except KeyError:
+            pass
+        overrides = env_overrides_var.get()
+        if overrides and key in overrides:
+            overrides.pop(key, None)
+        return val
+    if default is not _SENTINEL:
+        return default
+    raise KeyError(key)
+
+
+def tenant_delitem(self, key):
+    try:
+        _orig_delitem(self, key)
+    except KeyError:
+        pass
+    overrides = env_overrides_var.get()
+    if overrides and key in overrides:
+        overrides.pop(key, None)
+
+
 os.environ.__class__.__getitem__ = tenant_getitem
 os.environ.__class__.get = tenant_get
 os.environ.__class__.__contains__ = tenant_contains
 os.environ.__class__.__iter__ = tenant_iter
 os.environ.__class__.__len__ = tenant_len
 os.environ.__class__.copy = tenant_copy
+os.environ.__class__.pop = tenant_pop
+os.environ.__class__.__delitem__ = tenant_delitem
 
 
 def _get_active_runtime_dir() -> Path:
+    import os
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return Path.home() / ".vibe-trading-cnx"
     old_dir = Path.home() / ".vibe-trading-cnx"
     new_dir = Path.home() / ".tide-trading"
     if not new_dir.exists() and old_dir.exists():

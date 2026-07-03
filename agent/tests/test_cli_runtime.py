@@ -174,8 +174,8 @@ class TestRunnerControlEndpoints:
             assert cmd_connector_start("robinhood-live-mcp") == EXIT_SUCCESS
 
         out = capsys.readouterr().out
-        assert "vibe-trading connector status" in out
-        assert "vibe-trading live" not in out
+        assert "tide connector status" in out
+        assert "tide live" not in out
 
     def test_connector_start_rejects_readonly_ibkr_mcp(
         self, capsys: pytest.CaptureFixture[str]

@@ -716,7 +716,7 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
             temperature=temperature,
             timeout=int(os.getenv("TIMEOUT_SECONDS", "120")),
             reasoning_effort=effort or None,
-            base_url=base_url or None,
+            codex_url=base_url or None,
         )
 
     if provider == "deepseek":

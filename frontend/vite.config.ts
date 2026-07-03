@@ -4,21 +4,19 @@ import path from "path";
 
 const PROXY_PATHS = [
   "/sessions",
-  "/swarm/presets",
-  "/swarm/runs",
-  "/settings/llm",
-  "/settings/data-sources",
-  "/settings/profile",
+  "/swarm",
+  "/settings/",
   "/admin",
   "/mandate",
   "/live",
   "/upload",
   "/shadow-reports",
+  "/api/",
 ];
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiTarget = env.VITE_API_URL || "http://127.0.0.1:8899";
+  const apiTarget = env.VITE_API_URL || "http://127.0.0.1:19888";
   const apiProxy = { target: apiTarget, changeOrigin: true };
   const apiProxyWithHtmlFallback = {
     ...apiProxy,
@@ -35,7 +33,7 @@ export default defineConfig(({ mode }) => {
       alias: { "@": path.resolve(__dirname, "./src") },
     },
     server: {
-      port: 5899,
+      port: 9888,
       proxy: {
         ...Object.fromEntries(PROXY_PATHS.map((p) => [p, apiProxy])),
         // SPA RunDetail page — only the two-segment ``/runs/{id}``

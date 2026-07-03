@@ -2,12 +2,30 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { api, type MonitorStats, type QuoteGatewayStatus, type TenantKey, type SystemVersionInfo, type LiveStatus } from "@/lib/api";
-import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, KeyRound, Power, Trash2, ArrowUpCircle, Loader2, Copy, Check, Save, Plus } from "lucide-react";
+import { api, type MonitorStats, type QuoteGatewayStatus, type TenantKey, type SystemVersionInfo, type LiveStatus, type UserProfile } from "@/lib/api";
+import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, KeyRound, Power, Trash2, ArrowUpCircle, Loader2, Copy, Check, Save, Plus, ShieldAlert } from "lucide-react";
 
 export function Monitor() {
   const { i18n } = useTranslation();
   const isZh = i18n.language === "zh-CN";
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    api.getSettingsProfile()
+      .then((p) => {
+        if (!alive) return;
+        setProfile(p);
+        setProfileLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setProfileLoading(false);
+      });
+    return () => { alive = false; };
+  }, []);
 
   const [stats, setStats] = useState<MonitorStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -121,6 +139,8 @@ export function Monitor() {
 
   // Initial load and periodic stats/quote refresh
   useEffect(() => {
+    if (profile?.role !== "admin") return;
+
     fetchStats();
     fetchQuoteStatus(true, false);
     fetchTenantKeys();
@@ -133,7 +153,7 @@ export function Monitor() {
       fetchLiveStatus(false, false);
     }, 10000); // Stats and Quote Gateway refresh every 10s
     return () => clearInterval(interval);
-  }, []);
+  }, [profile]);
 
   // Countdown timer for upgrade modal
   useEffect(() => {
@@ -207,6 +227,34 @@ export function Monitor() {
       toast.error(error instanceof Error ? error.message : "删除密钥失败");
     }
   };
+
+  if (profileLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center text-muted-foreground animate-pulse">
+        {isZh ? "正在验证访问权限..." : "Verifying access permissions..."}
+      </div>
+    );
+  }
+
+  if (profile?.role !== "admin") {
+    return (
+      <div className="mx-auto max-w-md w-full p-8 mt-20 text-center space-y-4 rounded-xl border border-destructive/20 bg-destructive/5 shadow-lg">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+          <ShieldAlert className="h-6 w-6 text-destructive" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">
+            {isZh ? "访问受限" : "Access Denied"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {isZh 
+              ? "此页面属于系统运维管理功能，仅限系统管理员访问。请前往设置页面进行管理员提权。"
+              : "This page belongs to system administration functions and is restricted to system administrators. Please go to Settings to elevate your privileges."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
