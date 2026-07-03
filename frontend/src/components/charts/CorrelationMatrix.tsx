@@ -6,10 +6,11 @@ import { getChartTheme } from "@/lib/chart-theme";
 interface Props {
   labels: string[];
   matrix: number[][];
+  names?: Record<string, string>;
   height?: number;
 }
 
-export function CorrelationMatrix({ labels, matrix, height = 500 }: Props) {
+export function CorrelationMatrix({ labels, matrix, names = {}, height = 500 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,6 +31,18 @@ export function CorrelationMatrix({ labels, matrix, height = 500 }: Props) {
     const minVal = -1;
     const maxVal = 1;
 
+    const formatAxisLabel = (value: string) => {
+      const name = names[value] || value;
+      const parts = value.split(".");
+      const code = parts[0];
+      const suffix = parts[1] || "";
+      if (name && name !== value) {
+        const displayCode = suffix ? `${suffix.toUpperCase()}${code}` : code;
+        return `${name}\n${displayCode}`;
+      }
+      return value;
+    };
+
     chart.setOption({
       backgroundColor: "transparent",
       tooltip: {
@@ -40,18 +53,22 @@ export function CorrelationMatrix({ labels, matrix, height = 500 }: Props) {
         formatter: (params: unknown) => {
           const p = params as { data: [number, number, number] };
           const [x, y, v] = p.data;
-          return `<b>${labels[x]}</b> vs <b>${labels[y]}</b><br/>r = <b>${v.toFixed(4)}</b>`;
+          const nameX = names[labels[x]] || labels[x];
+          const nameY = names[labels[y]] || labels[y];
+          return `<b>${nameX}</b> (${labels[x]})<br/>vs<br/><b>${nameY}</b> (${labels[y]})<br/>r = <b>${v.toFixed(4)}</b>`;
         },
       },
-      grid: { left: "3%", right: "8%", top: "8%", bottom: "12%", containLabel: true },
+      grid: { left: "4%", right: "10%", top: "8%", bottom: "16%", containLabel: true },
       xAxis: {
         type: "category",
         data: labels,
         axisLabel: {
           color: t.textColor,
-          fontSize: 11,
-          rotate: 30,
+          fontSize: 10,
+          rotate: 0,
           interval: 0,
+          lineHeight: 14,
+          formatter: formatAxisLabel,
         },
         axisLine: { lineStyle: { color: t.axisColor } },
         splitArea: { show: false },
@@ -59,7 +76,13 @@ export function CorrelationMatrix({ labels, matrix, height = 500 }: Props) {
       yAxis: {
         type: "category",
         data: labels,
-        axisLabel: { color: t.textColor, fontSize: 11, interval: 0 },
+        axisLabel: {
+          color: t.textColor,
+          fontSize: 10,
+          interval: 0,
+          lineHeight: 14,
+          formatter: formatAxisLabel,
+        },
         axisLine: { lineStyle: { color: t.axisColor } },
         splitArea: { show: false },
       },

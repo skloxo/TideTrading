@@ -35,7 +35,7 @@ const GUIDE_MD = `
 `;
 
 export function Correlation() {
-  const [codes, setCodes] = useState("000001.SZ,600519.SH,000858.SZ,601318.SH");
+  const [codes, setCodes] = useState("000001,600519,000858,601318");
   const [days, setDays] = useState<number>(90);
   const [method, setMethod] = useState<"pearson" | "spearman">("pearson");
   const [loading, setLoading] = useState(false);
@@ -43,16 +43,18 @@ export function Correlation() {
   const [showGuide, setShowGuide] = useState(false);
 
   const [labels, setLabels] = useState<string[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
   const [matrix, setMatrix] = useState<number[][]>([]);
 
   const compute = async () => {
     setError(null);
     setLoading(true);
     try {
-      const result = await request<{ labels: string[]; matrix: number[][] }>(
+      const result = await request<{ labels: string[]; names: Record<string, string>; matrix: number[][] }>(
         `/correlation?codes=${encodeURIComponent(codes)}&days=${days}&method=${method}`
       );
       setLabels(result.labels);
+      setNames(result.names ?? {});
       setMatrix(result.matrix);
     } catch (e) {
       setError(e instanceof Error ? e.message : i18n.t("correlation.failedToCompute"));
@@ -101,11 +103,11 @@ export function Correlation() {
             type="text"
             value={codes}
             onChange={(e) => setCodes(e.target.value)}
-            placeholder="000001.SZ,600519.SH,000858.SZ"
+            placeholder="000001,600519,000858"
             className="w-full px-3 py-2 rounded-md border bg-background text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            {i18n.t("correlation.assetCodesHint")}
+            {i18n.language?.startsWith("zh") ? "逗号分隔的标的代码，如 000001,600519,000858" : "Comma-separated asset codes, e.g. 000001,600519,000858"}
           </p>
         </div>
 
@@ -166,7 +168,7 @@ export function Correlation() {
       )}
 
       {/* Chart */}
-      {labels.length > 0 && <CorrelationMatrix labels={labels} matrix={matrix} height={520} />}
+      {labels.length > 0 && <CorrelationMatrix labels={labels} names={names} matrix={matrix} height={520} />}
 
       {/* Full Guide Modal Overlay */}
       {showGuide && (

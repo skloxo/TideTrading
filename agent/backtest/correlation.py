@@ -250,8 +250,24 @@ def compute_correlation_matrix(
         )
 
     labels, matrix = _rolling_correlation_matrix(price_series, days, method)
+
+    # ── Resolve Chinese stock names ────────────────────────────────────────────
+    names: Dict[str, str] = {}
+    try:
+        from src.swarm.market_board import query_db_stock_names, get_static_stock_name
+        bare_codes = [c.split(".")[0].strip() for c in labels]
+        db_names = query_db_stock_names(bare_codes)
+        for original_code in labels:
+            bare = original_code.split(".")[0].strip()
+            name = db_names.get(bare) or get_static_stock_name(bare) or bare
+            names[original_code] = name
+    except Exception:
+        for original_code in labels:
+            names[original_code] = original_code.split(".")[0]
+
     return {
         "labels": labels,
+        "names": names,
         "matrix": matrix,
         "window": days,
         "method": method,

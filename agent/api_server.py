@@ -4595,7 +4595,24 @@ async def get_correlation_matrix(
     """
     from backtest.correlation import compute_correlation_matrix
 
-    code_list = [c.strip() for c in codes.split(",") if c.strip()]
+    def _normalize_code(c: str) -> str:
+        raw = c.strip().upper()
+        if not raw:
+            return ""
+        if "." in raw or "-" in raw:
+            return raw
+        # If it is a bare digit code, determine market based on A-share patterns
+        if raw.isdigit():
+            if raw.startswith(("6", "9", "5")):
+                return f"{raw}.SH"
+            elif raw.startswith(("0", "3", "1")):
+                return f"{raw}.SZ"
+            elif raw.startswith(("4", "8")):
+                return f"{raw}.BJ"
+        return raw
+
+    code_list = [_normalize_code(c) for c in codes.split(",") if c.strip()]
+    code_list = [c for c in code_list if c]
     if len(code_list) < 2:
         raise HTTPException(status_code=400, detail="At least 2 asset codes required")
     if len(code_list) > 20:
