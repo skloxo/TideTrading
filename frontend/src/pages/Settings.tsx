@@ -1,10 +1,9 @@
 import i18n from "@/i18n";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Database, KeyRound, Loader2, MessageSquare, RotateCcw, Save, Server, SlidersHorizontal, Plus, Trash2, Edit, Power, QrCode, Activity, ShieldAlert, Lock, LogOut } from "lucide-react";
+import { Database, KeyRound, Loader2, MessageSquare, RotateCcw, Save, Server, SlidersHorizontal, Plus, Trash2, Edit, Power, QrCode, Activity } from "lucide-react";
 import { toast } from "sonner";
-import { api, isAuthRequiredError, type DataSourceSettings, type FeatureFlagsResponse, type LLMProviderOption, type LLMSettings, type FeishuChannel, type WechatChannel, type UserProfile } from "@/lib/api";
-import { setApiAuthKey, setAdminToken, getAdminToken } from "@/lib/apiAuth";
+import { api, isAuthRequiredError, type DataSourceSettings, type LLMProviderOption, type LLMSettings, type FeishuChannel, type WechatChannel } from "@/lib/api";
+import { setApiAuthKey } from "@/lib/apiAuth";
 import { createPortal } from "react-dom";
 import { AuthBarrier } from "@/components/layout/AuthBarrier";interface LLMFormState {
   provider: string;
@@ -34,7 +33,7 @@ function toForm(settings: LLMSettings): LLMFormState {
 }
 
 export function Settings() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  
   const [settings, setSettings] = useState<LLMSettings | null>(null);
   const [dataSettings, setDataSettings] = useState<DataSourceSettings | null>(null);
   const [form, setForm] = useState<LLMFormState | null>(null);
@@ -54,8 +53,6 @@ export function Settings() {
   const [thsSavedOk, setThsSavedOk] = useState(false);
   const [thsSyncing, setThsSyncing] = useState(false);
   const [thsSyncResult, setThsSyncResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlagsResponse | null>(null);
   
   // Feishu platforms settings states
   const [feishuChannels, setFeishuChannels] = useState<FeishuChannel[]>([]);
@@ -97,122 +94,31 @@ export function Settings() {
   const [dataSaving, setDataSaving] = useState(false);
   const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
 
-  // Tenant API Keys states
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-
-  // Admin elevation states
-  const [adminUsername, setAdminUsername] = useState("admin");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminOldPassword, setAdminOldPassword] = useState("");
-  const [adminNewPassword, setAdminNewPassword] = useState("");
-  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
-  const [elevating, setElevating] = useState(false);
-  const [changingPwd, setChangingPwd] = useState(false);
-
   const [authFailed, setAuthFailed] = useState(false);
   const [llmMode, setLlmMode] = useState<"default" | "custom">("default");
   const [dataMode, setDataMode] = useState<"default" | "custom">("default");
-  const [activeSubTab, setActiveSubTab] = useState<"project" | "user">("user");
-  const [globalLLM, setGlobalLLM] = useState<LLMSettings | null>(null);
-  const [globalData, setGlobalData] = useState<DataSourceSettings | null>(null);
-  const [tenantLLM, setTenantLLM] = useState<LLMSettings | null>(null);
-  const [tenantData, setTenantData] = useState<DataSourceSettings | null>(null);
 
 
-
-
-
-
-
-  const handleAdminElevate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminPassword) return;
-    setElevating(true);
-    try {
-      const res = await api.adminElevate({ username: adminUsername, password: adminPassword });
-      setAdminToken(res.admin_token);
-      toast.success("管理员提权成功！");
-      setAdminPassword("");
-      // Redirect and reload page to expose admin sidebar menus
-      window.location.href = "/settings?tab=project";
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "提权失败，请检查账号密码");
-    } finally {
-      setElevating(false);
-    }
-  };
-
-  const handleAdminChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminOldPassword || !adminNewPassword) return;
-    if (adminNewPassword !== adminConfirmPassword) {
-      toast.error("两次输入的密码不一致");
-      return;
-    }
-    setChangingPwd(true);
-    try {
-      await api.adminChangePassword({ old_password: adminOldPassword, new_password: adminNewPassword });
-      toast.success("管理员密码修改成功！");
-      setAdminOldPassword("");
-      setAdminNewPassword("");
-      setAdminConfirmPassword("");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "密码修改失败");
-    } finally {
-      setChangingPwd(false);
-    }
-  };
-
-  const handleAdminDeelevate = async () => {
-    try {
-      await api.adminDeelevate();
-    } catch (e) { /* ignore */ }
-    setAdminToken("");
-    toast.success("已退出管理员提权状态");
-    // Redirect and reload page to hide admin sidebar menus and clean states
-    window.location.href = "/settings";
-  };
 
   useEffect(() => {
     let alive = true;
     Promise.all([
       api.getLLMSettings(),
       api.getDataSourceSettings(),
-      api.getLLMSettings({ headers: { "X-Vibe-Scope": "global" } }),
-      api.getDataSourceSettings({ headers: { "X-Vibe-Scope": "global" } }),
-      api.getFeatureFlags({ headers: { "X-Vibe-Scope": "global" } }),
       api.getFeishuChannels(),
-      api.getSettingsProfile(),
       api.getWechatChannels()
     ])
-      .then(async ([llmData, dataSourceData, globalLlmData, globalDataSourceData, flagsData, feishuData, profileData, wechatData]) => {
+      .then(async ([llmData, dataSourceData, feishuData, wechatData]) => {
         if (!alive) return;
-        setTenantLLM(llmData);
-        setTenantData(dataSourceData);
-        setGlobalLLM(globalLlmData);
-        setGlobalData(globalDataSourceData);
-        setFeatureFlags(flagsData);
         setFeishuChannels(feishuData);
-        setProfile(profileData);
         setWechatChannels(wechatData);
         setSettingsLoadError(null);
 
-        const initialTab = searchParams.get("tab") === "project" && profileData.role === "admin" ? "project" : "user";
-        setActiveSubTab(initialTab);
-        if (initialTab === "project" && globalLlmData && globalDataSourceData) {
-          setSettings(globalLlmData);
-          setForm(toForm(globalLlmData));
-          setDataSettings(globalDataSourceData);
-          setLlmMode("default");
-          setDataMode("default");
-        } else {
-          setSettings(llmData);
-          setForm(toForm(llmData));
-          setDataSettings(dataSourceData);
-          setLlmMode(llmData.is_custom ? "custom" : "default");
-          setDataMode(dataSourceData.is_custom ? "custom" : "default");
-        }
-
+        setSettings(llmData);
+        setForm(toForm(llmData));
+        setDataSettings(dataSourceData);
+        setLlmMode(llmData.is_custom ? "custom" : "default");
+        setDataMode(dataSourceData.is_custom ? "custom" : "default");
       })
       .catch((error) => {
         if (isAuthRequiredError(error)) {
@@ -229,36 +135,6 @@ export function Settings() {
       });
     return () => { alive = false; };
   }, []);
-
-  const switchTabState = (tab: "project" | "user") => {
-    setActiveSubTab(tab);
-    if (tab === "project" && globalLLM && globalData) {
-      setSettings(globalLLM);
-      setForm(toForm(globalLLM));
-      setDataSettings(globalData);
-      setLlmMode("default");
-      setDataMode("default");
-    } else if (tab === "user" && tenantLLM && tenantData) {
-      setSettings(tenantLLM);
-      setForm(toForm(tenantLLM));
-      setDataSettings(tenantData);
-      setLlmMode(tenantLLM.is_custom ? "custom" : "default");
-      setDataMode(tenantData.is_custom ? "custom" : "default");
-    }
-  };
-
-  useEffect(() => {
-    if (loading || !profile) return;
-    const tab = searchParams.get("tab") === "project" && profile?.role === "admin" ? "project" : "user";
-    if (tab !== activeSubTab) {
-      switchTabState(tab);
-    }
-  }, [searchParams, profile, loading, globalLLM, tenantLLM, activeSubTab]);
-
-  const handleTabChange = (tab: "project" | "user") => {
-    setSearchParams(tab === "project" ? { tab: "project" } : {});
-    switchTabState(tab);
-  };
 
 
 
@@ -295,8 +171,7 @@ export function Settings() {
     if (!form) return;
     setSaving(true);
     try {
-      const isDefault = activeSubTab === "user" && llmMode === "default";
-      const options = activeSubTab === "project" ? { headers: { "X-Vibe-Scope": "global" } } : undefined;
+      const isDefault = llmMode === "default";
       const updated = await api.updateLLMSettings({
         provider: isDefault ? "openai" : form.provider,
         model_name: isDefault ? "placeholder" : form.model_name,
@@ -308,16 +183,11 @@ export function Settings() {
         max_retries: isDefault ? 2 : form.max_retries,
         reasoning_effort: isDefault ? "" : form.reasoning_effort || undefined,
         use_default: isDefault,
-      }, options);
+      });
       setSettings(updated);
       setForm(toForm(updated));
       setApiKey("");
       setClearApiKey(false);
-      if (activeSubTab === "project") {
-        setGlobalLLM(updated);
-      } else {
-        setTenantLLM(updated);
-      }
       toast.success(i18n.t("settings.llmSettingsSaved"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -331,8 +201,7 @@ export function Settings() {
     event.preventDefault();
     setDataSaving(true);
     try {
-      const isDefault = activeSubTab === "user" && dataMode === "default";
-      const options = activeSubTab === "project" ? { headers: { "X-Vibe-Scope": "global" } } : undefined;
+      const isDefault = dataMode === "default";
       const updated = await api.updateDataSourceSettings({
         tushare_token: isDefault ? "" : tushareToken.trim() || undefined,
         clear_tushare_token: isDefault ? true : clearTushareToken,
@@ -341,7 +210,7 @@ export function Settings() {
         fred_api_key: isDefault ? "" : fredApiKey.trim() || undefined,
         clear_fred_api_key: isDefault ? true : clearFredApiKey,
         use_default: isDefault,
-      }, options);
+      });
       setDataSettings(updated);
       setTushareToken("");
       setClearTushareToken(false);
@@ -349,11 +218,6 @@ export function Settings() {
       setClearIwencaiKey(false);
       setFredApiKey("");
       setClearFredApiKey(false);
-      if (activeSubTab === "project") {
-        setGlobalData(updated);
-      } else {
-        setTenantData(updated);
-      }
       toast.success(i18n.t("settings.dataSourceSettingsSaved"));
     } catch (error) {
       toast.error(i18n.t("settings.saveDataSourceSettingsFailed", { message: error instanceof Error ? error.message : "Unknown error" }));
@@ -367,7 +231,7 @@ export function Settings() {
     setThsSaving(true);
     setThsSavedOk(false);
     try {
-      const isDefault = activeSubTab === "user" && dataMode === "default";
+      const isDefault = dataMode === "default";
       const doClear = clearMode ?? clearThsCookie;
       const updated = await api.updateDataSourceSettings({
         ths_cookie: isDefault || doClear ? "" : thsCookie.trim() || undefined,
@@ -377,11 +241,6 @@ export function Settings() {
       setThsCookie("");
       setClearThsCookie(false);
       setThsTestResult(null);
-      if (activeSubTab === "project") {
-        setGlobalData(updated);
-      } else {
-        setTenantData(updated);
-      }
       setThsSavedOk(true);
       setTimeout(() => setThsSavedOk(false), 3000);
       toast.success(doClear ? "同花顺 Cookie 已清除" : "同花顺自选股同步设置保存成功");
@@ -771,416 +630,9 @@ export function Settings() {
           <h1 className="text-2xl font-semibold tracking-tight">{i18n.t("settings.title")}</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">{i18n.t("settings.subtitle")}</p>
         </div>
-        
-        {/* Render Tab Sub-Navigation if role is admin */}
-        {profile?.role === "admin" && (
-          <div className="flex w-full md:w-auto bg-muted p-1 rounded-lg border border-border/80 self-stretch md:self-center">
-            <button
-              onClick={() => handleTabChange("project")}
-              className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition text-center ${
-                activeSubTab === "project"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              项目设置 (系统管理员)
-            </button>
-            <button
-              onClick={() => handleTabChange("user")}
-              className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-md transition text-center ${
-                activeSubTab === "user"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              用户设置
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* activeSubTab === "project": Admin View */}
-      {activeSubTab === "project" ? (
-        <div className="space-y-6">
-
-
-          {/* Global LLM and Data Settings */}
-          <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-            <section className="rounded-lg border bg-card p-5 shadow-sm">
-              <div className="mb-5 flex items-center gap-2">
-                <Server className="h-4 w-4 text-primary" />
-                <h2 className="text-base font-semibold">项目全局 LLM 连接设置</h2>
-              </div>
-
-              <div className="grid gap-4">
-                <label className="grid gap-2">
-                  <span className={labelClass}>{i18n.t("settings.provider")}</span>
-                  <select
-                    value={form.provider}
-                    onChange={(event) => onProviderChange(event.target.value)}
-                    className={fieldClass}
-                  >
-                    {providers.map((provider) => (
-                      <option key={provider.name} value={provider.name}>{provider.label}</option>
-                    ))}
-                  </select>
-                  <span className={hintClass}>{"Changing providers updates the recommended model and endpoint."}</span>
-                </label>
-
-                <label className="grid gap-2">
-                  <span className={labelClass}>{i18n.t("settings.model")}</span>
-                  <div className="flex gap-2">
-                    <input
-                      value={form.model_name}
-                      onChange={(event) => setForm({ ...form, model_name: event.target.value })}
-                      className={fieldClass}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => applyProviderDefaults()}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground cursor-pointer"
-                      title={i18n.t("settings.useProviderDefaults")}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      <span className="hidden sm:inline">{i18n.t("settings.useProviderDefaults")}</span>
-                    </button>
-                  </div>
-                  <span className={hintClass}>{i18n.t("settings.modelIdHint")}</span>
-                </label>
-
-                <label className="grid gap-2">
-                  <span className={labelClass}>{i18n.t("settings.baseUrl")}</span>
-                  <input
-                    value={form.base_url}
-                    onChange={(event) => setForm({ ...form, base_url: event.target.value })}
-                    className={fieldClass}
-                    placeholder={selectedProvider?.default_base_url}
-                    disabled={selectedProvider?.auth_type === "oauth"}
-                  />
-                </label>
-
-                <label className="grid gap-2">
-                  <span className={labelClass}>
-                    {selectedProvider?.auth_type === "oauth" ? "OAuth" : "API key"}
-                  </span>
-                  <div className="relative">
-                    <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(event) => setApiKey(event.target.value)}
-                      className={`${fieldClass} pl-9`}
-                      placeholder={settings.api_key_hint || keyStatus}
-                      autoComplete="current-password"
-                      disabled={apiKeyDisabled}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={hintClass}>{settings.api_key_hint || keyStatus}</span>
-                    {selectedProvider?.api_key_required ? (
-                      <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={clearApiKey}
-                          onChange={(event) => {
-                            setClearApiKey(event.target.checked);
-                            if (event.target.checked) setApiKey("");
-                          }}
-                          className="h-3.5 w-3.5 accent-primary"
-                        />
-                        {i18n.t("settings.clearApiKey")}
-                      </label>
-                    ) : null}
-                  </div>
-                  {selectedProvider?.api_key_required && (
-                    <div className="text-xs text-muted-foreground/80 mt-1">
-                      支持配置多个 Key（以英文逗号分隔），系统会自动进行并发轮换与 429 冷却重试自愈。
-                    </div>
-                  )}
-                </label>
-
-              </div>
-            </section>
-
-            <section className="rounded-lg border bg-card p-5 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="mb-5 flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-primary" />
-                  <h2 className="text-base font-semibold">全局大模型参数生成设置</h2>
-                </div>
-
-                <div className="grid gap-4">
-                  <label className="grid gap-2">
-                    <span className={labelClass}>{i18n.t("settings.temperature")}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      value={form.temperature}
-                      onChange={(event) => setForm({ ...form, temperature: Number(event.target.value) })}
-                      className={fieldClass}
-                    />
-                  </label>
-
-                  <label className="grid gap-2">
-                    <span className={labelClass}>{i18n.t("settings.timeoutSeconds")}</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={3600}
-                      step={1}
-                      value={form.timeout_seconds}
-                      onChange={(event) => setForm({ ...form, timeout_seconds: Number(event.target.value) })}
-                      className={fieldClass}
-                    />
-                  </label>
-
-                  <label className="grid gap-2">
-                    <span className={labelClass}>{i18n.t("settings.maxRetries")}</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={20}
-                      step={1}
-                      value={form.max_retries}
-                      onChange={(event) => setForm({ ...form, max_retries: Number(event.target.value) })}
-                      className={fieldClass}
-                    />
-                  </label>
-
-                  <label className="grid gap-2">
-                    <span className={labelClass}>{i18n.t("settings.reasoningEffort")}</span>
-                    <select
-                      value={form.reasoning_effort}
-                      onChange={(event) => setForm({ ...form, reasoning_effort: event.target.value })}
-                      className={fieldClass}
-                    >
-                      <option value="">{i18n.t("settings.off")}</option>
-                      <option value="low">{i18n.t("settings.reasoningEffortLow")}</option>
-                      <option value="medium">{i18n.t("settings.reasoningEffortMedium")}</option>
-                      <option value="high">{i18n.t("settings.reasoningEffortHigh")}</option>
-                      <option value="max">{i18n.t("settings.reasoningEffortMax")}</option>
-                    </select>
-                    <span className={hintClass}>{i18n.t("settings.reasoningEffortDesc")}</span>
-                  </label>
-
-                  <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{i18n.t("settings.saved")}: </span>
-                    <span className="break-all font-mono">{settings.env_path}</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {saving ? i18n.t("settings.saving") : i18n.t("settings.save")}
-              </button>
-            </section>
-          </form>
-
-          {/* Global Data Source Settings */}
-          <form onSubmit={submitDataSources} className="rounded-lg border bg-card p-5 shadow-sm space-y-6">
-            <div className="mb-2 space-y-1">
-              <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-primary" />
-                <h2 className="text-base font-semibold">项目全局数据源默认设置</h2>
-              </div>
-              <p className="text-sm text-muted-foreground">{i18n.t("settings.dataSourceSettingsDesc")}</p>
-            </div>
-
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-              <div className="grid gap-4">
-                <label className="grid gap-2">
-                  <span className={labelClass}>{i18n.t("settings.tushareToken")}</span>
-                  <div className="relative">
-                    <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="password"
-                      value={tushareToken}
-                      onChange={(event) => setTushareToken(event.target.value)}
-                      className={`${fieldClass} pl-9`}
-                      placeholder={tushareStatus}
-                      autoComplete="current-password"
-                      disabled={clearTushareToken}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={hintClass}>{i18n.t("settings.tushareDesc")}</span>
-                    <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={clearTushareToken}
-                        onChange={(event) => {
-                          setClearTushareToken(event.target.checked);
-                          if (event.target.checked) setTushareToken("");
-                        }}
-                        className="h-3.5 w-3.5 accent-primary"
-                      />
-                      {i18n.t("settings.clearTushareToken")}
-                    </label>
-                  </div>
-                </label>
-
-                <label className="grid gap-2">
-                  <span className={labelClass}>{i18n.t("settings.iwencaiApiKey")}</span>
-                  <div className="relative">
-                    <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="password"
-                      value={iwencaiKey}
-                      onChange={(event) => setIwencaiKey(event.target.value)}
-                      className={`${fieldClass} pl-9`}
-                      placeholder={dataSettings.iwencai_key_configured ? i18n.t("settings.configured") : i18n.t("settings.keepCurrentKey")}
-                      autoComplete="current-password"
-                      disabled={clearIwencaiKey}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={hintClass}>{i18n.t("settings.iwencaiDesc")}</span>
-                    <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={clearIwencaiKey}
-                        onChange={(event) => {
-                          setClearIwencaiKey(event.target.checked);
-                          if (event.target.checked) setIwencaiKey("");
-                        }}
-                        className="h-3.5 w-3.5 accent-primary"
-                      />
-                      {i18n.t("settings.clearSavedKey")}
-                    </label>
-                  </div>
-                </label>
-
-                <label className="grid gap-2">
-                  <span className={labelClass}>{i18n.t("settings.fredApiKey")}</span>
-                  <div className="relative">
-                    <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="password"
-                      value={fredApiKey}
-                      onChange={(event) => setFredApiKey(event.target.value)}
-                      className={`${fieldClass} pl-9`}
-                      placeholder={dataSettings.fred_api_key_configured ? i18n.t("settings.configured") : i18n.t("settings.keepCurrentKey")}
-                      autoComplete="current-password"
-                      disabled={clearFredApiKey}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={hintClass}>{i18n.t("settings.fredDesc")}</span>
-                    <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={clearFredApiKey}
-                        onChange={(event) => {
-                          setClearFredApiKey(event.target.checked);
-                          if (event.target.checked) setFredApiKey("");
-                        }}
-                        className="h-3.5 w-3.5 accent-primary"
-                      />
-                      {i18n.t("settings.clearSavedKey")}
-                    </label>
-                  </div>
-                </label>
-
-
-
-                <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">{i18n.t("settings.saved")}: </span>
-                  <span className="break-all font-mono">{dataSettings.env_path}</span>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={dataSaving}
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm"
-                >
-                  {dataSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {dataSaving ? i18n.t("settings.saving") : i18n.t("settings.saveDataSourceSettings")}
-                </button>
-              </div>
-
-              <div className="rounded-md border bg-muted/20 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium">{i18n.t("settings.baostock")}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${dataSettings.baostock_supported ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
-                    {dataSettings.baostock_supported ? i18n.t("settings.loaderAvailable") : i18n.t("settings.noProjectLoader")}
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm text-muted-foreground font-sans">
-                  <p>{dataSettings.baostock_message}</p>
-                  <p>
-                    {dataSettings.baostock_installed
-                      ? i18n.t("settings.pythonPackageInstalled")
-                      : i18n.t("settings.pythonPackageNotInstalled")}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </form>
-
-          {/* Feature Flags Card (Read-only status badges) */}
-          {featureFlags && (
-            <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
-              <div className="mb-5 space-y-1">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-primary" />
-                  <h2 className="text-base font-semibold">{i18n.t("settings.featureFlags")}</h2>
-                </div>
-                <p className="text-sm text-muted-foreground">{i18n.t("settings.featureFlagsDesc")} (系统级只读状态)</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3 opacity-90">
-                  <span className="text-sm font-medium">{i18n.t("settings.shellTools")}</span>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    featureFlags.shell_tools_enabled
-                      ? "bg-green-500/10 text-green-500"
-                      : "bg-gray-500/10 text-gray-500"
-                  }`}>
-                    {featureFlags.shell_tools_enabled ? "已启用" : "未启用"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3 opacity-90">
-                  <span className="text-sm font-medium">{i18n.t("settings.scheduler")}</span>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    featureFlags.scheduler_enabled
-                      ? "bg-green-500/10 text-green-500"
-                      : "bg-gray-500/10 text-gray-500"
-                  }`}>
-                    {featureFlags.scheduler_enabled ? "已启用" : "未启用"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3 opacity-90">
-                  <span className="text-sm font-medium">{i18n.t("settings.sessionRuntime")}</span>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    featureFlags.session_runtime_enabled
-                      ? "bg-green-500/10 text-green-500"
-                      : "bg-gray-500/10 text-gray-500"
-                  }`}>
-                    {featureFlags.session_runtime_enabled ? "已启用" : "未启用"}
-                  </span>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
-                {i18n.t("settings.flagsReadFrom", {
-                  env1: "VIBE_TRADING_ENABLE_SHELL_TOOLS",
-                  env2: "VIBE_TRADING_ENABLE_SCHEDULER",
-                  env3: "ENABLE_SESSION_RUNTIME",
-                  env_path: featureFlags.env_path
-                })}
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* activeSubTab === "user": Tenant Settings View */
-        <div className="space-y-6">
+      <div className="space-y-6">
 
           {/* Feishu Bot Channels Settings Card */}
           <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
@@ -1952,129 +1404,8 @@ export function Settings() {
             </div>
           </form>
 
-          {/* 管理员提权 / 密码修改卡片 */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-primary" />
-                  <h2 className="text-base font-semibold">
-                    {getAdminToken() ? "修改管理员密码 (已提权)" : "管理员提权 (系统设置)"}
-                  </h2>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {getAdminToken()
-                    ? "您当前处于系统管理员身份，可以修改管理员账户密码或退出提权。"
-                    : "普通租户访问权限受限。请输入系统管理员账号密码进行提权，以修改全局配置及查看系统日志。"}
-                </p>
-              </div>
-              
-              {getAdminToken() && (
-                <button
-                  type="button"
-                  onClick={handleAdminDeelevate}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition cursor-pointer"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  退出提权
-                </button>
-              )}
-            </div>
-
-            {!getAdminToken() ? (
-              <form onSubmit={handleAdminElevate} className="max-w-xl space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                      管理员账号
-                    </span>
-                    <input
-                      type="text"
-                      value={adminUsername}
-                      onChange={(e) => setAdminUsername(e.target.value)}
-                      className={fieldClass}
-                      required
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                      管理员密码
-                    </span>
-                    <input
-                      type="password"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      className={fieldClass}
-                      placeholder="请输入管理员密码"
-                      required
-                    />
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  disabled={elevating}
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm"
-                >
-                  {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                  进行管理员提权
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleAdminChangePassword} className="max-w-xl space-y-4">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                      原管理员密码
-                    </span>
-                    <input
-                      type="password"
-                      value={adminOldPassword}
-                      onChange={(e) => setAdminOldPassword(e.target.value)}
-                      className={fieldClass}
-                      placeholder="旧密码"
-                      required
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                      新管理员密码
-                    </span>
-                    <input
-                      type="password"
-                      value={adminNewPassword}
-                      onChange={(e) => setAdminNewPassword(e.target.value)}
-                      className={fieldClass}
-                      placeholder="新密码"
-                      required
-                    />
-                  </label>
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
-                      确认新密码
-                    </span>
-                    <input
-                      type="password"
-                      value={adminConfirmPassword}
-                      onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                      className={fieldClass}
-                      placeholder="确认新密码"
-                      required
-                    />
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  disabled={changingPwd}
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm"
-                >
-                  {changingPwd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  保存管理员密码
-                </button>
-              </form>
-            )}
-          </div>
         </div>
-      )}
+       
 
 
 

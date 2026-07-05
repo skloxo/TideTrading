@@ -97,13 +97,13 @@ export function CorrelationMatrix({ labels, matrix, names = {}, height = 500 }: 
         textStyle: { color: t.textColor, fontSize: 11 },
         inRange: {
           color: [
-            "#047857", // -1.0: Deep green (negative)
-            "#10b981", // -0.7: Green
-            "#a7f3d0", // -0.3: Light green
+            "#b91c1c", // -1.0: Deep red (A-share: red=good, neg corr=diversify)
+            "#f87171", // -0.7: Red
+            "#fecaca", // -0.3: Light red
             "#3b82f6", //  0.0: Blue (Neutral)
-            "#fecaca", //  0.3: Light red
-            "#f87171", //  0.7: Red
-            "#b91c1c"  //  1.0: Deep red (positive)
+            "#a7f3d0", //  0.3: Light green
+            "#10b981", //  0.7: Green
+            "#047857"  //  1.0: Deep green (A-share: green=bad, high corr=risk)
           ],
         },
       },

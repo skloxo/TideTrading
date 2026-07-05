@@ -1933,15 +1933,13 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
             tenant_vals = _read_env_values(tenant_env)
             is_custom = "LANGCHAIN_PROVIDER" in tenant_vals
 
-    if is_public and tenant != "default":
-        env_values = values if values is not None else (_read_env_values(ENV_PATH) if ENV_PATH.exists() else {})
+    if tenant != "default":
+        if is_custom:
+            env_values = values if values is not None else tenant_vals
+        else:
+            env_values = {}
     else:
         env_values = values if values is not None else _read_settings_env_values()
-
-    if tenant != "default" and not is_custom and is_public:
-        # For non-admin tenants who have not configured a custom LLM, do not expose
-        # the admin's global configurations in form values. Return standard default values instead.
-        env_values = {}
 
     provider_name = env_values.get("LANGCHAIN_PROVIDER", "openai").strip().lower()
     provider = LLM_PROVIDER_BY_NAME.get(provider_name, LLM_PROVIDER_BY_NAME["openai"])
@@ -1959,13 +1957,7 @@ def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_pub
         api_key_hint = None
     else:
         if api_key_configured and not is_public:
-            if tenant != "default":
-                if not is_custom:
-                    api_key_hint = "********"
-                else:
-                    api_key_hint = None
-            else:
-                api_key_hint = mask_api_keys(api_key)
+            api_key_hint = mask_api_keys(api_key)
 
     return LLMSettingsResponse(
         provider=provider.name,
@@ -2010,8 +2002,21 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
     from src.config.paths import active_tenant_var
     tenant = active_tenant_var.get()
 
-    if is_public and tenant != "default":
-        env_values = values if values is not None else (_read_env_values(ENV_PATH) if ENV_PATH.exists() else {})
+    is_custom = True
+    tenant_vals = {}
+    if tenant != "default":
+        tenant_env = get_runtime_root() / ".env"
+        if not tenant_env.exists():
+            is_custom = False
+        else:
+            tenant_vals = _read_env_values(tenant_env)
+            is_custom = any(k in tenant_vals for k in ["TUSHARE_TOKEN", "FRED_API_KEY", "VIBE_TRADING_IWENCAI_KEY", "THS_COOKIE"])
+
+    if tenant != "default":
+        if is_custom:
+            env_values = values if values is not None else tenant_vals
+        else:
+            env_values = {}
     else:
         env_values = values if values is not None else _read_settings_env_values()
 
@@ -2036,29 +2041,15 @@ def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None
     iwencai_key_hint = None
     fred_api_key_hint = None
     ths_cookie_hint = None
-    if tenant != "default" and not is_public:
-        tenant_env = get_runtime_root() / ".env"
-        tenant_vals = {}
-        if tenant_env.exists():
-            tenant_vals = _read_env_values(tenant_env)
-        
-        if token_configured and not _is_configured_secret(tenant_vals.get("TUSHARE_TOKEN", ""), TUSHARE_TOKEN_PLACEHOLDERS):
-            tushare_token_hint = "********"
-        if iwencai_key_configured and not _is_configured_secret(tenant_vals.get("VIBE_TRADING_IWENCAI_KEY", ""), IWENCAI_KEY_PLACEHOLDERS):
-            iwencai_key_hint = "********"
-        if fred_key_configured and not _is_configured_secret(tenant_vals.get("FRED_API_KEY", ""), FRED_API_KEY_PLACEHOLDERS):
-            fred_api_key_hint = "********"
-        if ths_cookie_configured and not _is_configured_secret(tenant_vals.get("THS_COOKIE", ""), THS_COOKIE_PLACEHOLDERS):
-            ths_cookie_hint = "********"
-
-    is_custom = True
-    if tenant != "default":
-        tenant_env = get_runtime_root() / ".env"
-        if not tenant_env.exists():
-            is_custom = False
-        else:
-            tenant_vals = _read_env_values(tenant_env)
-            is_custom = any(k in tenant_vals for k in ["TUSHARE_TOKEN", "FRED_API_KEY", "VIBE_TRADING_IWENCAI_KEY", "THS_COOKIE"])
+    if not is_public:
+        if token_configured:
+            tushare_token_hint = mask_api_keys(token)
+        if iwencai_key_configured:
+            iwencai_key_hint = mask_api_keys(iwencai_key)
+        if fred_key_configured:
+            fred_api_key_hint = mask_api_keys(fred_key)
+        if ths_cookie_configured:
+            ths_cookie_hint = mask_api_keys(ths_cookie)
 
     return DataSourceSettingsResponse(
         tushare_token_configured=token_configured,

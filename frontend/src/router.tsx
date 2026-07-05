@@ -1,7 +1,6 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
-import { isAdminElevated } from "@/lib/apiAuth";
 
 const Home = lazy(() => import("@/pages/Home").then((m) => ({ default: m.Home })));
 const Agent = lazy(() => import("@/pages/Agent").then((m) => ({ default: m.Agent })));
@@ -38,8 +37,14 @@ const Monitor = lazy(() =>
 const Logs = lazy(() =>
   import("@/pages/Logs").then((m) => ({ default: m.Logs })),
 );
+const TenantManagement = lazy(() =>
+  import("@/pages/TenantManagement").then((m) => ({ default: m.TenantManagement })),
+);
 const GlobalDashboard = lazy(() =>
   import("@/pages/GlobalDashboard").then((m) => ({ default: m.GlobalDashboard })),
+);
+const ProjectSettings = lazy(() =>
+  import("@/pages/ProjectSettings").then((m) => ({ default: m.ProjectSettings })),
 );
 
 function PageLoader() {
@@ -58,30 +63,21 @@ function wrap(Component: ComponentType) {
   );
 }
 
-/**
- * Route guard for devops/admin pages (/dashboard, /monitor, /logs).
- * Redirects to /settings (with a hint) if the user has not elevated to admin.
- */
-function AdminGuard({ children }: { children: React.ReactNode }) {
-  if (!isAdminElevated()) {
-    return <Navigate to="/settings" replace />;
-  }
-  return <>{children}</>;
-}
-
 export const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
       { path: "/", element: wrap(Home) },
-      { path: "/dashboard", element: <AdminGuard>{wrap(GlobalDashboard)}</AdminGuard> },
+      { path: "/dashboard", element: wrap(GlobalDashboard) },
       { path: "/agent", element: wrap(Agent) },
       { path: "/runtime", element: wrap(Runtime) },
       { path: "/reports", element: wrap(Reports) },
       { path: "/settings", element: wrap(Settings) },
+      { path: "/project-settings", element: wrap(ProjectSettings) },
       { path: "/xueqiu", element: wrap(Xueqiu) },
-      { path: "/monitor", element: <AdminGuard>{wrap(Monitor)}</AdminGuard> },
-      { path: "/logs", element: <AdminGuard>{wrap(Logs)}</AdminGuard> },
+      { path: "/monitor", element: wrap(Monitor) },
+      { path: "/logs", element: wrap(Logs) },
+      { path: "/tenants", element: wrap(TenantManagement) },
       { path: "/runs/:runId", element: wrap(RunDetail) },
       { path: "/compare", element: wrap(Compare) },
       { path: "/correlation", element: wrap(Correlation) },

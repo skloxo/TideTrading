@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
-import { Activity, BarChart3, Bot, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, ChevronDown, ChevronRight, Cpu } from "lucide-react";
+import { Activity, BarChart3, Bot, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, ChevronDown, ChevronRight, Cpu, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, isAuthRequiredError, type SessionItem, type UserProfile } from "@/lib/api";
@@ -258,11 +258,11 @@ export function Layout() {
                   </Link>
 
                   <Link
-                    to="/settings?tab=project"
+                    to="/project-settings"
                     className={cn(
                       "flex items-center rounded-md text-xs transition-colors",
                       isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
-                      (pathname === "/settings" && searchParams.get("tab") === "project")
+                      pathname === "/project-settings"
                         ? "bg-primary/10 text-primary font-semibold"
                         : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
                     )}
@@ -285,6 +285,21 @@ export function Layout() {
                   >
                     <Terminal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {!isCollapsed && (i18nHook.language === "zh-CN" ? "运行日志" : "Runtime Logs")}
+                  </Link>
+
+                  <Link
+                    to="/tenants"
+                    className={cn(
+                      "flex items-center rounded-md text-xs transition-colors",
+                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
+                      pathname === "/tenants"
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                    )}
+                    title={isCollapsed ? (i18nHook.language === "zh-CN" ? "租户管理" : "Tenants") : undefined}
+                  >
+                    <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {!isCollapsed && (i18nHook.language === "zh-CN" ? "租户管理" : "Tenants")}
                   </Link>
                 </div>
               )}

@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { api, type MonitorStats, type QuoteGatewayStatus, type TenantKey, type SystemVersionInfo, type LiveStatus, type UserProfile } from "@/lib/api";
-import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, KeyRound, Power, Trash2, ArrowUpCircle, Loader2, Copy, Check, Save, Plus, ShieldAlert } from "lucide-react";
+import { api, type MonitorStats, type QuoteGatewayStatus, type SystemVersionInfo, type LiveStatus, type UserProfile } from "@/lib/api";
+import { setAdminToken } from "@/lib/apiAuth";
+import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, Loader2, Save, ShieldAlert, Lock, LogOut, ArrowUpCircle } from "lucide-react";
 
 export function Monitor() {
   const { i18n } = useTranslation();
@@ -35,14 +36,14 @@ export function Monitor() {
   const [quoteStatus, setQuoteStatus] = useState<QuoteGatewayStatus | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
 
-  // Tenant API Keys states
-  const [tenantKeys, setTenantKeys] = useState<TenantKey[]>([]);
-  const [tenantKeysLoading, setTenantKeysLoading] = useState(false);
-  const [isTenantModalOpen, setIsTenantModalOpen] = useState(false);
-  const [newKeyName, setNewKeyName] = useState("");
-  const [tenantSaving, setTenantSaving] = useState(false);
-  const [generatedKey, setGeneratedKey] = useState("");
-  const [isCopied, setIsCopied] = useState(false);
+  // System version & one-click upgrade states
+  const [adminUsername, setAdminUsername] = useState("admin");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [elevating, setElevating] = useState(false);
+  const [adminOldPassword, setAdminOldPassword] = useState("");
+  const [adminNewPassword, setAdminNewPassword] = useState("");
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [changingPwd, setChangingPwd] = useState(false);
 
   // System version & one-click upgrade states
   const [versionInfo, setVersionInfo] = useState<SystemVersionInfo | null>(null);
@@ -85,17 +86,6 @@ export function Monitor() {
     }
   };
 
-  const fetchTenantKeys = async () => {
-    try {
-      setTenantKeysLoading(true);
-      const keys = await api.getTenantKeys();
-      setTenantKeys(keys);
-    } catch (err) {
-      console.error("Failed to load tenant keys:", err);
-    } finally {
-      setTenantKeysLoading(false);
-    }
-  };
 
   const fetchVersionInfo = async (showToast = false) => {
     try {
@@ -143,7 +133,6 @@ export function Monitor() {
 
     fetchStats();
     fetchQuoteStatus(true, false);
-    fetchTenantKeys();
     fetchVersionInfo(false);
     fetchLiveStatus(true, false);
 
@@ -186,46 +175,47 @@ export function Monitor() {
     }
   };
 
-  const handleCreateTenantKey = async (e: FormEvent) => {
+  const handleAdminElevate = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newKeyName.trim()) return;
-    setTenantSaving(true);
+    if (!adminPassword) return;
+    setElevating(true);
     try {
-      const result = await api.createTenantKey({ name: newKeyName.trim() });
-      setGeneratedKey(result.key);
-      setTenantKeys([...tenantKeys, result]);
-      setNewKeyName("");
-      toast.success("密钥生成成功");
-      fetchStats(); // Refresh active tenants count
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "生成密钥失败");
+      const res = await api.adminElevate({ username: adminUsername, password: adminPassword });
+      setAdminToken(res.admin_token);
+      toast.success("管理员提权成功！");
+      setAdminPassword("");
+      window.location.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "提权失败，请检查账号密码");
     } finally {
-      setTenantSaving(false);
+      setElevating(false);
     }
   };
 
-  const handleToggleTenantKey = async (tid: string, currentActive: boolean) => {
-    try {
-      const updated = await api.updateTenantKey(tid, { is_active: !currentActive });
-      setTenantKeys(tenantKeys.map(k => k.tenant_id === tid ? updated : k));
-      toast.success("密钥状态已更新");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "修改密钥状态失败");
-    }
-  };
-
-  const handleDeleteTenantKey = async (tid: string) => {
-    if (!window.confirm("确认删除此密钥？删除后该租户的 API 访问权限与隔离工作区将被立即彻底清除，无法撤销！")) {
+  const handleAdminChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (adminNewPassword !== adminConfirmPassword) {
+      toast.error("两次输入的新密码不一致");
       return;
     }
+    setChangingPwd(true);
     try {
-      await api.deleteTenantKey(tid);
-      setTenantKeys(tenantKeys.filter(k => k.tenant_id !== tid));
-      toast.success("密钥已成功删除");
-      fetchStats(); // Refresh stats
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "删除密钥失败");
+      await api.adminChangePassword({ old_password: adminOldPassword, new_password: adminNewPassword });
+      toast.success("管理员密码修改成功！");
+      setAdminOldPassword("");
+      setAdminNewPassword("");
+      setAdminConfirmPassword("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "密码修改失败");
+    } finally {
+      setChangingPwd(false);
     }
+  };
+
+  const handleAdminDeelevate = () => {
+    setAdminToken("");
+    toast.success("已退出管理员提权状态");
+    window.location.reload();
   };
 
   if (profileLoading) {
@@ -236,21 +226,42 @@ export function Monitor() {
     );
   }
 
-  if (profile?.role !== "admin") {
+  if (!profileLoading && profile?.role !== "admin") {
+    const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
-      <div className="mx-auto max-w-md w-full p-8 mt-20 text-center space-y-4 rounded-xl border border-destructive/20 bg-destructive/5 shadow-lg">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-          <ShieldAlert className="h-6 w-6 text-destructive" />
+      <div className="mx-auto max-w-7xl space-y-6 p-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isZh ? "服务配置与性能监控" : "Service Configuration & Monitor"}
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              {isZh ? "实时监控进程资源占用及系统升级维护。" : "Monitor running processes and handle system updates in real-time."}
+            </p>
+          </div>
         </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-foreground">
-            {isZh ? "访问受限" : "Access Denied"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {isZh 
-              ? "此页面属于系统运维管理功能，仅限系统管理员访问。请前往设置页面进行管理员提权。"
-              : "This page belongs to system administration functions and is restricted to system administrators. Please go to Settings to elevate your privileges."}
-          </p>
+        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <ShieldAlert className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold">管理员提权 (系统运维)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">此页面属于系统运维管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
+          <form onSubmit={handleAdminElevate} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
+                <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} className={fieldClass} required />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
+                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder="请输入管理员密码" />
+              </label>
+            </div>
+            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+              {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              进行管理员提权
+            </button>
+          </form>
         </div>
       </div>
     );
@@ -275,7 +286,6 @@ export function Monitor() {
             await Promise.all([
               fetchStats(),
               fetchQuoteStatus(true, false),
-              fetchTenantKeys(),
               fetchVersionInfo(false),
               fetchLiveStatus(true, false)
             ]);
@@ -510,129 +520,10 @@ export function Monitor() {
         </div>
       </div>
 
-      {/* Main Content Layout */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        {/* Left Column: Tenant API Keys Management */}
-        <div className="rounded-lg border bg-card p-5 shadow-sm flex flex-col justify-between min-h-[450px]">
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4 mb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="h-4.5 w-4.5 text-primary" />
-                  <h2 className="text-base font-semibold">{isZh ? "租户密钥与工作区管理" : "Tenant Keys & Workspaces"}</h2>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {isZh
-                    ? "生成新密钥时系统会自动创建其对应的物理隔离沙箱工作空间。"
-                    : "Workspaces are physically isolated under each tenant ID automatically."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setGeneratedKey("");
-                  setNewKeyName("");
-                  setIsTenantModalOpen(true);
-                }}
-                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 px-3 py-1.5 text-xs font-medium transition cursor-pointer self-start sm:self-center shadow-sm"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {isZh ? "生成新租户密钥" : "Generate Tenant Key"}
-              </button>
-            </div>
-
-            <div className="w-full overflow-x-auto overflow-y-auto max-h-[420px] scrollbar-thin">
-              <table className="w-full min-w-[600px] border-collapse text-left text-xs text-muted-foreground">
-                <thead>
-                  <tr className="border-b border-border text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/30">
-                    <th className="px-3 py-2.5">{isZh ? "租户备注名称" : "Tenant Nickname"}</th>
-                    <th className="px-3 py-2.5">Tenant ID</th>
-                    <th className="px-3 py-2.5">{isZh ? "系统密钥" : "API Key"}</th>
-                    <th className="px-3 py-2.5">{isZh ? "状态" : "Status"}</th>
-                    <th className="px-3 py-2.5 text-right">{isZh ? "操作" : "Actions"}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {tenantKeysLoading ? (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center">
-                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          {isZh ? "正在加载租户密钥列表..." : "Loading tenant keys..."}
-                        </div>
-                      </td>
-                    </tr>
-                  ) : tenantKeys.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                        {isZh
-                          ? "暂无已注册租户。点击右上角“生成新租户密钥”开始接入。"
-                          : "No active tenants registered. Generate key above to start."}
-                      </td>
-                    </tr>
-                  ) : (
-                    tenantKeys.map((key) => (
-                      <tr key={key.tenant_id} className="hover:bg-muted/10 transition-colors">
-                        <td className="px-3 py-3 font-medium text-foreground">{key.name}</td>
-                        <td className="px-3 py-3 font-mono text-[10px]">{key.tenant_id}</td>
-                        <td className="px-3 py-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(key.key);
-                              toast.success(isZh ? "密钥已成功复制到剪贴板" : "API key copied to clipboard");
-                            }}
-                            className="inline-flex items-center gap-1 rounded bg-muted/60 hover:bg-muted text-foreground px-2 py-1 text-[10px] font-medium transition cursor-pointer"
-                          >
-                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                            {isZh ? "复制密钥" : "Copy Key"}
-                          </button>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border ${
-                            key.is_active !== false
-                              ? "bg-green-500/10 text-green-500 border-green-500/20"
-                              : "bg-red-500/10 text-red-500 border-red-500/20"
-                          }`}>
-                            {key.is_active !== false ? (isZh ? "启用" : "Active") : (isZh ? "禁用" : "Disabled")}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleTenantKey(key.tenant_id, key.is_active !== false)}
-                              className={`rounded p-1 transition ${
-                                key.is_active !== false
-                                  ? "text-yellow-500 hover:bg-yellow-500/10"
-                                  : "text-green-500 hover:bg-green-500/10"
-                              }`}
-                              title={key.is_active !== false ? (isZh ? "禁用该密钥" : "Disable") : (isZh ? "启用该密钥" : "Enable")}
-                            >
-                              <Power className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTenantKey(key.tenant_id)}
-                              className="text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded p-1 transition"
-                              title={isZh ? "删除租户" : "Delete"}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Realtime Quote Gateway, Live Engine & System Version Cards */}
-        <div className="space-y-6">
-          {/* 1. Realtime Quote Gateway Card */}
+      <div className="space-y-6">
+        {/* Realtime Quote Gateway, Live Engine & System Version Cards */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Quote Gateway */}
           {quoteStatus && (
             <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
@@ -642,81 +533,32 @@ export function Monitor() {
                   </div>
                   <div>
                     <h2 className="text-base font-semibold">{isZh ? "实时行情网关状态" : "Realtime Quote Gateway"}</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {isZh ? "通达信 TCP 行情连接池与延迟监控" : "TDX TCP connection pool and latency"}
-                    </p>
                   </div>
                 </div>
                 <button
-                  id="quote-gateway-refresh-btn"
                   type="button"
                   onClick={() => fetchQuoteStatus(true, true)}
                   disabled={quoteLoading}
                   className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${quoteLoading ? "animate-spin" : ""}`} />
-                  {isZh ? "刷新状态" : "Refresh"}
+                  {isZh ? "刷新" : "Refresh"}
                 </button>
               </div>
-
-              <div className="grid gap-4 grid-cols-3">
+              <div className="grid gap-4 grid-cols-2">
                 <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
                   <span className="text-[10px] text-muted-foreground">{isZh ? "网关状态" : "Status"}</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`h-2 w-2 rounded-full ${
-                      quoteStatus.status === "connected"
-                        ? "bg-success"
-                        : quoteStatus.status === "degraded"
-                        ? "bg-warning animate-pulse"
-                        : "bg-destructive"
-                    }`} />
-                    <span className="text-xs font-semibold">
-                      {quoteStatus.status === "connected"
-                        ? (isZh ? "连接正常 (TCP)" : "Online (TCP)")
-                        : quoteStatus.status === "degraded"
-                        ? (isZh ? "已降级 (Tencent HTTP)" : "Degraded (HTTP)")
-                        : (isZh ? "未连接" : "Offline")}
-                    </span>
-                  </div>
+                  <div className="text-xs font-semibold">{quoteStatus.status}</div>
                 </div>
-
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "活动连接数" : "Active Conns"}</span>
-                  <span className="text-sm font-bold mt-1 font-mono">
-                    {quoteStatus.active_connections} <span className="text-[10px] font-normal text-muted-foreground">/ 3</span>
-                  </span>
-                </div>
-
                 <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
                   <span className="text-[10px] text-muted-foreground">{isZh ? "平均测速延迟" : "Avg Latency"}</span>
-                  <span className="text-sm font-bold mt-1 font-mono">
-                    {quoteStatus.status === "degraded" ? "--" : `${quoteStatus.latency_ms} ms`}
-                  </span>
+                  <div className="text-xs font-semibold font-mono">{quoteStatus.latency_ms} ms</div>
                 </div>
               </div>
-
-              {quoteStatus.pool && quoteStatus.pool.length > 0 && (
-                <div className="rounded-md border bg-muted/5 p-3 space-y-2">
-                  <div className="text-[10px] font-medium text-muted-foreground">
-                    {isZh ? "活动行情服务器列表：" : "Active Quote Servers:"}
-                  </div>
-                  <div className="divide-y divide-border/40 max-h-[120px] overflow-auto">
-                    {quoteStatus.pool.map((srv, idx) => (
-                      <div key={idx} className="flex items-center justify-between py-1.5 text-xs">
-                        <span className="font-mono text-[10px] text-muted-foreground">{srv.ip}:{srv.port}</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                          <span className="font-mono font-medium text-[10px]">{srv.latency_ms} ms</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {/* 2. Live Trading Engine Card */}
+          {/* Live Trading Engine */}
           {liveStatus && (
             <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
@@ -726,9 +568,6 @@ export function Monitor() {
                   </div>
                   <div>
                     <h2 className="text-base font-semibold">{isZh ? "实盘引擎监控" : "Live Trading Monitor"}</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {isZh ? "全局交易熔断与连接器状态汇总" : "Global halt and connector summary"}
-                    </p>
                   </div>
                 </div>
                 <button
@@ -738,41 +577,23 @@ export function Monitor() {
                   className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${liveLoading ? "animate-spin" : ""}`} />
-                  {isZh ? "刷新状态" : "Refresh"}
+                  {isZh ? "刷新" : "Refresh"}
                 </button>
               </div>
-
-              <div className="grid gap-4 grid-cols-3">
+              <div className="grid gap-4 grid-cols-2">
                 <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
                   <span className="text-[10px] text-muted-foreground">{isZh ? "全局熔断状态" : "Global Halt"}</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`h-2 w-2 rounded-full ${
-                      liveStatus.global_halted ? "bg-destructive animate-pulse" : "bg-success"
-                    }`} />
-                    <span className="text-xs font-semibold">
-                      {liveStatus.global_halted ? (isZh ? "紧急已熔断" : "HALTED") : (isZh ? "交易运转正常" : "NORMAL")}
-                    </span>
-                  </div>
+                  <div className="text-xs font-semibold">{liveStatus.global_halted ? "HALTED" : "NORMAL"}</div>
                 </div>
-
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "已授权连接数" : "Authorized Conns"}</span>
-                  <span className="text-sm font-bold mt-1 font-mono">
-                    {liveStatus.brokers.filter(b => b.auth.oauth_token_present).length} <span className="text-[10px] font-normal text-muted-foreground">/ {liveStatus.brokers.length}</span>
-                  </span>
-                </div>
-
                 <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
                   <span className="text-[10px] text-muted-foreground">{isZh ? "活跃运行器" : "Active Runners"}</span>
-                  <span className="text-sm font-bold mt-1 font-mono">
-                    {liveStatus.brokers.filter(b => b.runner?.alive).length} <span className="text-[10px] font-normal text-muted-foreground">/ {liveStatus.brokers.length}</span>
-                  </span>
+                  <div className="text-xs font-semibold font-mono">{liveStatus.brokers.filter(b => b.runner?.alive).length}</div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* 3. System Version Management Card */}
+          {/* System Version */}
           {versionInfo && (
             <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
@@ -782,9 +603,6 @@ export function Monitor() {
                   </div>
                   <div>
                     <h2 className="text-base font-semibold">{isZh ? "系统版本管理" : "System Version"}</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {isZh ? "一键查看并平滑升级系统代码" : "Inspect and upgrade system codebase"}
-                    </p>
                   </div>
                 </div>
                 <button
@@ -794,39 +612,25 @@ export function Monitor() {
                   className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${versionLoading ? "animate-spin" : ""}`} />
-                  {isZh ? "检查更新" : "Check Update"}
+                  {isZh ? "检查" : "Check"}
                 </button>
               </div>
-
               <div className="grid gap-4 grid-cols-2">
                 <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "当前版本" : "Current Version"}</span>
-                  <span className="text-xs font-bold mt-1 font-mono">{versionInfo.current_version}</span>
+                  <span className="text-[10px] text-muted-foreground">{isZh ? "当前版本" : "Current"}</span>
+                  <div className="text-xs font-bold font-mono">{versionInfo.current_version}</div>
                 </div>
-
                 <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "最新版本" : "Latest Version"}</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-xs font-bold font-mono">{versionInfo.latest_version}</span>
-                    {versionInfo.has_update ? (
-                      <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400 animate-pulse">
-                        UPDATE
-                      </span>
-                    ) : (
-                      <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
-                        LATEST
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-[10px] text-muted-foreground">{isZh ? "最新版本" : "Latest"}</span>
+                  <div className="text-xs font-bold font-mono">{versionInfo.latest_version}</div>
                 </div>
               </div>
-
               {versionInfo.has_update && (
                 <button
                   type="button"
                   onClick={handleTriggerUpgrade}
                   disabled={upgrading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 transition disabled:opacity-70 cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 transition disabled:opacity-70 cursor-pointer mt-4"
                 >
                   {upgrading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpCircle className="h-4 w-4" />}
                   {upgrading ? (isZh ? "正在触发升级…" : "Upgrading...") : (isZh ? `立即升级到 ${versionInfo.latest_version}` : `Upgrade to ${versionInfo.latest_version}`)}
@@ -837,86 +641,49 @@ export function Monitor() {
         </div>
       </div>
 
+      {/* Admin Control Card */}
+      {(() => {
+        const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
+        return (
+          <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-primary" />
+                <h2 className="text-base font-semibold">管理员身份管理</h2>
+              </div>
+              <button type="button" onClick={handleAdminDeelevate} className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition cursor-pointer">
+                <LogOut className="h-3.5 w-3.5" />
+                退出提权
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">您当前处于系统管理员身份，可以修改管理员账户密码。</p>
+            <form onSubmit={handleAdminChangePassword} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">原管理员密码</span>
+                  <input type="password" value={adminOldPassword} onChange={(e) => setAdminOldPassword(e.target.value)} className={fieldClass} placeholder="旧密码" required />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">新管理员密码</span>
+                  <input type="password" value={adminNewPassword} onChange={(e) => setAdminNewPassword(e.target.value)} className={fieldClass} placeholder="新密码" required />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">确认新密码</span>
+                  <input type="password" value={adminConfirmPassword} onChange={(e) => setAdminConfirmPassword(e.target.value)} className={fieldClass} placeholder="确认新密码" required />
+                </label>
+              </div>
+              <button type="submit" disabled={changingPwd} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+                {changingPwd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                保存管理员密码
+              </button>
+            </form>
+          </div>
+        );
+      })()}
+
       {/* --- MODALS --- */}
 
-      {/* 1. Tenant Key Generation Modal */}
-      {isTenantModalOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-semibold mb-4 text-foreground">
-              {generatedKey ? "密钥生成成功" : "生成新租户密钥"}
-            </h3>
-            
-            {generatedKey ? (
-              <div className="space-y-4">
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  新租户的 API 密钥已生成。该密钥<strong>仅在此展示一次</strong>，请立即复制并妥善保存您的密钥：
-                </p>
-                <div className="flex gap-2 items-center rounded-md border bg-muted/40 p-3 font-mono text-sm break-all select-all text-emerald-500">
-                  <span className="flex-1">{generatedKey}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedKey);
-                      setIsCopied(true);
-                      setTimeout(() => setIsCopied(false), 2000);
-                    }}
-                    className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition shrink-0"
-                    title="复制到剪贴板"
-                  >
-                    {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-end pt-4 border-t">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTenantModalOpen(false);
-                      setGeneratedKey("");
-                    }}
-                    className="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 px-4 py-2 text-sm font-medium transition cursor-pointer"
-                  >
-                    已复制并关闭
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleCreateTenantKey} className="space-y-4">
-                <label className="grid gap-1.5">
-                  <span className="text-sm font-medium">租户备注名称 (例如：量化团队A)</span>
-                  <input
-                    type="text"
-                    required
-                    value={newKeyName}
-                    onChange={(e) => setNewKeyName(e.target.value)}
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    placeholder="请输入方便识别的租户名称"
-                  />
-                </label>
-
-                <div className="flex items-center justify-end gap-3 border-t pt-4 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setIsTenantModalOpen(false)}
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent px-4 py-2 text-sm font-medium transition cursor-pointer"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={tenantSaving}
-                    className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-70 transition cursor-pointer"
-                  >
-                    {tenantSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {tenantSaving ? "生成中..." : "生成密钥"}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
+      {/* Upgrade Countdown Modal */}
 
       {/* 2. Upgrade Countdown Modal */}
       {showUpgradeModal && createPortal(

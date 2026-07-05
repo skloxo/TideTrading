@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type LogEntry, type UserProfile } from "@/lib/api";
-import { RefreshCw, Search, Terminal, Play, Pause, AlertTriangle, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
+import { RefreshCw, Search, Terminal, Play, Pause, AlertTriangle, ShieldAlert, Lock, Loader2 } from "lucide-react";
+import { setAdminToken } from "@/lib/apiAuth";
 
 export function Logs() {
   const { i18n } = useTranslation();
@@ -22,6 +24,11 @@ export function Logs() {
 
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
+  // Admin elevation states
+  const [adminUsername, setAdminUsername] = useState("admin");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [elevating, setElevating] = useState(false);
+
   useEffect(() => {
     let alive = true;
     api.getSettingsProfile()
@@ -36,7 +43,22 @@ export function Logs() {
       });
     return () => { alive = false; };
   }, []);
-
+  const handleAdminElevate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminPassword) return;
+    setElevating(true);
+    try {
+      const res = await api.adminElevate({ username: adminUsername, password: adminPassword });
+      setAdminToken(res.admin_token);
+      toast.success("管理员提权成功！");
+      setAdminPassword("");
+      window.location.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "提权失败，请检查账号密码");
+    } finally {
+      setElevating(false);
+    }
+  };
   const fetchLogs = async () => {
     if (paused || authLoading || profile?.role !== "admin") return;
     try {
@@ -94,22 +116,43 @@ export function Logs() {
     );
   }
 
-  // 阻断非管理员访问
+  // 阻断非管理员访问，就地展示提权卡片
   if (profile?.role !== "admin") {
+    const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
-      <div className="mx-auto max-w-md w-full p-8 mt-20 text-center space-y-4 rounded-xl border border-destructive/20 bg-destructive/5 shadow-lg">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-          <ShieldAlert className="h-6 w-6 text-destructive" />
+      <div className="mx-auto max-w-7xl space-y-6 p-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isZh ? "系统运行日志" : "System Runtime Logs"}
+            </h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              {isZh ? "实时检索和诊断量化工作站后台进程输出的诊断与错误日志。" : "Search quantitative trading station backend logs in real-time."}
+            </p>
+          </div>
         </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-foreground">
-            {isZh ? "访问受限" : "Access Denied"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {isZh 
-              ? "此页面属于系统运维管理功能，仅限系统管理员访问。请前往设置页面进行管理员提权。"
-              : "This page belongs to system administration functions and is restricted to system administrators. Please go to Settings to elevate your privileges."}
-          </p>
+        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <ShieldAlert className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold">管理员提权 (查看日志)</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">此页面属于系统运维日志功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
+          <form onSubmit={handleAdminElevate} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
+                <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} className={fieldClass} required />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
+                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder="请输入管理员密码" />
+              </label>
+            </div>
+            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+              {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              进行管理员提权
+            </button>
+          </form>
         </div>
       </div>
     );
