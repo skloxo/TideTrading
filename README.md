@@ -26,6 +26,11 @@
 
 ## 📰 最新动态
 
+- **2026-07-06** 🚀 **v1.7.4 — 项目设置独立页面 · 租户敏感凭证物理隔离（隐私防漏泄版本）**：
+  - **项目设置独立化**：将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为专属的 [ProjectSettings.tsx](file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/Vibe-Trading/frontend/src/pages/ProjectSettings.tsx) 单页（路由 `/project-settings`），支持管理员就地提权访问。
+  - **租户敏感凭证物理隔离**：重构了后端 API 的租户与全局配置合并逻辑。只要当前会话是普通租户（`tenant != "default"`），即使在本地 localhost 下访问，其“自定义大模型”表单输入框中也绝对不会回显或暴露任何属于全局管理员的敏感 API 密钥、模型名称（如 `mimo-v2.5-pro-ultraspeed`）或 Base URL，实现物理级的隐私安全防泄露。
+  - **Tabless 清爽租户设置页**：重构后的 `/settings` 主页面去除了所有多余的页签切换，成为纯粹的租户个人通道（飞书机器人、微信）及覆盖配置管理页。
+
 - **2026-07-03** 🚀 **v1.7.3 — 管理员就地提权卡片 · 独立租户管理页面上线（操作流失防范版本）**：
   - **就地管理员提权**：重构了所有受限管理界面的鉴权拦截逻辑。未提权用户访问 `/monitor`（服务看板）、`/settings` (项目设置选项卡)、`/logs`（运行日志）和 `/tenants`（租户管理）时，不再触发 `AdminGuard` 路由级重定向，而是在页面中就地展示 `管理员提权` 凭证输入框，大幅优化交互路径并防范重定向割裂。
   - **独立租户管理页面**：将原服务看板的租户密钥管理解耦，升级为独立的 [TenantManagement.tsx](file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/Vibe-Trading/frontend/src/pages/TenantManagement.tsx)（路由 `/tenants`），并于侧边栏“项目运维”中集成“租户管理”二级导航。

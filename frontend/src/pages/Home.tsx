@@ -78,7 +78,7 @@ export function Home() {
         {/* Version badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold backdrop-blur-sm shadow-sm shadow-primary/10">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v1.7.3 Stable</span>
+          <span>v1.7.4 Stable</span>
           <span className="w-px h-3 bg-primary/30" />
           <span className="text-emerald-400 font-normal">{isZh ? "运行中" : "Live"}</span>
         </div>
@@ -352,7 +352,8 @@ export function Home() {
             </h3>
             <div className="space-y-5">
               {[
-                { v: "v1.7.3", active: true,  label: isZh ? "已上线" : "Stable", labelColor: "text-emerald-400 bg-emerald-500/10", body: isZh ? "重构管理员权限提权逻辑为各功能页面的就地提权卡片交互，并从服务看板中剥离出独立的租户与物理隔离工作区管理页面（新路由 `/tenants`），极大简化了管理员与普通用户的操作路径并防范了路由重定向断流。" : "Refactored admin privilege verification to inline elevation cards across restricted pages (Monitor, Settings, Logs, Tenants). Decoupled and launched a dedicated Tenant & Workspace Management page under the `/tenants` route to avoid full-page route redirects." },
+                { v: "v1.7.4", active: true,  label: isZh ? "已上线" : "Stable", labelColor: "text-emerald-400 bg-emerald-500/10", body: isZh ? "将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为独立单页`/project-settings`；同时重构后端配置合并逻辑，在租户没有配置自定义 LLM 时进行物理级隐私隔离，不再向普通租户端泄露全局模型名（如 mimo）及密钥凭证。" : "Decoupled global project settings to a standalone page under the `/project-settings` route. Refactored backend configuration merging to strictly isolate tenant spaces; if a tenant has not configured custom LLM/data settings, global admin secrets and model names (e.g. mimo-v2.5-pro-ultraspeed) are fully hidden from the tenant settings form." },
+                { v: "v1.7.3", active: false, label: null, labelColor: "", body: isZh ? "重构管理员权限提权逻辑为各功能页面的就地提权卡片交互，并从服务看板中剥离出独立的租户与物理隔离工作区管理页面（新路由 `/tenants`），极大简化了管理员与普通用户的操作路径并防范了路由重定向断流。" : "Refactored admin privilege verification to inline elevation cards across restricted pages (Monitor, Settings, Logs, Tenants). Decoupled and launched a dedicated Tenant & Workspace Management page under the `/tenants` route to avoid full-page route redirects." },
                 { v: "v1.7.1", active: false, label: null, labelColor: "", body: isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影，仿真控制台亮色/暗色主题完美适配；开发本地 SQLite 库个股占位名一键清洗脚本，打通腾讯行情分批 API 抓取解决超长 URL 失败故障。" : "Rebuilt layout cards to premium glassmorphic widgets. Added dark/light theme adaptation for emulator console. Implemented automatic SQLite stock name sanitization and batched Tencent quotes retrieval." },
                 { v: "v1.6.0", active: false, label: null, labelColor: "", body: isZh ? "行情网关启动自愈预检（秒拔 mootdx BESTIP 损坏），Git 远程多参考仓库动态追踪大看板与每日增量对账日志，跨仓库 CLI 贡献 SOP 确立。" : "Gateway self-healing preflight, dynamic reference repo board with daily logs, and CLI contribution SOP." },
                 { v: "v1.5.0", active: false, label: null, labelColor: "", body: isZh ? "同花顺多租户双向自动/手动同步（交易日5分钟/其余30分钟自适应），秒级自选股实时监控，收盘数据维护与 Gap Healing 对账自愈。" : "Multi-tenant bi-directional Tonghuashun watchlist sync, close maintenance with self-healing, and real-time alerts." },
