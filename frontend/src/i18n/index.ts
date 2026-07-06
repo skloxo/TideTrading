@@ -8,10 +8,13 @@ if (typeof window !== "undefined" && !localStorage.getItem("i18nextLng")) {
   localStorage.setItem("i18nextLng", "zh-CN");
 }
 
+const isTest = typeof process !== "undefined" && process.env.VITEST;
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
+    lng: isTest ? "en" : undefined,
     resources: {
       en: { translation: en },
       "zh-CN": { translation: zhCN },
@@ -19,7 +22,7 @@ i18n
     // Default to Chinese (zh-CN) for all new visitors.
     // If the user explicitly switches to English via the language toggle,
     // that choice is persisted to localStorage and respected on return visits.
-    fallbackLng: "zh-CN",
+    fallbackLng: isTest ? "en" : "zh-CN",
     interpolation: { escapeValue: false },
     detection: {
       order: ["localStorage"],
