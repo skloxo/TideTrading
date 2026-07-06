@@ -717,15 +717,15 @@ def test_admin_tenant_keys_crud_and_config_inheritance(
     resp = local_tenant_client.get("/settings/llm", headers=tenant_headers)
     assert resp.status_code == 200
     llm_settings = resp.json()
-    assert llm_settings["api_key_configured"] is True
-    assert llm_settings["api_key_hint"] == "********"
+    assert llm_settings["api_key_configured"] is False
+    assert llm_settings["api_key_hint"] is None
     
-    # Tenant gets data source settings - should inherit and mask TUSHARE_TOKEN
+    # Tenant gets data source settings - should not inherit TUSHARE_TOKEN
     resp = local_tenant_client.get("/settings/data-sources", headers=tenant_headers)
     assert resp.status_code == 200
     ds_settings = resp.json()
-    assert ds_settings["tushare_token_configured"] is True
-    assert ds_settings["tushare_token_hint"] == "********"
+    assert ds_settings["tushare_token_configured"] is False
+    assert ds_settings["tushare_token_hint"] is None
     
     # 4. Test writing settings as tenant
     # Tenant updates temperature and submits the masked API key "********"
@@ -782,7 +782,7 @@ def test_admin_tenant_keys_crud_and_config_inheritance(
     assert resp.status_code == 200
     llm_settings = resp.json()
     assert llm_settings["api_key_configured"] is True
-    assert llm_settings["api_key_hint"] is None
+    assert llm_settings["api_key_hint"] == "sk-c...-key"
     
     # 6. Test toggling tenant key activation status by Admin
     resp = admin_client.put(

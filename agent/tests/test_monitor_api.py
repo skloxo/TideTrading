@@ -137,14 +137,14 @@ def test_public_tenant_settings_isolation_vs_local(monkeypatch: pytest.MonkeyPat
     resp = local_client.get("/settings/llm", headers=local_headers)
     assert resp.status_code == 200
     llm_data = resp.json()
-    assert llm_data["api_key_configured"] is True
-    assert llm_data["api_key_hint"] == "********"
+    assert llm_data["api_key_configured"] is False
+    assert llm_data["api_key_hint"] is None
     
     resp = local_client.get("/settings/data-sources", headers=local_headers)
     assert resp.status_code == 200
     ds_data = resp.json()
-    assert ds_data["tushare_token_configured"] is True
-    assert ds_data["tushare_token_hint"] == "********"
+    assert ds_data["tushare_token_configured"] is False
+    assert ds_data["tushare_token_hint"] is None
 
     # 2. Remote (Public) client access: should NOT inherit or show global config
     remote_client = _remote_client()
