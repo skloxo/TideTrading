@@ -163,7 +163,7 @@ export function RunDetail() {
   if (authFailed) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="mx-auto max-w-md w-full p-6 space-y-6">
+        <div className="mx-auto max-w-md w-full p-4 space-y-4">
           <AuthBarrier
             onLogin={(key) => {
               setApiAuthKey(key);
@@ -177,7 +177,7 @@ export function RunDetail() {
 
   if (loading) {
     return (
-      <div className="p-8 space-y-4">
+      <div className="p-4.5 space-y-4">
         <Skeleton className="h-6 w-48" />
         <SkeletonMetrics />
         <SkeletonChart height={400} />
@@ -187,7 +187,7 @@ export function RunDetail() {
 
   if (error || !run) {
     return (
-      <div className="p-8 space-y-2">
+      <div className="p-4.5 space-y-2">
         <p className="text-red-500 font-medium">{i18n.t("runDetail.runNotFound")}</p>
         <p className="text-sm text-muted-foreground">
           {error ? `${i18n.t("runDetail.runNotFoundDesc")} (Error: ${error})` : i18n.t("runDetail.runNotFoundDesc")}
@@ -545,7 +545,7 @@ function ChartTab({
 
   if (chartSymbols.length === 0 && entries.length === 0 && !hasEquity) {
     return (
-      <div className="p-8 text-center text-muted-foreground space-y-2">
+      <div className="p-4.5 text-center text-muted-foreground space-y-2">
         <p className="text-sm">{i18n.t("runDetail.noChartData")}</p>
         <p className="text-xs">{i18n.t("runDetail.noChartDataDesc")}</p>
       </div>
@@ -629,7 +629,7 @@ function ChartTab({
         </div>
       )}
       {entries.length === 0 && (
-        <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
           {Object.keys(loadingSymbols).length > 0 ? i18n.t("runDetail.loadingSelectedChart") : i18n.t("runDetail.pickSymbolToLoad")}
         </div>
       )}
@@ -651,7 +651,7 @@ function ChartTab({
 
 function TradesTab({ run }: { run: RunData }) {
   const trades = run.trade_log || [];
-  if (trades.length === 0) return <div className="p-8 text-muted-foreground text-sm">{i18n.t("runDetail.noTrades")}</div>;
+  if (trades.length === 0) return <div className="p-4.5 text-muted-foreground text-sm">{i18n.t("runDetail.noTrades")}</div>;
   return (
     <div className="p-4">
       <table className="w-full text-sm">
@@ -685,7 +685,7 @@ function TradesTab({ run }: { run: RunData }) {
 function CodeTab({ code }: { code: Record<string, string> }) {
   const files = Object.entries(code);
   const [active, setActive] = useState(files[0]?.[0] || "");
-  if (files.length === 0) return <div className="p-8 text-muted-foreground text-sm">{i18n.t("runDetail.noCodeFiles")}</div>;
+  if (files.length === 0) return <div className="p-4.5 text-muted-foreground text-sm">{i18n.t("runDetail.noCodeFiles")}</div>;
   return (
     <div className="flex flex-col h-full">
       <div className="flex gap-1 p-2 border-b">

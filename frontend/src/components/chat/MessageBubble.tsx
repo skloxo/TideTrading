@@ -53,7 +53,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
   if (msg.type === "user") {
     return (
       <div className="flex justify-end gap-3 group">
-        <div className="max-w-[72%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
+        <div className="max-w-[72%] rounded-md rounded-tr-sm bg-primary text-primary-foreground px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
           {msg.content}
           {ts && <span className="block text-[9px] opacity-50 text-right mt-1">{ts}</span>}
         </div>
@@ -89,7 +89,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
       <div className="flex gap-3">
         <AgentAvatar />
         <div className="space-y-2">
-          <div className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
+          <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3">
             <XCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
             <p className="text-sm text-danger leading-relaxed">{msg.content}</p>
           </div>

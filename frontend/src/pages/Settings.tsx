@@ -576,7 +576,7 @@ export function Settings() {
 
   if (authFailed) {
     return (
-      <div className="mx-auto max-w-md w-full p-6 space-y-6">
+      <div className="mx-auto max-w-md w-full p-4 space-y-4">
         <AuthBarrier
           onLogin={(key) => {
             setApiAuthKey(key);
@@ -589,12 +589,12 @@ export function Settings() {
 
   if (loading || !form || !settings || !dataSettings) {
     return (
-      <div className="mx-auto max-w-5xl space-y-6 p-6">
+      <div className="mx-auto max-w-5xl space-y-4 p-4">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">{i18n.t("settings.title")}</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">{i18n.t("settings.subtitle")}</p>
         </div>
-        <div className="flex min-h-32 items-center justify-center rounded-lg border bg-card p-5 text-sm text-muted-foreground">
+        <div className="flex min-h-32 items-center justify-center rounded-lg border bg-card p-3.5 text-sm text-muted-foreground">
           {settingsLoadError ? (
             <div className="text-center">
               <div className="font-medium text-foreground">{i18n.t("settings.unavailable")}</div>
@@ -624,7 +624,7 @@ export function Settings() {
     : i18n.t("settings.keepCurrentToken");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-4 p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{i18n.t("settings.title")}</h1>
@@ -632,10 +632,10 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
 
           {/* Feishu Bot Channels Settings Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="space-y-1 pr-4">
                 <div className="flex items-center gap-2">
@@ -722,7 +722,7 @@ export function Settings() {
           </div>
 
           {/* WeChat Channels Settings Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="space-y-1 pr-4">
                 <div className="flex items-center gap-2">
@@ -817,7 +817,7 @@ export function Settings() {
 
           {/* Tenant LLM Settings */}
           {/* Tenant LLM settings has a connection and generation settings form which is toggled by Custom vs Default */}
-          <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] border bg-card/30 rounded-xl p-5 shadow-sm">
+          <form onSubmit={submit} className="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)] border bg-card/30 rounded-md p-3.5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 col-span-full border-b pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -853,7 +853,7 @@ export function Settings() {
             </div>
 
             {llmMode === "default" ? (
-              <div className="rounded-lg border bg-muted/20 p-8 text-center space-y-4 col-span-full">
+              <div className="rounded-lg border bg-muted/20 p-4.5 text-center space-y-4 col-span-full">
                 <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-full w-fit mx-auto">
                   <Server className="h-6 w-6" />
                 </div>
@@ -874,7 +874,7 @@ export function Settings() {
               </div>
             ) : (
               <>
-                <section className="rounded-lg border bg-card p-5 shadow-sm">
+                <section className="rounded-lg border bg-card p-3.5 shadow-sm">
                   <div className="mb-5 flex items-center gap-2">
                     <Server className="h-4 w-4 text-primary" />
                     <h2 className="text-base font-semibold">{i18n.t("settings.connection")}</h2>
@@ -970,7 +970,7 @@ export function Settings() {
                   </div>
                 </section>
 
-                <section className="rounded-lg border bg-card p-5 shadow-sm flex flex-col justify-between">
+                <section className="rounded-lg border bg-card p-3.5 shadow-sm flex flex-col justify-between">
                   <div className="space-y-4">
                     <div className="mb-5 flex items-center gap-2">
                       <SlidersHorizontal className="h-4 w-4 text-primary" />
@@ -1054,7 +1054,7 @@ export function Settings() {
           </form>
 
           {/* Tenant Data Source Settings */}
-          <form onSubmit={submitDataSources} className="rounded-lg border bg-card p-5 shadow-sm space-y-6">
+          <form onSubmit={submitDataSources} className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -1090,7 +1090,7 @@ export function Settings() {
             </div>
 
             {dataMode === "default" ? (
-              <div className="rounded-lg border bg-muted/20 p-8 text-center space-y-4">
+              <div className="rounded-lg border bg-muted/20 p-4.5 text-center space-y-4">
                 <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-full w-fit mx-auto">
                   <Database className="h-6 w-6" />
                 </div>
@@ -1110,7 +1110,7 @@ export function Settings() {
                 </button>
               </div>
             ) : (
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+              <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
                 <div className="grid gap-4">
                   <label className="grid gap-2">
                     <span className={labelClass}>{i18n.t("settings.tushareToken")}</span>
@@ -1241,7 +1241,7 @@ export function Settings() {
           </form>
 
           {/* 同花顺自选同步设置 (用户独立配置卡片) */}
-          <form onSubmit={submitThsSync} className="rounded-lg border bg-card p-5 shadow-sm space-y-6">
+          <form onSubmit={submitThsSync} className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -1252,7 +1252,7 @@ export function Settings() {
               </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+            <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
               <div className="grid gap-4">
                 <label className="grid gap-2">
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -1412,7 +1412,7 @@ export function Settings() {
       {/* Feishu Modal */}
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-lg rounded-md border bg-card p-4 shadow-xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-semibold mb-4 text-foreground">
               {editingChannel ? i18n.t("settings.editChannel") : i18n.t("settings.addChannel")}
             </h3>
@@ -1532,7 +1532,7 @@ export function Settings() {
       {/* WeChat Delete Confirm Modal */}
       {wechatChannelToDelete && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-sm rounded-md border bg-card p-4 shadow-xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-semibold mb-2 text-foreground">确认删除通道</h3>
             <p className="text-sm text-muted-foreground mb-6">
               确定要删除该微信通道配置吗？此操作无法撤销。
@@ -1574,7 +1574,7 @@ export function Settings() {
       {/* WeChat Modal */}
       {isWechatModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-lg rounded-md border bg-card p-4 shadow-xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-semibold mb-4 text-foreground">
               {editingWechatChannel ? "编辑微信通道" : "添加微信通道"}
             </h3>

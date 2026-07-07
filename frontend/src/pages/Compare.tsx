@@ -250,7 +250,7 @@ export function Compare() {
   const hasData = Boolean(leftData || rightData);
 
   return (
-    <div className="p-8 max-w-4xl space-y-6">
+    <div className="p-4.5 max-w-4xl space-y-4">
       <h1 className="text-xl font-bold flex items-center gap-2">
         <GitCompare className="h-5 w-5" /> Strategy Comparison
       </h1>
@@ -276,12 +276,12 @@ export function Compare() {
 
       {/* Loading state — show skeletons while a selected run's data is in flight */}
       {loading && !hasData && (
-        <div className="space-y-6">
-          <div className="border rounded-xl p-4">
+        <div className="space-y-4">
+          <div className="border rounded-md p-4">
             <h2 className="text-sm font-medium text-muted-foreground mb-2">{i18n.t("compare.equityDrawdown")}</h2>
             <SkeletonChart height={320} />
           </div>
-          <div className="border rounded-xl overflow-hidden">
+          <div className="border rounded-md overflow-hidden">
             <SkeletonMetrics />
           </div>
         </div>
@@ -289,7 +289,7 @@ export function Compare() {
 
       {/* Equity curve overlay */}
       {(leftCurve.length > 0 || rightCurve.length > 0) && (
-        <div className="border rounded-xl p-4">
+        <div className="border rounded-md p-4">
           <h2 className="text-sm font-medium text-muted-foreground mb-2">{i18n.t("compare.equityDrawdown")}</h2>
           <EquityChartOverlay
             leftCurve={leftCurve}
@@ -302,7 +302,7 @@ export function Compare() {
 
       {/* Metrics table */}
       {(leftData || rightData) && (
-        <div className="border rounded-xl overflow-hidden">
+        <div className="border rounded-md overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">

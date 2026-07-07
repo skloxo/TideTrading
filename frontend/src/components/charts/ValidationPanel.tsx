@@ -47,7 +47,7 @@ function MonteCarloSection({ mc }: { mc: NonNullable<ValidationData["monte_carlo
       <p className="text-xs text-muted-foreground">
         {i18n.t("validation.monteCarloDesc", { n: mc.n_simulations.toLocaleString() })}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-md border border-border/60 bg-muted/20 p-3">
         <Stat label={i18n.t("validation.actualSharpe")} value={mc.actual_sharpe.toFixed(2)} />
         <Stat label={i18n.t("validation.pValueSharpe")} value={mc.p_value_sharpe.toFixed(4)} sub={sig ? "< 0.05" : ">= 0.05"} />
         <Stat label={i18n.t("validation.simulatedMean")} value={mc.simulated_sharpe_mean.toFixed(2)} sub={`std ${mc.simulated_sharpe_std.toFixed(2)}`} />
@@ -81,7 +81,7 @@ function BootstrapSection({ bs }: { bs: NonNullable<ValidationData["bootstrap"]>
       <p className="text-xs text-muted-foreground">
         {i18n.t("validation.bootstrapDesc", { n: bs.n_bootstrap.toLocaleString(), pct: (bs.confidence * 100).toFixed(0) + "%" })}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-md border border-border/60 bg-muted/20 p-3">
         <Stat label={i18n.t("validation.observedSharpe")} value={bs.observed_sharpe.toFixed(2)} />
         <Stat label={i18n.t("validation.ci", { pct: (bs.confidence * 100).toFixed(0) + "%" })} value={`[${bs.ci_lower.toFixed(2)}, ${bs.ci_upper.toFixed(2)}]`} />
         <Stat label={i18n.t("validation.medianSharpe")} value={bs.median_sharpe.toFixed(2)} />
@@ -114,7 +114,7 @@ function WalkForwardSection({ wf }: { wf: NonNullable<ValidationData["walk_forwa
       <p className="text-xs text-muted-foreground">
         {i18n.t("validation.walkForwardDesc", { n: wf.n_windows })}
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-md border border-border/60 bg-muted/20 p-3">
         <Stat label={i18n.t("validation.consistency")} value={pctFmt(wf.consistency_rate)} />
         <Stat label={i18n.t("validation.avgReturn")} value={pctFmt(wf.return_mean)} sub={`std ${pctFmt(wf.return_std)}`} />
         <Stat label={i18n.t("validation.avgSharpe")} value={wf.sharpe_mean.toFixed(2)} sub={`std ${wf.sharpe_std.toFixed(2)}`} />
@@ -171,11 +171,11 @@ export function ValidationPanel({ data }: Props) {
   const hasWF = !!data.walk_forward;
 
   if (!hasMC && !hasBS && !hasWF) {
-    return <p className="p-8 text-sm text-muted-foreground">{i18n.t("validation.noData")}</p>;
+    return <p className="p-4.5 text-sm text-muted-foreground">{i18n.t("validation.noData")}</p>;
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-4">
       {hasMC && <MonteCarloSection mc={data.monte_carlo!} />}
       {hasBS && <BootstrapSection bs={data.bootstrap!} />}
       {hasWF && <WalkForwardSection wf={data.walk_forward!} />}

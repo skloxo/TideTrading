@@ -37,7 +37,7 @@ export function AuthBarrier({ onLogin }: AuthBarrierProps) {
   };
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-xl space-y-6">
+    <div className="rounded-md border bg-card p-4 shadow-xl space-y-4">
       <div className="text-center space-y-2">
         <h2 className="text-xl font-bold tracking-tight text-foreground">
           潮汐投研 TideTrading 系统访问

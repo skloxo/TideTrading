@@ -278,7 +278,7 @@ export function Xueqiu() {
   const paginatedLogs = logs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 space-y-4 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-4">
         <div className="space-y-1">
@@ -311,13 +311,13 @@ export function Xueqiu() {
       </div>
 
       {/* Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
         
         {/* Left Side: Configuration Panels */}
-        <div className="space-y-6 lg:col-span-1">
+        <div className="space-y-4 lg:col-span-1">
           
           {/* Token Acquisition Guide Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center gap-2 text-primary font-semibold text-sm border-b pb-2">
               <Key className="h-4 w-4" />
               <span>获取雪球登录凭证 (xq_a_token)</span>
@@ -370,7 +370,7 @@ export function Xueqiu() {
           </div>
 
           {/* Webhook & Notification Settings */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center gap-2 font-semibold text-sm border-b pb-2">
               <MessageSquare className="h-4 w-4 text-primary" />
               <span>通知接收通道</span>
@@ -410,7 +410,7 @@ export function Xueqiu() {
           </div>
 
           {/* Manual Token Pool */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2 font-semibold text-sm">
                 <Key className="h-4 w-4 text-primary" />
@@ -463,10 +463,10 @@ export function Xueqiu() {
         </div>
 
         {/* Right Side: Combo CRUD and Rebalancing History Logs */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4">
           
           {/* Combinations Management Dashboard */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2 font-semibold text-sm">
                 <Layers className="h-4 w-4 text-primary" />
@@ -743,7 +743,7 @@ export function Xueqiu() {
           </div>
 
           {/* Watchlist Monitor Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center gap-2 text-primary font-semibold text-sm border-b pb-2">
               <TrendingUp className="h-4 w-4" />
               <span>关注大 V 自选股监控 (实时盯梢)</span>
@@ -819,7 +819,7 @@ export function Xueqiu() {
           </div>
 
           {/* Rebalancing Log History Table */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2 font-semibold text-sm">
                 <Activity className="h-4 w-4 text-primary" />
@@ -853,7 +853,7 @@ export function Xueqiu() {
                 <tbody className="divide-y">
                   {logs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="p-4.5 text-center text-muted-foreground">
                         暂无调仓历史日志。当监控服务触发实际调仓时，记录会自动归集于此。
                       </td>
                     </tr>

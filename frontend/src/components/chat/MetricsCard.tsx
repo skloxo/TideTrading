@@ -24,7 +24,7 @@ export const MetricsCard = memo(function MetricsCard({ metrics, compact = false 
 
   return (
     <div className={cn(
-      "grid gap-1.5 rounded-xl border border-border/60 bg-muted/20 p-3",
+      "grid gap-1.5 rounded-md border border-border/60 bg-muted/20 p-3",
       compact ? "grid-cols-3" : "grid-cols-[repeat(auto-fit,minmax(120px,1fr))]"
     )}>
       {shown.map(({ k, v }) => (

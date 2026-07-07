@@ -60,7 +60,7 @@ export function XueqiuAuth() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full border border-slate-700 bg-slate-800 rounded-2xl p-6 shadow-2xl space-y-6 relative overflow-hidden">
+      <div className="max-w-md w-full border border-slate-700 bg-slate-800 rounded-md p-4 shadow-2xl space-y-4 relative overflow-hidden">
         
         {/* Decorative background gradient */}
         <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
@@ -68,7 +68,7 @@ export function XueqiuAuth() {
 
         {/* Top Header */}
         <div className="flex flex-col items-center text-center space-y-3">
-          <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
+          <div className="h-12 w-12 rounded-md bg-primary/20 flex items-center justify-center border border-primary/30">
             <Activity className="h-6 w-6 text-primary" />
           </div>
           <div>
@@ -86,7 +86,7 @@ export function XueqiuAuth() {
 
         {success ? (
           // Success State
-          <div className="space-y-6 py-4 text-center">
+          <div className="space-y-4 py-4 text-center">
             <div className="flex flex-col items-center justify-center space-y-3">
               <div className="h-16 w-16 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20 text-green-500">
                 <CheckCircle2 className="h-10 w-10 animate-bounce" />

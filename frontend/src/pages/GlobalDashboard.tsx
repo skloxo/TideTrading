@@ -402,7 +402,7 @@ export function GlobalDashboard() {
         >
           {/* Watchlist widget */}
           {enabledWidgets.watchlist && isWidgetAllowed("watchlist") && (
-            <div key="watchlist" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="watchlist" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <Watchlist data={marketData?.watchlist} />
             </div>
@@ -410,7 +410,7 @@ export function GlobalDashboard() {
 
           {/* LimitUpBoard widget */}
           {enabledWidgets.limitUp && isWidgetAllowed("limitUp") && (
-            <div key="limitUp" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="limitUp" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <LimitUpBoard data={marketData?.limitup} />
             </div>
@@ -418,7 +418,7 @@ export function GlobalDashboard() {
 
           {/* YuziMovement widget */}
           {enabledWidgets.yuzi && isWidgetAllowed("yuzi") && (
-            <div key="yuzi" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="yuzi" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <YuziMovement data={marketData?.yuzi} />
             </div>
@@ -426,7 +426,7 @@ export function GlobalDashboard() {
 
           {/* PopularStocks widget */}
           {enabledWidgets.popular && isWidgetAllowed("popular") && (
-            <div key="popular" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="popular" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <PopularStocks data={marketData?.watchlist} />
             </div>
@@ -434,7 +434,7 @@ export function GlobalDashboard() {
 
           {/* MarketSentiment widget */}
           {enabledWidgets.sentiment && isWidgetAllowed("sentiment") && (
-            <div key="sentiment" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="sentiment" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <MarketSentiment score={marketData?.sentiment?.score} description={marketData?.sentiment?.description} />
             </div>
@@ -442,7 +442,7 @@ export function GlobalDashboard() {
 
           {/* FundFlows widget */}
           {enabledWidgets.fundFlows && isWidgetAllowed("fundFlows") && (
-            <div key="fundFlows" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="fundFlows" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <FundFlows data={marketData?.sectors} />
             </div>
@@ -450,7 +450,7 @@ export function GlobalDashboard() {
 
           {/* ConceptRotation widget */}
           {enabledWidgets.concepts && isWidgetAllowed("concepts") && (
-            <div key="concepts" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="concepts" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <ConceptRotation data={marketData?.sectors} />
             </div>
@@ -458,7 +458,7 @@ export function GlobalDashboard() {
 
           {/* LonghuBang widget */}
           {enabledWidgets.longhu && isWidgetAllowed("longhu") && (
-            <div key="longhu" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="longhu" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <LonghuBang data={marketData?.longhu} />
             </div>
@@ -466,7 +466,7 @@ export function GlobalDashboard() {
 
           {/* ECharts Relation Graph widget */}
           {enabledWidgets.d3Graph && isWidgetAllowed("d3Graph") && (
-            <div key="d3Graph" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5 flex flex-col p-4">
+            <div key="d3Graph" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5 flex flex-col p-4">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center shrink-0 mb-1"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <div className="flex justify-between items-center border-b border-border/60 pb-2 mb-2 shrink-0">
                 <span className="text-[11px] font-black tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
@@ -480,7 +480,7 @@ export function GlobalDashboard() {
               <div className="flex-1 min-h-0 relative">
                 <EChartsRelationGraph onSelectNode={setActiveNode} activeNode={activeNode} />
                 {activeNode && (
-                  <div className="absolute bottom-3 left-3 right-3 bg-card/95 border border-border p-3 text-xs flex flex-col gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 text-foreground shadow-lg rounded-xl">
+                  <div className="absolute bottom-3 left-3 right-3 bg-card/95 border border-border p-3 text-xs flex flex-col gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 text-foreground shadow-lg rounded-md">
                     <div className="flex justify-between items-center border-b border-border pb-1">
                       <span className="font-bold text-rose-500 text-sm">
                         {activeNode === "low-alt" ? "题材: 低空经济" :
@@ -507,7 +507,7 @@ export function GlobalDashboard() {
 
           {/* Agent Chat Console widget */}
           {enabledWidgets.agentConsole && isWidgetAllowed("agentConsole") && (
-            <div key="agentConsole" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="agentConsole" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <AgentChatConsole />
             </div>
@@ -515,7 +515,7 @@ export function GlobalDashboard() {
 
           {/* Probability Lattice widget */}
           {enabledWidgets.lattice && isWidgetAllowed("lattice") && (
-            <div key="lattice" className="border border-border/80 bg-card/90 backdrop-blur-md p-4 flex flex-col gap-2.5 h-full rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="lattice" className="border border-border/80 bg-card/90 backdrop-blur-md p-4 flex flex-col gap-2.5 h-full rounded-md transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <span className="text-[11px] font-black tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">📈 {isEn ? "Probability Lattice" : "概率格子 · 涨停突破概率分布"}</span>
               <div className="flex-1 flex flex-col gap-2.5 bg-muted/30 p-4 rounded-lg relative border border-border/40 min-h-[120px]">
@@ -525,7 +525,7 @@ export function GlobalDashboard() {
                 </div>
 
                 <div className="flex flex-col items-center gap-2 py-2 border-b border-border/25">
-                  <div className="flex gap-6 text-muted-foreground/80 text-[10px] font-bold">
+                  <div className="flex gap-3.5 text-muted-foreground/80 text-[10px] font-bold">
                     <span>1 阶</span><span>2 阶</span><span>3 阶</span><span>4 阶</span><span>5 阶</span>
                   </div>
                   <div className="flex gap-4">
@@ -569,7 +569,7 @@ export function GlobalDashboard() {
 
           {/* KolOpinions widget */}
           {enabledWidgets.kol && isWidgetAllowed("kol") && (
-            <div key="kol" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="kol" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <KolOpinions data={marketData?.kol} />
             </div>
@@ -577,7 +577,7 @@ export function GlobalDashboard() {
 
           {/* MobileAlerts widget */}
           {enabledWidgets.alerts && isWidgetAllowed("alerts") && (
-            <div key="alerts" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="alerts" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <MobileAlerts data={marketData?.alerts} />
             </div>
@@ -585,7 +585,7 @@ export function GlobalDashboard() {
 
           {/* Portfolio widget */}
           {enabledWidgets.portfolio && isWidgetAllowed("portfolio") && (
-            <div key="portfolio" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="portfolio" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <Portfolio data={marketData?.portfolio} netAsset={marketData?.netAsset} />
             </div>
@@ -593,7 +593,7 @@ export function GlobalDashboard() {
 
           {/* Simulation logs terminal widget */}
           {enabledWidgets.logsTerminal && isWidgetAllowed("logsTerminal") && (
-            <div key="logsTerminal" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden flex flex-col shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="logsTerminal" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden flex flex-col shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center shrink-0"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <div className="border-b border-border/60 px-3 py-2 flex justify-between items-center bg-card/50 backdrop-blur-md shrink-0">
                 <span className="text-[11px] font-black tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 font-mono">
@@ -635,7 +635,7 @@ export function GlobalDashboard() {
 
           {/* ReACT Thinking Timeline Panel */}
           {enabledWidgets.reactTimeline && isWidgetAllowed("reactTimeline") && (
-            <div key="reactTimeline" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
+            <div key="reactTimeline" className="border border-border/80 bg-card/90 backdrop-blur-md rounded-md overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/5">
               {!isLayoutLocked && <div className="drag-handle h-4 bg-slate-200 dark:bg-[#1a1a2e] cursor-move flex items-center justify-center"><Grid className="h-3 w-3 text-slate-400" /></div>}
               <ReActTimeline />
             </div>

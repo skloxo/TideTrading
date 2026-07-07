@@ -142,7 +142,7 @@ export function Layout() {
   if (authFailed) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="mx-auto max-w-md w-full p-6 space-y-6">
+        <div className="mx-auto max-w-md w-full p-4 space-y-4">
           <AuthBarrier
             onLogin={(key) => {
               setApiAuthKey(key);

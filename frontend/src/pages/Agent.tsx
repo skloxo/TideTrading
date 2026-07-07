@@ -1161,7 +1161,7 @@ export function Agent() {
 
   return (
     <div className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
-      <div ref={listRef} className="flex-1 overflow-auto p-6 scroll-smooth relative">
+      <div ref={listRef} className="flex-1 overflow-auto p-4 scroll-smooth relative">
         <div className="max-w-3xl mx-auto space-y-4">
           {sessionLoading && (
             <div className="space-y-4 py-4">
@@ -1336,7 +1336,7 @@ export function Agent() {
                 />
               </button>
               {goalDetailsOpen && (
-                <div className="grid gap-3 rounded-xl border border-primary/20 bg-background/95 p-3 text-xs shadow-sm">
+                <div className="grid gap-3 rounded-md border border-primary/20 bg-background/95 p-3 text-xs shadow-sm">
                   {goalEditActive ? (
                     <div className="grid gap-2">
                       <textarea
@@ -1528,7 +1528,7 @@ export function Agent() {
                 <Plus className="h-4 w-4" />
               </button>
               {showUploadMenu && (
-                <div className="absolute bottom-full left-0 mb-2 w-52 rounded-xl border bg-background/95 backdrop-blur-sm shadow-lg py-1 z-50">
+                <div className="absolute bottom-full left-0 mb-2 w-52 rounded-md border bg-background/95 backdrop-blur-sm shadow-lg py-1 z-50">
                   <button
                     type="button"
                     onClick={() => { fileInputRef.current?.click(); setShowUploadMenu(false); }}
@@ -1634,14 +1634,14 @@ export function Agent() {
                   ? t("agent.describeGoal")
                   : t("agent.placeholder")
               }
-              className="flex-1 px-4 py-2.5 rounded-xl border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow resize-none max-h-32 overflow-y-auto"
+              className="flex-1 px-4 py-2.5 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow resize-none max-h-32 overflow-y-auto"
               disabled={status === "streaming"}
             />
             {messages.length > 0 && (
               <button
                 type="button"
                 onClick={handleExport}
-                className="px-3 py-2.5 rounded-xl border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="px-3 py-2.5 rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 title={t('agent.exportChat')}
               >
                 <Download className="h-4 w-4" />
@@ -1651,7 +1651,7 @@ export function Agent() {
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-4 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                className="px-4 py-2.5 rounded-md bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-opacity"
                 title={t('agent.stopGeneration')}
               >
                 <Square className="h-4 w-4" />
@@ -1660,7 +1660,7 @@ export function Agent() {
               <button
                 type="submit"
                 disabled={goalComposerActive ? !input.trim() : (!input.trim() && !attachment)}
-                className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
+                className="px-4 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
               >
                 <Send className="h-4 w-4" />
               </button>

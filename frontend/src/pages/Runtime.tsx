@@ -128,7 +128,7 @@ export function Runtime() {
 
 
   const identityStatusCard = (
-    <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
+    <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -216,8 +216,8 @@ export function Runtime() {
   );
 
   return (
-    <div className="min-h-screen p-6 lg:p-8">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <div className="min-h-screen p-4 lg:p-4.5">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3.5">
         <section className="flex flex-col gap-4 border-b pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground">
@@ -255,7 +255,7 @@ export function Runtime() {
         ) : null}
 
         {!loading && error ? (
-          <section className="rounded-md border border-amber-500/30 bg-amber-500/5 p-5">
+          <section className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3.5">
             <div className="flex items-center gap-2 font-medium text-amber-700 dark:text-amber-300">
               <AlertTriangle className="h-5 w-5" />
               {t("runtime.unavailableTitle")}
@@ -270,7 +270,7 @@ export function Runtime() {
 
 
             {status.brokers.length === 0 ? (
-              <section className="rounded-md border border-dashed p-8 text-center">
+              <section className="rounded-md border border-dashed p-4.5 text-center">
                 <ShieldOff className="mx-auto h-8 w-8 text-muted-foreground" />
                 <h2 className="mt-3 font-medium">{t("runtime.noProfilesTitle")}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{t("runtime.noProfilesBody")}</p>
@@ -289,7 +289,7 @@ export function Runtime() {
       {/* Tenant Registration Modal */}
       {isRegisterModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md rounded-md border bg-card p-4 shadow-xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-semibold mb-4 text-foreground">
               {registeredResult ? "注册成功" : "自助注册新租户"}
             </h3>

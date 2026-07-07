@@ -72,7 +72,7 @@ function ProfileTile({
   return (
     <div
       className={[
-        "rounded-xl border p-3 transition-colors",
+        "rounded-md border p-3 transition-colors",
         active
           ? "border-primary/60 bg-primary/5"
           : "border-border/60 bg-muted/20 hover:border-primary/40",
@@ -252,7 +252,7 @@ export const MandateProposalCard = memo(function MandateProposalCard({ proposal,
   return (
     <div className="flex gap-3">
       <AgentAvatar />
-      <div className="flex-1 min-w-0 space-y-3 rounded-2xl border border-primary/20 bg-background/95 p-4 shadow-sm">
+      <div className="flex-1 min-w-0 space-y-3 rounded-md border border-primary/20 bg-background/95 p-4 shadow-sm">
         <div className="flex items-start gap-2">
           {isReauth ? (
             <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500" />

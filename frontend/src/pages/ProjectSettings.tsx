@@ -232,7 +232,7 @@ export function ProjectSettings() {
 
   if (profile?.role !== "admin") {
     return (
-      <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <div className="mx-auto max-w-7xl space-y-4 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -243,7 +243,7 @@ export function ProjectSettings() {
             </p>
           </div>
         </div>
-        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
+        <div className="rounded-lg border bg-card p-4 shadow-sm space-y-4 max-w-xl">
           <div className="flex items-center gap-2 border-b pb-3">
             <ShieldAlert className="h-4 w-4 text-primary" />
             <h2 className="text-base font-semibold">管理员提权 (项目设置)</h2>
@@ -290,7 +290,7 @@ export function ProjectSettings() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-4 p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{isZh ? "项目全局设置 (系统管理员)" : "Project Settings (Admin)"}</h1>
@@ -298,8 +298,8 @@ export function ProjectSettings() {
         </div>
       </div>
 
-      <form onSubmit={submitLLM} className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
-        <section className="rounded-lg border bg-card p-5 shadow-sm">
+      <form onSubmit={submitLLM} className="grid gap-3.5 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+        <section className="rounded-lg border bg-card p-3.5 shadow-sm">
           <div className="mb-5 flex items-center gap-2">
             <Server className="h-4 w-4 text-primary" />
             <h2 className="text-base font-semibold">项目全局 LLM 连接设置</h2>
@@ -385,7 +385,7 @@ export function ProjectSettings() {
           </div>
         </section>
 
-        <section className="rounded-lg border bg-card p-5 shadow-sm flex flex-col justify-between">
+        <section className="rounded-lg border bg-card p-3.5 shadow-sm flex flex-col justify-between">
           <div className="space-y-4">
             <div className="mb-5 flex items-center gap-2">
               <SlidersHorizontal className="h-4 w-4 text-primary" />
@@ -465,7 +465,7 @@ export function ProjectSettings() {
         </section>
       </form>
 
-      <form onSubmit={submitDataSources} className="rounded-lg border bg-card p-5 shadow-sm space-y-6">
+      <form onSubmit={submitDataSources} className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
         <div className="mb-2 space-y-1">
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-primary" />
@@ -474,7 +474,7 @@ export function ProjectSettings() {
           <p className="text-sm text-muted-foreground">{isZh ? "为主站行情源、回测 and 选股因子数据库接入系统级认证凭证。" : "Configure fallback credentials for technical data feeds and stock screeners."}</p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+        <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
           <div className="grid gap-4">
             <label className="grid gap-2">
               <span className={labelClass}>Tushare Token</span>

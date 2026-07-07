@@ -117,7 +117,7 @@ export function Home() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-6 space-y-20 pb-28">
+    <div className="mx-auto max-w-6xl p-4 space-y-20 pb-28">
 
       {/* ══════════════════ 1. HERO SECTION ══════════════════ */}
       <section className="relative flex flex-col items-center justify-center text-center space-y-7 pt-14 overflow-hidden">
@@ -153,14 +153,14 @@ export function Home() {
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
           <Link
             to="/agent"
-            className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 active:scale-95"
+            className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-md bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 active:scale-95"
           >
             {isZh ? "进入智能体工作区" : "Enter Agent Workspace"}
             <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
           </Link>
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm font-medium text-sm hover:bg-card/90 hover:border-primary/30 transition-all"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-md border border-border/80 bg-card/60 backdrop-blur-sm font-medium text-sm hover:bg-card/90 hover:border-primary/30 transition-all"
           >
             {isZh ? "进入量化大屏" : "Live Dashboard"}
           </Link>
@@ -169,24 +169,24 @@ export function Home() {
       </section>
 
       {/* ══════════════════ 2. FEATURE CARDS ══════════════════ */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="text-center space-y-1.5">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
             {isZh ? "核心产品能力与优势" : "Core Capabilities & Advantages"}
           </h2>
           <p className="text-xs text-muted-foreground">{isZh ? "专为 A/H 股市场打造的量化智能工作站" : "Quantitative intelligence for A/H-share markets"}</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5">
           {FEATURES.map(({ icon: Icon, color, title, desc }) => {
             const c = colorMap[color];
             return (
               <div
                 key={title}
-                className={`group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-6 space-y-4 hover:border-border/90 hover:bg-card/80 transition-all duration-300 hover:shadow-xl ${c.glow} cursor-default overflow-hidden`}
+                className={`group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-md p-4 space-y-4 hover:border-border/90 hover:bg-card/80 transition-all duration-300 hover:shadow-xl ${c.glow} cursor-default overflow-hidden`}
               >
                 {/* Corner glow */}
                 <div className={`absolute top-0 right-0 w-20 h-20 ${c.bg} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-x-4 -translate-y-4 pointer-events-none`} />
-                <div className={`inline-flex p-2.5 rounded-xl ${c.bg} ${c.icon} border ${c.border}`}>
+                <div className={`inline-flex p-2.5 rounded-md ${c.bg} ${c.icon} border ${c.border}`}>
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="space-y-1.5">
@@ -200,7 +200,7 @@ export function Home() {
       </section>
 
       {/* ══════════════════ 3. LLM ORCHESTRATION ══════════════════ */}
-      <section className="relative rounded-2xl overflow-hidden border border-border/50 bg-gradient-to-br from-card/80 to-muted/20 backdrop-blur-sm p-8 md:p-10">
+      <section className="relative rounded-md overflow-hidden border border-border/50 bg-gradient-to-br from-card/80 to-muted/20 backdrop-blur-sm p-4.5 md:p-10">
         {/* Bg accent */}
         <div className="absolute inset-0 pointer-events-none -z-10">
           <div className="absolute top-0 right-0 w-80 h-80 bg-primary/4 rounded-full blur-[80px]" />
@@ -208,7 +208,7 @@ export function Home() {
 
         <div className="grid gap-10 lg:grid-cols-12 items-start">
           {/* Left */}
-          <div className="lg:col-span-5 space-y-5">
+          <div className="lg:col-span-5 space-y-3.5">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold border border-primary/25 bg-primary/8 text-primary">
               <Cpu className="h-3 w-3" />
               <span>{isZh ? "设计哲学" : "Orchestration Philosophy"}</span>
@@ -259,7 +259,7 @@ export function Home() {
             ].map((step) => (
               <div
                 key={step.n}
-                className="flex items-start gap-4 bg-card/60 backdrop-blur-sm p-4 rounded-xl border border-border/50 hover:border-primary/30 transition-all group"
+                className="flex items-start gap-4 bg-card/60 backdrop-blur-sm p-4 rounded-md border border-border/50 hover:border-primary/30 transition-all group"
               >
                 <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black border-2 transition-colors
                   ${step.color === "cyan"    ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-400 group-hover:bg-cyan-500/25" :
@@ -290,9 +290,9 @@ export function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {/* A-Share card — red neon theme */}
-          <div className="relative border border-rose-500/20 bg-card/60 backdrop-blur-sm p-7 rounded-2xl space-y-5 overflow-hidden group hover:border-rose-500/40 transition-all hover:shadow-lg hover:shadow-rose-500/10">
+          <div className="relative border border-rose-500/20 bg-card/60 backdrop-blur-sm p-4 rounded-md space-y-3.5 overflow-hidden group hover:border-rose-500/40 transition-all hover:shadow-lg hover:shadow-rose-500/10">
             <div className="absolute top-0 right-0 w-40 h-40 bg-rose-500/5 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center gap-2.5 font-bold text-sm text-rose-400">
               <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20">
@@ -315,13 +315,13 @@ export function Home() {
                 </li>
               ))}
             </ul>
-            <div className="p-3 bg-rose-950/20 dark:bg-rose-950/30 rounded-xl border border-rose-500/10 text-[10px] font-mono text-rose-400/80">
+            <div className="p-3 bg-rose-950/20 dark:bg-rose-950/30 rounded-md border border-rose-500/10 text-[10px] font-mono text-rose-400/80">
               {isZh ? "A股数据链: TDX TCP → SharedMemory → sqlite:stocks.db" : "A-Share: TDX TCP → SharedMemory → sqlite:stocks.db"}
             </div>
           </div>
 
           {/* H-Share/Risk card — cyan neon theme */}
-          <div className="relative border border-cyan-500/20 bg-card/60 backdrop-blur-sm p-7 rounded-2xl space-y-5 overflow-hidden group hover:border-cyan-500/40 transition-all hover:shadow-lg hover:shadow-cyan-500/10">
+          <div className="relative border border-cyan-500/20 bg-card/60 backdrop-blur-sm p-4 rounded-md space-y-3.5 overflow-hidden group hover:border-cyan-500/40 transition-all hover:shadow-lg hover:shadow-cyan-500/10">
             <div className="absolute top-0 right-0 w-40 h-40 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
             <div className="flex items-center gap-2.5 font-bold text-sm text-cyan-400">
               <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
@@ -344,7 +344,7 @@ export function Home() {
                 </li>
               ))}
             </ul>
-            <div className="p-3 bg-cyan-950/20 dark:bg-cyan-950/30 rounded-xl border border-cyan-500/10 text-[10px] font-mono text-cyan-400/80">
+            <div className="p-3 bg-cyan-950/20 dark:bg-cyan-950/30 rounded-md border border-cyan-500/10 text-[10px] font-mono text-cyan-400/80">
               {isZh ? "风控链: Broker API → OAuth Token → Mandate limits → Global Halt" : "Risk: Broker API → OAuth Token → Mandate limits → Global Halt"}
             </div>
           </div>
@@ -362,7 +362,7 @@ export function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5">
           {[
             { n: "01", icon: UserCircle2, color: "cyan",   title: isZh ? "步骤一：配置券商密钥" : "Step 1: Broker Auth",       body: isZh ? "前往「设置」，在个人配置中填写您的券商密钥（如 Longbridge API 密钥、Xueqiu Cookie 等）以激活交易连接。" : "Navigate to Settings and add your broker credentials (Longbridge API key, Xueqiu cookie)." },
             { n: "02", icon: Cpu,         color: "primary", title: isZh ? "步骤二：配置私有模型" : "Step 2: Private LLM",       body: isZh ? "配置您专属的 AI 大模型后端（OpenAI, OpenRouter 等），设定个性化决策参数。" : "Configure your private LLM provider, setting model name, base URL, and API key." },
@@ -372,9 +372,9 @@ export function Home() {
             const Icon = step.icon;
             const c = colorMap[step.color] ?? colorMap["cyan"];
             return (
-              <div key={step.n} className="relative border border-border/50 bg-card/50 backdrop-blur-sm p-6 rounded-2xl space-y-4 group hover:border-primary/30 hover:shadow-md transition-all overflow-hidden">
+              <div key={step.n} className="relative border border-border/50 bg-card/50 backdrop-blur-sm p-4 rounded-md space-y-4 group hover:border-primary/30 hover:shadow-md transition-all overflow-hidden">
                 <div className={`absolute top-4 right-4 text-3xl font-black ${c.icon} opacity-10 group-hover:opacity-20 transition-opacity font-mono select-none`}>{step.n}</div>
-                <div className={`inline-flex p-2.5 rounded-xl ${c.bg} ${c.icon} border ${c.border}`}>
+                <div className={`inline-flex p-2.5 rounded-md ${c.bg} ${c.icon} border ${c.border}`}>
                   <Icon className="h-4 w-4" />
                 </div>
                 <h3 className="font-semibold text-xs leading-snug">{step.title}</h3>
@@ -386,7 +386,7 @@ export function Home() {
       </section>
 
       {/* ══════════════════ 6. ROADMAP & CHANGELOG ══════════════════ */}
-      <section className="space-y-8">
+      <section className="space-y-4">
         <div className="text-center space-y-1.5">
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center justify-center gap-2.5">
             <Compass className="h-6 w-6 text-primary" />
@@ -397,9 +397,9 @@ export function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {/* Changelog */}
-          <div className="border border-border/50 bg-card/60 backdrop-blur-sm p-7 rounded-2xl space-y-5">
+          <div className="border border-border/50 bg-card/60 backdrop-blur-sm p-4 rounded-md space-y-3.5">
             <h3 className="text-sm font-bold flex items-center gap-2 text-primary pb-3 border-b border-border/50">
               <History className="h-4 w-4" />
               {isZh ? "迭代记录 (Milestones Completed)" : "Milestones Completed"}
@@ -438,7 +438,7 @@ export function Home() {
           </div>
 
           {/* Roadmap */}
-          <div className="border border-border/50 bg-card/60 backdrop-blur-sm p-7 rounded-2xl space-y-5">
+          <div className="border border-border/50 bg-card/60 backdrop-blur-sm p-4 rounded-md space-y-3.5">
             <h3 className="text-sm font-bold flex items-center gap-2 text-orange-400 pb-3 border-b border-border/50">
               <Zap className="h-4 w-4" />
               {isZh ? "规划蓝图 (Future Blueprints)" : "Future Blueprints"}

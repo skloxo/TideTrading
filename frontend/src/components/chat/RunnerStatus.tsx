@@ -315,7 +315,7 @@ export const RunnerStatus = memo(function RunnerStatus({ status, unavailable, ha
       </button>
 
       {open && (
-        <div className="grid gap-2 rounded-xl border border-primary/20 bg-background/95 p-3 shadow-sm">
+        <div className="grid gap-2 rounded-md border border-primary/20 bg-background/95 p-3 shadow-sm">
           {status.brokers.map((broker) => (
             <BrokerRow key={broker.auth.broker} broker={broker} halted={isHalted || broker.halted} onRefresh={onRefresh} />
           ))}

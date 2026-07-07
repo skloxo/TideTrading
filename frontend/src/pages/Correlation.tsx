@@ -64,7 +64,7 @@ export function Correlation() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-5xl mx-auto relative">
+    <div className="flex flex-col gap-3.5 p-4 max-w-5xl mx-auto relative">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -81,7 +81,7 @@ export function Correlation() {
       </div>
 
       {/* Brief explanation card (100 words Chinese/English) */}
-      <div className="flex items-start gap-3 p-4 rounded-xl border border-primary/10 bg-primary/2 dark:bg-primary/5 text-xs text-muted-foreground leading-relaxed shadow-sm">
+      <div className="flex items-start gap-3 p-4 rounded-md border border-primary/10 bg-primary/2 dark:bg-primary/5 text-xs text-muted-foreground leading-relaxed shadow-sm">
         <HelpCircle className="h-4.5 w-4.5 text-primary shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-semibold text-foreground">
@@ -174,7 +174,7 @@ export function Correlation() {
       {showGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div 
-            className="relative flex flex-col w-full max-w-3xl max-h-[85vh] bg-card border border-border rounded-2xl shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200"
+            className="relative flex flex-col w-full max-w-3xl max-h-[85vh] bg-card border border-border rounded-md shadow-2xl p-4 overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

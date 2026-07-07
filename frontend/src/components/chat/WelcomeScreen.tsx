@@ -176,12 +176,12 @@ interface Props {
 export function WelcomeScreen({ onExample }: Props) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8 text-center">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
       {/* Header */}
       <div className="space-y-3">
         <img
           src="/logo.png"
-          className="h-16 w-16 mx-auto rounded-2xl shadow-lg object-cover"
+          className="h-16 w-16 mx-auto rounded-md shadow-lg object-cover"
           alt="TideTrading Logo"
         />
         <div>
@@ -222,7 +222,7 @@ export function WelcomeScreen({ onExample }: Props) {
                   <button
                     key={ex.titleKey}
                     onClick={() => onExample(t(ex.promptKey))}
-                    className={`block w-full text-left px-3 py-2.5 rounded-xl border transition-colors ${cat.color}`}
+                    className={`block w-full text-left px-3 py-2.5 rounded-md border transition-colors ${cat.color}`}
                   >
                     <span className="text-sm font-medium text-foreground leading-snug">
                       {t(ex.titleKey)}

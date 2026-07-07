@@ -120,7 +120,7 @@ export function Logs() {
   if (profile?.role !== "admin") {
     const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
-      <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <div className="mx-auto max-w-7xl space-y-4 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -131,7 +131,7 @@ export function Logs() {
             </p>
           </div>
         </div>
-        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
+        <div className="rounded-lg border bg-card p-4 shadow-sm space-y-4 max-w-xl">
           <div className="flex items-center gap-2 border-b pb-3">
             <ShieldAlert className="h-4 w-4 text-primary" />
             <h2 className="text-base font-semibold">管理员提权 (查看日志)</h2>
@@ -159,7 +159,7 @@ export function Logs() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-4 p-4">
       {/* Title */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
         <div className="space-y-1">
