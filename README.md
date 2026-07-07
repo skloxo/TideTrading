@@ -26,6 +26,11 @@
 
 ## 📰 最新动态
 
+- **2026-07-07** 🚀 **v1.7.5 — 雪球监控多租户联合查询与 Cookie 轮询 & 持久化共享缓存池 (性能与反爬专项)**：
+  - **持久化共享缓存池 (Persistent Shared Cache Pool)**：底层引入了 `shared_xueqiu_cache.json` 磁盘缓存。针对所有租户监控的组合及自选股，每一轮 Tick 仅在缓存失效时向雪球服务器发送一次请求，拉取的数据自动在磁盘上进行持久化。这极大地降低了重复请求与封禁风险，并且支持服务重启后免线上请求直接加载数据。
+  - **协同 Cookie 负载均衡轮询 (Cooperative Cookie Rotation)**：当监控标的必须向线上请求时，系统收集所有监控此标的的租户所配置的 `xq_tokens`（雪球 Cookie）凭证，维护全局轮询指针轮流使用，热门组合由多租户协同分摊查询请求压力。
+  - **租户安全隔离分发**：调仓日志与自选股变动独立记录在各租户自己的专属目录下，推送也只指向租户各自独立的飞书机器人，实现租户间的信息安全隔离。
+
 - **2026-07-06** 🚀 **v1.7.4 — 项目设置独立页面 · 租户敏感凭证物理隔离（隐私防漏泄版本）**：
   - **项目设置独立化**：将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为专属的 [ProjectSettings.tsx](file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/Vibe-Trading/frontend/src/pages/ProjectSettings.tsx) 单页（路由 `/project-settings`），支持管理员就地提权访问。
   - **租户敏感凭证物理隔离**：重构了后端 API 的租户与全局配置合并逻辑。只要当前会话是普通租户（`tenant != "default"`），即使在本地 localhost 下访问，其“自定义大模型”表单输入框中也绝对不会回显或暴露任何属于全局管理员的敏感 API 密钥、模型名称（如 `mimo-v2.5-pro-ultraspeed`）或 Base URL，实现物理级的隐私安全防泄露。

@@ -53,6 +53,14 @@ export function Home() {
         ? "使用租户 API Key 隔离运行环境。会话、执行记录、上传文件等均物理独立，确保资产隐私。"
         : "Physical isolation based on Tenant API Keys for sessions, policy runs, and file storage.",
     },
+    {
+      icon: Compass,
+      color: "emerald",
+      title: isZh ? "雪球协同监控" : "Cooperative Xueqiu Watcher",
+      desc: isZh
+        ? "支持多租户隔离监控，底层共享持久化缓存池，协同 Cookie 旋转轮询，大幅分摊并降低接口封禁风险。"
+        : "Multi-tenant monitoring with persistent shared cache pool and cooperative cookie rotation to prevent bans.",
+    },
   ];
 
   const colorMap: Record<string, { icon: string; bg: string; border: string; glow: string }> = {
@@ -60,6 +68,7 @@ export function Home() {
     orange: { icon: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20", glow: "group-hover:shadow-orange-500/20" },
     pink:   { icon: "text-pink-400",   bg: "bg-pink-500/10",   border: "border-pink-500/20",   glow: "group-hover:shadow-pink-500/20" },
     amber:  { icon: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20",  glow: "group-hover:shadow-amber-500/20" },
+    emerald:{ icon: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20",glow: "group-hover:shadow-emerald-500/20" },
   };
 
   return (
@@ -78,7 +87,7 @@ export function Home() {
         {/* Version badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold backdrop-blur-sm shadow-sm shadow-primary/10">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v1.7.4 Stable</span>
+          <span>v1.7.5 Stable</span>
           <span className="w-px h-3 bg-primary/30" />
           <span className="text-emerald-400 font-normal">{isZh ? "运行中" : "Live"}</span>
         </div>
@@ -122,7 +131,7 @@ export function Home() {
           </h2>
           <p className="text-xs text-muted-foreground">{isZh ? "专为 A/H 股市场打造的量化智能工作站" : "Quantitative intelligence for A/H-share markets"}</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
           {FEATURES.map(({ icon: Icon, color, title, desc }) => {
             const c = colorMap[color];
             return (
