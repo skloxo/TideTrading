@@ -2772,6 +2772,17 @@ async def delete_tenant_key(tenant_id: str):
 async def get_system_version(request: Request):
     """Get the current and latest Git repository version."""
     import subprocess
+    import re
+
+    def _is_newer_version(latest: str, current: str) -> bool:
+        try:
+            t_latest = tuple(int(x) for x in re.findall(r'\d+', latest))
+            t_current = tuple(int(x) for x in re.findall(r'\d+', current))
+            if t_latest and t_current:
+                return t_latest > t_current
+        except Exception:
+            pass
+        return latest != current
 
     current_ver = APP_VERSION
     if not current_ver.startswith("v"):
@@ -2799,7 +2810,7 @@ async def get_system_version(request: Request):
             tag = res.stdout.strip()
             if tag:
                 latest_ver = tag
-                has_update = (latest_ver != current_ver)
+                has_update = _is_newer_version(latest_ver, current_ver)
                 git_success = True
     except Exception:
         pass
@@ -2819,7 +2830,7 @@ async def get_system_version(request: Request):
                     tag = data.get("tag_name")
                     if tag:
                         latest_ver = tag
-                        has_update = (latest_ver != current_ver)
+                        has_update = _is_newer_version(latest_ver, current_ver)
         except Exception:
             pass
 
