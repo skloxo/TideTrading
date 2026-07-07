@@ -7,6 +7,7 @@ const PROXY_PATHS = [
   "/swarm",
   "/settings/",
   "/admin",
+  "/channels",
   "/mandate",
   "/live",
   "/upload",

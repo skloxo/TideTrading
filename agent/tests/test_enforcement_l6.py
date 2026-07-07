@@ -3,9 +3,9 @@
 Covers:
 
 * The frozen canonical Robinhood read/write catalog.
-* The extractor's finalized ``place_order`` field mapping (symbol/side/size,
+* The extractor's finalized ``place_equity_order`` field mapping (symbol/side/size,
   unknown keys ignored, ambiguity → ``None``).
-* Quantity-only quote derivation: broker ``get_quotes`` preferred, data-loader
+* Quantity-only quote derivation: broker ``get_equity_quotes`` preferred, data-loader
   fallback, fail-closed DENY when no quote is obtainable. Never hits the network
   (the loader path is stubbed).
 """
@@ -37,8 +37,14 @@ from src.tools.mcp import MCPRemoteToolSpec
 # C1 / L6 — frozen canonical catalog                                          #
 # --------------------------------------------------------------------------- #
 
-_CANONICAL_READ = {"get_account", "get_positions", "get_quotes", "list_orders"}
-_CANONICAL_WRITE = {"place_order", "cancel_order"}
+_CANONICAL_READ = {
+    "get_accounts",
+    "get_portfolio",
+    "get_equity_positions",
+    "get_equity_quotes",
+    "get_equity_orders",
+}
+_CANONICAL_WRITE = {"place_equity_order", "cancel_equity_order"}
 
 
 def test_catalog_is_exactly_the_canonical_set() -> None:
@@ -57,7 +63,7 @@ def test_catalog_is_exactly_the_canonical_set() -> None:
 
 def test_extractor_maps_notional_order() -> None:
     intent = extract_order_intent(
-        "place_order",
+        "place_equity_order",
         {"symbol": "aapl", "side": "buy", "instrument_type": "stock", "notional_usd": 250.0},
     )
     assert intent is not None
@@ -70,7 +76,7 @@ def test_extractor_maps_notional_order() -> None:
 
 def test_extractor_maps_quantity_and_dollar_amount_alias() -> None:
     intent = extract_order_intent(
-        "place_order",
+        "place_equity_order",
         {"ticker": "NVDA", "action": "sell", "type": "equity", "quantity": 3, "dollar_amount": 600},
     )
     assert intent is not None
@@ -83,7 +89,7 @@ def test_extractor_maps_quantity_and_dollar_amount_alias() -> None:
 
 def test_extractor_ignores_unknown_extra_keys() -> None:
     intent = extract_order_intent(
-        "place_order",
+        "place_equity_order",
         {
             "symbol": "MSFT", "side": "buy", "instrument_type": "equity",
             "quantity": 1, "time_in_force": "gtc", "client_tag": "x", "extended_hours": True,
@@ -95,17 +101,17 @@ def test_extractor_ignores_unknown_extra_keys() -> None:
 
 
 def test_extractor_rejects_non_order_tool() -> None:
-    assert extract_order_intent("cancel_order", {"order_id": "x"}) is None
-    assert extract_order_intent("get_quotes", {"symbol": "AAPL"}) is None
+    assert extract_order_intent("cancel_equity_order", {"order_id": "x"}) is None
+    assert extract_order_intent("get_equity_quotes", {"symbol": "AAPL"}) is None
 
 
 def test_extractor_rejects_missing_or_ambiguous_fields() -> None:
     # Missing side.
-    assert extract_order_intent("place_order", {"symbol": "AAPL", "instrument_type": "equity", "notional_usd": 10}) is None
+    assert extract_order_intent("place_equity_order", {"symbol": "AAPL", "instrument_type": "equity", "notional_usd": 10}) is None
     # Unknown instrument.
-    assert extract_order_intent("place_order", {"symbol": "AAPL", "side": "buy", "instrument_type": "warrant", "notional_usd": 10}) is None
+    assert extract_order_intent("place_equity_order", {"symbol": "AAPL", "side": "buy", "instrument_type": "warrant", "notional_usd": 10}) is None
     # No size at all.
-    assert extract_order_intent("place_order", {"symbol": "AAPL", "side": "buy", "instrument_type": "equity"}) is None
+    assert extract_order_intent("place_equity_order", {"symbol": "AAPL", "side": "buy", "instrument_type": "equity"}) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -122,8 +128,8 @@ def live_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def _spec() -> MCPRemoteToolSpec:
     return MCPRemoteToolSpec(
         server_name="robinhood",
-        remote_name="place_order",
-        local_name="mcp_robinhood_place_order",
+        remote_name="place_equity_order",
+        local_name="mcp_robinhood_place_equity_order",
         description="Place an order.",
         parameters={"type": "object", "properties": {}, "additionalProperties": True},
     )
@@ -161,7 +167,7 @@ def _write_mandate(live_runtime: Path, *, max_order_notional_usd: float = 750.0)
 
 
 class _BrokerQuoteAdapter:
-    """Adapter whose ``get_quotes`` returns a price; loader path is never needed."""
+    """Adapter whose ``get_equity_quotes`` returns a price; loader path is never needed."""
 
     def __init__(self, *, price: float) -> None:
         self.server_name = "robinhood"
@@ -170,11 +176,11 @@ class _BrokerQuoteAdapter:
         self.quote_calls = 0
 
     def call_tool(self, remote_name: str, arguments: dict, *, local_name: str | None = None) -> dict:
-        if remote_name == "get_positions":
+        if remote_name == "get_equity_positions":
             return {"positions": [], "status": "ok"}
-        if remote_name == "get_account":
+        if remote_name == "get_portfolio":
             return {"equity": 100000.0, "status": "ok"}
-        if remote_name == "get_quotes":
+        if remote_name == "get_equity_quotes":
             self.quote_calls += 1
             return {"status": "ok", "results": [{"symbol": arguments.get("symbol"), "last_price": self._price}]}
         self.order_calls.append({"remote": remote_name, "arguments": arguments})
@@ -182,18 +188,18 @@ class _BrokerQuoteAdapter:
 
 
 class _NoBrokerQuoteAdapter:
-    """Adapter whose ``get_quotes`` errors — forces the data-loader fallback."""
+    """Adapter whose ``get_equity_quotes`` errors — forces the data-loader fallback."""
 
     def __init__(self) -> None:
         self.server_name = "robinhood"
         self.order_calls: list[dict[str, Any]] = []
 
     def call_tool(self, remote_name: str, arguments: dict, *, local_name: str | None = None) -> dict:
-        if remote_name == "get_positions":
+        if remote_name == "get_equity_positions":
             return {"positions": [], "status": "ok"}
-        if remote_name == "get_account":
+        if remote_name == "get_portfolio":
             return {"equity": 100000.0, "status": "ok"}
-        if remote_name == "get_quotes":
+        if remote_name == "get_equity_quotes":
             return {"status": "error", "error": "quotes unavailable"}
         self.order_calls.append({"remote": remote_name, "arguments": arguments})
         return {"status": "ok", "order_id": "rh_q", "state": "accepted"}

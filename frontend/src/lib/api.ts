@@ -47,7 +47,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw await errorFromResponse(res);
   }
   const text = await res.text();
-  return text ? JSON.parse(text) : ({} as T);
+  if (!text) return {} as T;
+
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const preview = text.slice(0, 80).replace(/\s+/g, " ");
+    throw new ApiError(
+      `Expected JSON from ${path}, got ${contentType || "unknown content type"}: ${preview}`,
+      res.status,
+    );
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export interface UploadResult {
@@ -83,6 +94,8 @@ export const api = {
   },
   getRunCode: (id: string) => request<Record<string, string>>(`/runs/${id}/code`),
   getRunPine: (id: string) => request<PineScriptResult>(`/runs/${id}/pine`),
+  getPolicyDecisions: (runId: string) =>
+    request<PolicyDecisionsResponse>(`/governance/policy-decisions?run_id=${encodeURIComponent(runId)}`),
   listSessions: () => request<SessionItem[]>("/sessions"),
   createSession: (title?: string) => request<SessionItem>("/sessions", { method: "POST", body: JSON.stringify({ title: title || "" }) }),
   deleteSession: (sid: string) => request<{ status: string }>(`/sessions/${sid}`, { method: "DELETE" }),
@@ -204,6 +217,15 @@ export const api = {
       ilink_bot_id?: string;
       ilink_user_id?: string;
     }>(`/settings/platforms/wechat/transient/status?temp_id=${tempId}`),
+
+  getChannelStatus: () => request<ChannelRuntimeStatus>("/channels/status"),
+  startChannels: () => request<ChannelRuntimeActionResponse>("/channels/start", { method: "POST" }),
+  stopChannels: () => request<ChannelRuntimeActionResponse>("/channels/stop", { method: "POST" }),
+  runChannelPairingCommand: (body: ChannelPairingCommandRequest) =>
+    request<ChannelPairingCommandResponse>("/channels/pairing/command", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   // Alpha Zoo API
   listAlphas: (params: AlphaListParams = {}) => {
@@ -527,6 +549,40 @@ export interface FeatureFlagsResponse {
   env_path: string;
 }
 
+export interface ChannelAdapterStatus {
+  name: string;
+  display_name: string;
+  configured: boolean;
+  enabled: boolean;
+  available: boolean;
+  loaded: boolean;
+  running: boolean;
+  error?: string;
+  install_hint?: string;
+}
+
+export interface ChannelRuntimeStatus {
+  running: boolean;
+  inbound_queue: number;
+  outbound_queue: number;
+  session_count: number;
+  channels: Record<string, ChannelAdapterStatus>;
+}
+
+export interface ChannelRuntimeActionResponse extends ChannelRuntimeStatus {
+  status: string;
+}
+
+export interface ChannelPairingCommandRequest {
+  channel: string;
+  command: string;
+}
+
+export interface ChannelPairingCommandResponse {
+  channel: string;
+  reply: string;
+}
+
 // --- Types matching backend API contracts ---
 
 export interface RunListItem {
@@ -632,6 +688,7 @@ export interface RunData {
   metrics?: BacktestMetrics;
   artifacts?: ArtifactInfo[];
   run_card?: RunCard;
+  research_card?: ResearchCard;
   validation?: ValidationData;
 
   chart_symbols?: string[];
@@ -661,6 +718,51 @@ export interface RunCardArtifact {
   path: string;
   size_bytes: number;
   sha256: string;
+}
+
+export interface StructuredResearchIssue {
+  code: string;
+  severity?: string;
+  message?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ResearchCard {
+  card_id: string;
+  schema_version?: string;
+  title?: string;
+  hypothesis?: string | null;
+  universe?: Record<string, unknown>;
+  data_sources?: Array<Record<string, unknown>>;
+  data_audit_refs?: string[];
+  policy_decision_refs?: string[];
+  policy_decisions?: Array<Record<string, unknown>>;
+  tool_trace_refs?: string[];
+  backtest_refs?: string[];
+  alpha_bench_refs?: string[];
+  scorecard?: Record<string, unknown> | null;
+  key_metrics?: Record<string, unknown>;
+  benchmark?: Record<string, unknown>;
+  cost_model?: Record<string, unknown>;
+  execution_assumptions?: Record<string, unknown>;
+  oos_results?: Record<string, unknown>;
+  warnings?: StructuredResearchIssue[];
+  hard_failures?: StructuredResearchIssue[];
+  reproducibility?: Record<string, unknown>;
+  conclusion_level?: string;
+}
+
+export interface PolicyDecisionRecord {
+  decision_id?: string;
+  tool_name?: string;
+  action?: string;
+  rule_id?: string | null;
+  [key: string]: unknown;
+}
+
+export interface PolicyDecisionsResponse {
+  schema_version: string;
+  decisions: PolicyDecisionRecord[];
 }
 
 export interface BacktestMetrics {

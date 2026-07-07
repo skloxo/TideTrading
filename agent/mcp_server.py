@@ -76,6 +76,7 @@ _skills_loader = None
 _registry = None
 _goal_store = None
 _include_shell_tools = True
+_governance_surface = "mcp_stdio"
 
 
 def _env_shell_tools_enabled() -> bool:
@@ -96,8 +97,17 @@ def _get_registry():
     global _registry
     if _registry is None:
         from src.tools import build_registry
+        from src.governance.config import get_governance_mode, parse_surface
+        from src.governance.decisions import RuntimeContext
+        from src.governance.manifest import ToolSurface
+        from src.governance.runtime import govern_registry
 
-        _registry = build_registry(include_shell_tools=_include_shell_tools)
+        surface = parse_surface(_governance_surface, default=ToolSurface.MCP_STDIO)
+        _registry = govern_registry(
+            build_registry(include_shell_tools=_include_shell_tools),
+            surface=surface,
+            context=RuntimeContext(surface=surface, mode=get_governance_mode()),
+        )
     return _registry
 
 
@@ -1819,7 +1829,7 @@ def scan_shadow_signals(
 
 def main():
     """Entry point for `vibe-trading-mcp` CLI command."""
-    global _include_shell_tools, _registry
+    global _include_shell_tools, _registry, _governance_surface
     import argparse
 
     parser = argparse.ArgumentParser(description="Vibe-Trading MCP Server")
@@ -1837,6 +1847,8 @@ def main():
             _include_shell_tools = _env_shell_tools_enabled()
         else:
             _include_shell_tools = True  # SSE on loopback → safe default
+
+    _governance_surface = "mcp_stdio" if args.transport == "stdio" else "mcp_sse"
     _registry = None
     _get_registry()  # pre-warm: avoids deadlock when first tools/call lazy-inits inside FastMCP worker thread
 

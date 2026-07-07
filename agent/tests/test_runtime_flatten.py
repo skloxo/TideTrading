@@ -171,11 +171,11 @@ def test_every_action_is_audited(live_runtime: Path) -> None:
     kinds = sorted(r["kind"] for r in records)
     assert kinds == ["order_placed", "order_rejected"]
     rejected = next(r for r in records if r["kind"] == "order_rejected")
-    assert rejected["remote_tool"] == "cancel_order"
+    assert rejected["remote_tool"] == "cancel_equity_order"
     assert rejected["outcome"] == "error"
     assert rejected["error"] == "broker rejected o1"
     placed = next(r for r in records if r["kind"] == "order_placed")
-    assert placed["remote_tool"] == "place_order"
+    assert placed["remote_tool"] == "place_equity_order"
     assert placed["outcome"] == "accepted"
     assert placed["server"] == "robinhood"
 

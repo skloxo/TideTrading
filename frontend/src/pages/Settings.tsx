@@ -1,11 +1,14 @@
 import i18n from "@/i18n";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Database, KeyRound, Loader2, MessageSquare, RotateCcw, Save, Server, SlidersHorizontal, Plus, Trash2, Edit, Power, QrCode, Activity } from "lucide-react";
+import { Database, KeyRound, Loader2, MessageSquare, MessageSquareMore, Play, RefreshCw, RotateCcw, Save, Server, SlidersHorizontal, Square, Plus, Trash2, Edit, Power, QrCode, Activity } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { api, isAuthRequiredError, type DataSourceSettings, type LLMProviderOption, type LLMSettings, type FeishuChannel, type WechatChannel } from "@/lib/api";
-import { setApiAuthKey } from "@/lib/apiAuth";
+import { api, isAuthRequiredError, type DataSourceSettings, type LLMProviderOption, type LLMSettings, type FeishuChannel, type WechatChannel, type ChannelRuntimeStatus } from "@/lib/api";
+import { getApiAuthKey, setApiAuthKey } from "@/lib/apiAuth";
 import { createPortal } from "react-dom";
-import { AuthBarrier } from "@/components/layout/AuthBarrier";interface LLMFormState {
+import { AuthBarrier } from "@/components/layout/AuthBarrier";
+
+interface LLMFormState {
   provider: string;
   model_name: string;
   base_url: string;
@@ -33,9 +36,10 @@ function toForm(settings: LLMSettings): LLMFormState {
 }
 
 export function Settings() {
-  
+  const { t } = useTranslation();
   const [settings, setSettings] = useState<LLMSettings | null>(null);
   const [dataSettings, setDataSettings] = useState<DataSourceSettings | null>(null);
+  const [channelStatus, setChannelStatus] = useState<ChannelRuntimeStatus | null>(null);
   const [form, setForm] = useState<LLMFormState | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [clearApiKey, setClearApiKey] = useState(false);
@@ -92,6 +96,8 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dataSaving, setDataSaving] = useState(false);
+  const [channelRefreshing, setChannelRefreshing] = useState(false);
+  const [channelAction, setChannelAction] = useState<"start" | "stop" | null>(null);
   const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
 
   const [authFailed, setAuthFailed] = useState(false);
@@ -102,39 +108,98 @@ export function Settings() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([
+    Promise.allSettled([
       api.getLLMSettings(),
       api.getDataSourceSettings(),
       api.getFeishuChannels(),
-      api.getWechatChannels()
+      api.getWechatChannels(),
+      api.getChannelStatus(),
     ])
-      .then(async ([llmData, dataSourceData, feishuData, wechatData]) => {
+      .then(([llmResult, dataSourceResult, feishuResult, wechatResult, channelResult]) => {
         if (!alive) return;
-        setFeishuChannels(feishuData);
-        setWechatChannels(wechatData);
-        setSettingsLoadError(null);
 
-        setSettings(llmData);
-        setForm(toForm(llmData));
-        setDataSettings(dataSourceData);
-        setLlmMode(llmData.is_custom ? "custom" : "default");
-        setDataMode(dataSourceData.is_custom ? "custom" : "default");
-      })
-      .catch((error) => {
-        if (isAuthRequiredError(error)) {
-          setAuthFailed(true);
+        if (llmResult.status === "fulfilled") {
+          setSettings(llmResult.value);
+          setForm(toForm(llmResult.value));
         } else {
-          const message = error instanceof Error ? error.message : "Unknown error";
+          const message = llmResult.reason instanceof Error ? llmResult.reason.message : "Unknown error";
           setSettingsLoadError(message);
-          toast.error(i18n.t("settings.loadLlmSettingsFailed", { message }));
-          toast.error(i18n.t("settings.loadDataSourceSettingsFailed", { message }));
+          if (isAuthRequiredError(llmResult.reason)) {
+            setAuthFailed(true);
+            toast.error(message);
+          } else {
+            toast.error(`Failed to load LLM settings: ${message}`);
+          }
+        }
+
+        if (dataSourceResult.status === "fulfilled") {
+          setDataSettings(dataSourceResult.value);
+        } else {
+          const message = dataSourceResult.reason instanceof Error ? dataSourceResult.reason.message : "Unknown error";
+          setSettingsLoadError(message);
+          if (isAuthRequiredError(dataSourceResult.reason)) {
+            setAuthFailed(true);
+            toast.error(message);
+          } else {
+            toast.error(`Failed to load data source settings: ${message}`);
+          }
+        }
+
+        if (feishuResult.status === "fulfilled") {
+          setFeishuChannels(feishuResult.value);
+        } else {
+          const message = feishuResult.reason instanceof Error ? feishuResult.reason.message : "Unknown error";
+          toast.error(`Failed to load Feishu channels: ${message}`);
+        }
+
+        if (wechatResult.status === "fulfilled") {
+          setWechatChannels(wechatResult.value);
+        } else {
+          const message = wechatResult.reason instanceof Error ? wechatResult.reason.message : "Unknown error";
+          toast.error(`Failed to load WeChat channels: ${message}`);
+        }
+
+        if (channelResult.status === "fulfilled") {
+          setChannelStatus(channelResult.value);
+        } else {
+          const message = channelResult.reason instanceof Error ? channelResult.reason.message : "Unknown error";
+          toast.error(`${t("settings.channels.refreshFailed") || "Failed to refresh channels"}: ${message}`);
+          setChannelStatus(null);
+        }
         }
       })
       .finally(() => {
         if (alive) setLoading(false);
       });
-    return () => { alive = false; };
-  }, []);
+
+    return () => {
+      alive = false;
+    };
+  }, [t]);
+
+  const refreshChannelStatus = async () => {
+    setChannelRefreshing(true);
+    try {
+      setChannelStatus(await api.getChannelStatus());
+    } catch (error) {
+      toast.error(`${t("settings.channels.refreshFailed")}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setChannelRefreshing(false);
+    }
+  };
+
+  const setChannelsRunning = async (action: "start" | "stop") => {
+    setChannelAction(action);
+    try {
+      const updated = action === "start" ? await api.startChannels() : await api.stopChannels();
+      setChannelStatus(updated);
+      toast.success(action === "start" ? t("settings.channels.started") : t("settings.channels.stoppedToast"));
+    } catch (error) {
+      toast.error(`${action === "start" ? t("settings.channels.startFailed") : t("settings.channels.stopFailed")}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setChannelAction(null);
+    }
+  };
 
 
 
@@ -607,10 +672,6 @@ export function Settings() {
             </>
           )}
         </div>
-      </div>
-    );
-  }
-
   const keyStatus = settings.api_key_configured
     ? i18n.t("settings.configured")
     : settings.api_key_required
@@ -622,6 +683,122 @@ export function Settings() {
   const tushareStatus = dataSettings.tushare_token_configured
     ? i18n.t("settings.configured")
     : i18n.t("settings.keepCurrentToken");
+  const channelRows = channelStatus
+    ? Object.entries(channelStatus.channels ?? {}).sort(([a], [b]) => a.localeCompare(b))
+    : [];
+  const channelEnabledCount = channelRows.filter(([, item]) => item.enabled).length;
+  const channelLoadedCount = channelRows.filter(([, item]) => item.loaded).length;
+  const channelUnavailableCount = channelRows.filter(([, item]) => item.available === false).length;
+  const channelBusy = channelRefreshing || channelAction !== null;
+
+  const channelsSection = (
+    <section className="rounded-lg border bg-card p-5 shadow-sm">
+      <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <MessageSquareMore className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold">{t("settings.channels.title")}</h2>
+          </div>
+          <p className="max-w-3xl text-sm text-muted-foreground">{t("settings.channels.description")}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={refreshChannelStatus}
+            disabled={channelBusy}
+            className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {channelRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {t("settings.channels.refresh")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setChannelsRunning("start")}
+            disabled={channelBusy || !channelStatus}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {channelAction === "start" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            {t("settings.channels.start")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setChannelsRunning("stop")}
+            disabled={channelBusy || !channelStatus}
+            className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {channelAction === "stop" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+            {t("settings.channels.stop")}
+          </button>
+        </div>
+      </div>
+
+      {channelStatus ? (
+        <>
+          <div className="mb-4 grid gap-3 md:grid-cols-4">
+            <div className="rounded-md border bg-muted/20 px-3 py-2">
+              <div className="text-xs text-muted-foreground">{t("settings.channels.runtime")}</div>
+              <div className="text-sm font-medium">{channelStatus.running ? t("settings.channels.running") : t("settings.channels.stopped")}</div>
+            </div>
+            <div className="rounded-md border bg-muted/20 px-3 py-2">
+              <div className="text-xs text-muted-foreground">{t("settings.channels.enabled")}</div>
+              <div className="text-sm font-medium">{channelEnabledCount}</div>
+            </div>
+            <div className="rounded-md border bg-muted/20 px-3 py-2">
+              <div className="text-xs text-muted-foreground">{t("settings.channels.loaded")}</div>
+              <div className="text-sm font-medium">{channelLoadedCount}</div>
+            </div>
+            <div className="rounded-md border bg-muted/20 px-3 py-2">
+              <div className="text-xs text-muted-foreground">{t("settings.channels.unavailable")}</div>
+              <div className="text-sm font-medium">{channelUnavailableCount}</div>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">{t("settings.channels.channel")}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t("settings.channels.state")}</th>
+                  <th className="px-3 py-2 text-left font-medium">{t("settings.channels.recovery")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {channelRows.map(([name, item]) => (
+                  <tr key={name} className="border-t">
+                    <td className="px-3 py-2 align-top">
+                      <div className="font-medium">{item.display_name || name}</div>
+                      <div className="text-xs text-muted-foreground">{name}</div>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${item.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                          {item.enabled ? t("settings.channels.enabled") : t("settings.channels.disabled")}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${item.loaded ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+                          {item.loaded ? t("settings.channels.loaded") : t("settings.channels.notLoaded")}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${item.running ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+                          {item.running ? t("settings.channels.running") : t("settings.channels.stopped")}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="max-w-md px-3 py-2 align-top text-xs text-muted-foreground">
+                      {item.install_hint || item.error || t("settings.channels.noRecovery")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-md border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+          {t("settings.channels.refreshFailed")}
+        </div>
+      )}
+    </section>
+  );
+>>>>>>> ref-upstream/main
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4">
@@ -634,25 +811,27 @@ export function Settings() {
 
       <div className="space-y-4">
 
-          {/* Feishu Bot Channels Settings Card */}
-          <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="space-y-1 pr-4">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                  <h2 className="text-base font-semibold">{i18n.t("settings.feishuTitle")}</h2>
-                </div>
-                <p className="text-xs text-muted-foreground">{i18n.t("settings.feishuDesc")}</p>
-              </div>
-              <button
-                type="button"
-                onClick={openAddModal}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 text-xs font-medium transition cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {i18n.t("settings.addChannel")}
-              </button>
+      {channelsSection}
+
+      {/* Feishu Bot Channels Settings Card */}
+      <div className="rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b pb-3">
+          <div className="space-y-1 pr-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              <h2 className="text-base font-semibold">{i18n.t("settings.feishuTitle")}</h2>
             </div>
+            <p className="text-xs text-muted-foreground">{i18n.t("settings.feishuDesc")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={openAddModal}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 text-xs font-medium transition cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {i18n.t("settings.addChannel")}
+          </button>
+        </div>
 
             {feishuChannels.length === 0 ? (
               <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TideTrading API Server - RESTful API for finance research and backtesting.
+"""Vibe-Trading API Server - RESTful API for finance research and backtesting.
 
 V5: ReAct Agent + async /run + CORS env + SSE tool events.
 """
@@ -14,26 +14,22 @@ import logging
 import os
 import re
 import signal
-import threading
-from collections import deque
 import time
 import csv
 import uuid
-import hashlib
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Security, UploadFile, status
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Security, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from rich.console import Console
 
 from cli._version import __version__ as APP_VERSION
-from src.goal.context import default_goal_criteria
 from src.ui_services import build_run_analysis, load_run_context
 
 # UTF-8 on Windows
@@ -43,33 +39,38 @@ for _s in ("stdout", "stderr"):
     if callable(_r):
         _r(encoding="utf-8", errors="replace")
 
-from src.config.paths import get_runs_dir, get_sessions_dir, get_uploads_dir, get_runtime_root, _get_active_runtime_dir
-RUNS_DIR = get_runs_dir()
-SESSIONS_DIR = get_sessions_dir()
-UPLOADS_DIR = get_uploads_dir()
 AGENT_DIR = Path(__file__).resolve().parent
+ENV_EXAMPLE_PATH = AGENT_DIR / ".env.example"
 
-def _get_sessions_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return SESSIONS_DIR
-    return get_runtime_root() / "sessions"
-
+def _get_active_runtime_dir() -> Path:
+    import os
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return Path.home() / ".vibe-trading-cnx"
+    old_dir = Path.home() / ".vibe-trading-cnx"
+    new_dir = Path.home() / ".tide-trading"
+    if not new_dir.exists() and old_dir.exists():
+        return old_dir
+    return new_dir
 
 def _get_runs_dir() -> Path:
     from src.config.paths import active_tenant_var, get_runtime_root
     tenant = active_tenant_var.get() or "default"
     if tenant == "default":
-        return RUNS_DIR
+        return Path(__file__).resolve().parent / "runs"
     return get_runtime_root() / "runs"
 
+def _get_sessions_dir() -> Path:
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get() or "default"
+    if tenant == "default":
+        return Path(__file__).resolve().parent / "sessions"
+    return get_runtime_root() / "sessions"
 
 def _get_uploads_dir() -> Path:
     from src.config.paths import active_tenant_var, get_runtime_root
     tenant = active_tenant_var.get() or "default"
     if tenant == "default":
-        return UPLOADS_DIR
+        return Path(__file__).resolve().parent / "uploads"
     return get_runtime_root() / "uploads"
 
 class _DynamicEnvPath(type(Path())):
@@ -80,7 +81,6 @@ class _DynamicEnvPath(type(Path())):
     @property
     def _actual(self) -> Path:
         from src.config.paths import get_runtime_root
-        from src.config.paths import active_tenant_var
         return get_runtime_root() / ".env"
 
     def exists(self) -> bool:
@@ -115,94 +115,124 @@ class _DynamicEnvPath(type(Path())):
     def __fspath__(self):
         return str(self._actual)
 
+class _DynamicRunsDir(type(Path())):
+    def __new__(cls):
+        return super().__new__(cls, _get_runs_dir())
+
+    @property
+    def _actual(self) -> Path:
+        return _get_runs_dir()
+
+    def exists(self) -> bool:
+        return self._actual.exists()
+
+    @property
+    def parent(self) -> Path:
+        return self._actual.parent
+
+    def mkdir(self, *args, **kwargs):
+        return self._actual.mkdir(*args, **kwargs)
+
+    def resolve(self, *args, **kwargs) -> Path:
+        return self._actual.resolve(*args, **kwargs)
+
+    def iterdir(self):
+        return self._actual.iterdir()
+
+    def __truediv__(self, other):
+        return self._actual / other
+
+    def __str__(self):
+        return str(self._actual)
+
+    def __repr__(self):
+        return f"DynamicRunsDir({self._actual})"
+
+    def __fspath__(self):
+        return str(self._actual)
+
+class _DynamicSessionsDir(type(Path())):
+    def __new__(cls):
+        return super().__new__(cls, _get_sessions_dir())
+
+    @property
+    def _actual(self) -> Path:
+        return _get_sessions_dir()
+
+    def exists(self) -> bool:
+        return self._actual.exists()
+
+    @property
+    def parent(self) -> Path:
+        return self._actual.parent
+
+    def mkdir(self, *args, **kwargs):
+        return self._actual.mkdir(*args, **kwargs)
+
+    def resolve(self, *args, **kwargs) -> Path:
+        return self._actual.resolve(*args, **kwargs)
+
+    def iterdir(self):
+        return self._actual.iterdir()
+
+    def __truediv__(self, other):
+        return self._actual / other
+
+    def __str__(self):
+        return str(self._actual)
+
+    def __repr__(self):
+        return f"DynamicSessionsDir({self._actual})"
+
+    def __fspath__(self):
+        return str(self._actual)
+
+class _DynamicUploadsDir(type(Path())):
+    def __new__(cls):
+        return super().__new__(cls, _get_uploads_dir())
+
+    @property
+    def _actual(self) -> Path:
+        return _get_uploads_dir()
+
+    def exists(self) -> bool:
+        return self._actual.exists()
+
+    @property
+    def parent(self) -> Path:
+        return self._actual.parent
+
+    def mkdir(self, *args, **kwargs):
+        return self._actual.mkdir(*args, **kwargs)
+
+    def resolve(self, *args, **kwargs) -> Path:
+        return self._actual.resolve(*args, **kwargs)
+
+    def iterdir(self):
+        return self._actual.iterdir()
+
+    def __truediv__(self, other):
+        return self._actual / other
+
+    def __str__(self):
+        return str(self._actual)
+
+    def __repr__(self):
+        return f"DynamicUploadsDir({self._actual})"
+
+    def __fspath__(self):
+        return str(self._actual)
+
+RUNS_DIR = _DynamicRunsDir()
+SESSIONS_DIR = _DynamicSessionsDir()
+UPLOADS_DIR = _DynamicUploadsDir()
 ENV_PATH = _DynamicEnvPath()
-ENV_EXAMPLE_PATH = AGENT_DIR / ".env.example"
-
-
-class MemoryLogHandler(logging.Handler):
-    """Thread-safe logging handler that retains the last N logs in memory."""
-    def __init__(self, maxlen: int = 1000):
-        super().__init__()
-        self._logs = deque(maxlen=maxlen)
-        self._lock = threading.Lock()
-
-    def emit(self, record: logging.LogRecord):
-        try:
-            msg = self.format(record)
-            log_entry = {
-                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
-                "level": record.levelname,
-                "logger": record.name,
-                "message": msg,
-            }
-            with self._lock:
-                self._logs.append(log_entry)
-        except Exception:
-            self.handleError(record)
-
-    def get_logs(self, limit: int = 100, level: Optional[str] = None, keyword: Optional[str] = None):
-        with self._lock:
-            results = list(self._logs)
-        if level:
-            level_upper = level.upper()
-            results = [log for log in results if log["level"] == level_upper]
-        if keyword:
-            keyword_lower = keyword.lower()
-            results = [
-                log for log in results
-                if keyword_lower in log["message"].lower() or keyword_lower in log["logger"].lower()
-            ]
-        return results[-limit:]
-
-
-memory_log_handler = MemoryLogHandler()
-memory_log_handler.setFormatter(logging.Formatter("%(message)s"))
-memory_log_handler.setLevel(logging.INFO)
-logging.getLogger().addHandler(memory_log_handler)
-
-
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 _UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 console = Console()
 logger = logging.getLogger(__name__)
-XUEQIU_COMBOS_CACHE = {}  # {tenant_id: (mtime, timestamp, details)}
-
-
-def _load_tenant_keys() -> list[dict]:
-    """Load tenant API keys from ~/.tide/tenants/tenant_keys.json."""
-    path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
-    if not path.exists():
-        return []
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error(f"Failed to load tenant keys: {e}")
-        return []
-
-
-def _save_tenant_keys(keys: list[dict]) -> None:
-    """Save tenant API keys to ~/.tide/tenants/tenant_keys.json."""
-    path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(keys, indent=2, ensure_ascii=False), encoding="utf-8")
-    except Exception as e:
-        logger.error(f"Failed to save tenant keys: {e}")
-
-
-def _set_tenant_from_matched_key(matched: str) -> None:
-    from src.config.paths import active_tenant_var
-    if not matched:
-        active_tenant_var.set("default")
-        return
-    admin_keys = _configured_api_keys()
-    if any(hmac.compare_digest(matched, k) for k in admin_keys):
-        active_tenant_var.set("default")
-    else:
-        tenant_id = "tenant_" + hashlib.sha256(matched.encode("utf-8")).hexdigest()[:12]
-        active_tenant_var.set(tenant_id)
 
 
 # ============================================================================
@@ -267,6 +297,7 @@ class RunResponse(BaseModel):
     metrics: Optional[BacktestMetrics] = Field(None, description="Backtest metrics")
     artifacts: List[Artifact] = Field(default_factory=list, description="Run artifacts")
     run_card: Optional[Dict[str, Any]] = Field(None, description="Trust Layer run card payload")
+    research_card: Optional[Dict[str, Any]] = Field(None, description="IRR-AGL research card payload")
     llm_usage: Optional[Dict[str, Any]] = Field(None, description="Provider-reported AgentLoop usage summary")
 
     equity_curve: Optional[List[Dict[str, Any]]] = Field(None, description="Equity preview")
@@ -289,502 +320,12 @@ class RunResponse(BaseModel):
     run_logs: Optional[List[Dict[str, Any]]] = Field(None, description="Structured stdout/stderr lines")
 
 
-class HealthResponse(BaseModel):
-    """Health check payload."""
-    status: str = Field(..., description="Service status")
-    service: str = Field(..., description="Service name")
-    timestamp: str = Field(..., description="Server timestamp")
 
 
-class LLMProviderOption(BaseModel):
-    """Supported LLM provider metadata for the settings UI."""
+# Session/goal Pydantic models are defined in src/api/sessions_routes.py.
 
-    name: str
-    label: str
-    api_key_env: Optional[str] = None
-    base_url_env: str
-    default_model: str
-    default_base_url: str
-    api_key_required: bool = True
-    auth_type: str = "api_key"
-    login_command: Optional[str] = None
 
-
-class ProfileResponse(BaseModel):
-    """Current login profile."""
-    role: str
-    tenant_id: str
-    name: Optional[str] = None
-    is_local: bool = False
-
-
-class AdminElevateRequest(BaseModel):
-    username: str
-    password: str
-
-
-class AdminChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
-
-
-class TenantKeyItem(BaseModel):
-    """Tenant key definition."""
-    key: str
-    tenant_id: str
-    name: str
-    created_at: str
-    is_active: bool
-
-
-class CreateTenantKeyRequest(BaseModel):
-    """Request payload to create a tenant key."""
-    name: str = Field(..., min_length=1)
-
-
-class UpdateTenantKeyRequest(BaseModel):
-    """Request payload to update a tenant key."""
-    name: Optional[str] = None
-    is_active: Optional[bool] = None
-
-
-class MonitorStatsResponse(BaseModel):
-    """Service monitoring statistics."""
-    active_tenants: List[Dict[str, Any]]
-    total_sessions: int
-    total_runs: int
-    memory_usage_mb: float
-    services: Dict[str, Any] = {}
-
-
-class LogEntry(BaseModel):
-    """Single log entry details."""
-    timestamp: str
-    level: str
-    logger: str
-    message: str
-
-
-class LLMSettingsResponse(BaseModel):
-    """Current LLM runtime settings."""
-
-    provider: str
-    model_name: str
-    base_url: str
-    api_key_env: Optional[str] = None
-    api_key_configured: bool
-    api_key_hint: Optional[str] = None
-    api_key_required: bool
-    temperature: float
-    timeout_seconds: int
-    max_retries: int
-    reasoning_effort: str
-    sse_timeout_seconds: int
-    env_path: str
-    is_custom: bool = True
-    providers: List[LLMProviderOption]
-
-
-class UpdateLLMSettingsRequest(BaseModel):
-    """Update LLM settings persisted to agent/.env."""
-
-    provider: Optional[str] = None
-    model_name: Optional[str] = None
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
-    clear_api_key: bool = False
-    temperature: float = 0.0
-    timeout_seconds: int = Field(120, ge=1, le=3600)
-    max_retries: int = Field(2, ge=0, le=20)
-    reasoning_effort: Optional[str] = None
-    use_default: bool = False
-
-
-class XueqiuSettingsResponse(BaseModel):
-    """Xueqiu portfolio monitoring settings."""
-    enabled: bool = False
-    feishu_webhook: str = ""
-    combos: Dict[str, str] = Field(default_factory=dict)
-    xq_tokens: List[str] = Field(default_factory=list)
-    watch_uids: Dict[str, str] = Field(default_factory=dict)
-    token_expired: bool = False
-
-
-class UpdateXueqiuSettingsRequest(BaseModel):
-    """Request payload to update Xueqiu monitoring settings."""
-    enabled: bool
-    feishu_webhook: str = ""
-    combos: Dict[str, str] = Field(default_factory=dict)
-    xq_tokens: List[str] = Field(default_factory=list)
-    watch_uids: Dict[str, str] = Field(default_factory=dict)
-
-
-class TestXueqiuWebhookRequest(BaseModel):
-    """Request payload to test Xueqiu Feishu Webhook."""
-    webhook_url: str
-
-
-class ConfirmQRCodeRequest(BaseModel):
-    """Request payload to confirm Xueqiu QR code scan login."""
-    qrcode_id: str
-    token: str
-
-
-
-
-class DataSourceSettingsResponse(BaseModel):
-    """Current data source credential settings."""
-
-    tushare_token_configured: bool
-    tushare_token_hint: Optional[str] = None
-    iwencai_key_configured: bool = False
-    iwencai_key_hint: Optional[str] = None
-    fred_api_key_configured: bool = False
-    fred_api_key_hint: Optional[str] = None
-    ths_cookie_configured: bool = False
-    ths_cookie_hint: Optional[str] = None
-    baostock_supported: bool
-    baostock_installed: bool
-    baostock_message: str
-    env_path: str
-    is_custom: bool = True
-
-
-class UpdateDataSourceSettingsRequest(BaseModel):
-    """Update project-local data source credentials."""
-
-    tushare_token: Optional[str] = None
-    clear_tushare_token: bool = False
-    iwencai_key: Optional[str] = None
-    clear_iwencai_key: bool = False
-    fred_api_key: Optional[str] = None
-    clear_fred_api_key: bool = False
-    ths_cookie: Optional[str] = None
-    clear_ths_cookie: bool = False
-    use_default: bool = False
-
-
-class FeishuChannelResponse(BaseModel):
-    """Detailed information for a single Feishu channel."""
-    id: str
-    name: str
-    app_id: str
-    app_secret_configured: bool
-    allowed_users: str
-    allow_all_users: bool
-    enabled: bool
-
-
-class CreateFeishuChannelRequest(BaseModel):
-    """Payload to create a new Feishu channel."""
-    name: str
-    app_id: str
-    app_secret: str
-    allowed_users: Optional[str] = ""
-    allow_all_users: bool = False
-    enabled: bool = True
-
-
-class UpdateFeishuChannelRequest(BaseModel):
-    """Payload to update an existing Feishu channel."""
-    name: str
-    app_id: str
-    app_secret: Optional[str] = None
-    allowed_users: Optional[str] = ""
-    allow_all_users: bool = False
-    enabled: bool = True
-
-
-class WechatChannelResponse(BaseModel):
-    """Detailed information for a single WeChat channel."""
-    id: str
-    name: str
-    mode: str = "ilink"
-    enabled: bool
-    ilink_bot_token: Optional[str] = ""
-    ilink_base_url: Optional[str] = ""
-    ilink_bot_id: Optional[str] = ""
-    ilink_user_id: Optional[str] = ""
-
-
-class CreateWechatChannelRequest(BaseModel):
-    """Payload to create a new WeChat channel."""
-    name: str
-    mode: str = "ilink"
-    enabled: bool = True
-    ilink_bot_token: Optional[str] = ""
-    ilink_base_url: Optional[str] = ""
-    ilink_bot_id: Optional[str] = ""
-    ilink_user_id: Optional[str] = ""
-
-
-class UpdateWechatChannelRequest(BaseModel):
-    """Payload to update an existing WeChat channel."""
-    name: str
-    mode: str = "ilink"
-    enabled: bool = True
-    ilink_bot_token: Optional[str] = None
-    ilink_base_url: Optional[str] = None
-    ilink_bot_id: Optional[str] = None
-    ilink_user_id: Optional[str] = None
-
-
-class FeatureFlagsResponse(BaseModel):
-    """Current feature flag state."""
-
-    shell_tools_enabled: bool
-    scheduler_enabled: bool
-    session_runtime_enabled: bool
-    env_path: str
-
-
-# ---- V4 Session Models ----
-
-class CreateSessionRequest(BaseModel):
-    """Create session request body."""
-    title: str = Field("", description="Session title")
-    config: Optional[Dict[str, Any]] = Field(None, description="Session config")
-
-
-class SessionResponse(BaseModel):
-    """Session record."""
-    session_id: str
-    title: str
-    status: str
-    created_at: str
-    updated_at: str
-    last_attempt_id: Optional[str] = None
-
-
-class SendMessageRequest(BaseModel):
-    """Send chat message: natural-language strategy description."""
-    content: str = Field(..., description="Natural language strategy description", min_length=1, max_length=5000)
-
-
-class MessageResponse(BaseModel):
-    """Stored chat message."""
-    message_id: str
-    session_id: str
-    role: str
-    content: str
-    created_at: str
-    linked_attempt_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-
-
-class CreateGoalRequest(BaseModel):
-    """Create or replace a finance research goal."""
-
-    objective: str = Field(..., min_length=1, max_length=5000)
-    criteria: List[str] = Field(default_factory=list)
-    ui_summary: str = ""
-    protocol: str = "thesis_review"
-    risk_tier: str = "research_general"
-    token_budget: Optional[int] = Field(None, ge=1)
-    turn_budget: Optional[int] = Field(None, ge=1)
-    time_budget_seconds: Optional[int] = Field(None, ge=1)
-
-
-class UpdateGoalRequest(BaseModel):
-    """Edit mutable finance research goal fields."""
-
-    goal_id: str = Field(..., min_length=1)
-    expected_goal_id: str = Field(..., min_length=1)
-    objective: Optional[str] = Field(None, min_length=1, max_length=5000)
-    ui_summary: Optional[str] = Field(None, max_length=500)
-
-
-class AddGoalEvidenceRequest(BaseModel):
-    """Append evidence to a finance research goal."""
-
-    goal_id: str = Field(..., min_length=1)
-    expected_goal_id: str = Field(..., min_length=1)
-    text: str = Field(..., min_length=1, max_length=10000)
-    criterion_id: Optional[str] = None
-    claim_id: Optional[str] = None
-    evidence_type: str = "evidence"
-    tool_call_id: Optional[str] = None
-    run_id: Optional[str] = None
-    source_provider: Optional[str] = None
-    source_type: Optional[str] = None
-    source_uri: Optional[str] = None
-    symbol_universe: List[str] = Field(default_factory=list)
-    benchmark: List[str] = Field(default_factory=list)
-    timeframe: Optional[str] = None
-    method: Optional[str] = None
-    assumptions: Dict[str, Any] = Field(default_factory=dict)
-    artifact_path: Optional[str] = None
-    artifact_hash: Optional[str] = None
-    data_as_of: Optional[str] = None
-    confidence: Optional[str] = None
-    caveat: Optional[str] = None
-    contradicts_claim_ids: List[str] = Field(default_factory=list)
-
-
-class GoalSnapshotResponse(BaseModel):
-    """Finance research goal snapshot."""
-
-    goal: Dict[str, Any]
-    claims: List[Dict[str, Any]]
-    criteria: List[Dict[str, Any]]
-    evidence: List[Dict[str, Any]]
-    evidence_count: int = 0
-
-
-class AddGoalEvidenceResponse(BaseModel):
-    """Response after appending goal evidence."""
-
-    evidence: Dict[str, Any]
-    snapshot: GoalSnapshotResponse
-
-
-class GoalAuditRowRequest(BaseModel):
-    """One criterion row for goal status audits."""
-
-    criterion_id: str = Field(..., min_length=1)
-    result: str = Field(..., min_length=1)
-    evidence_ids: List[str] = Field(default_factory=list)
-    notes: str = ""
-
-
-class UpdateGoalStatusRequest(BaseModel):
-    """Update a finance research goal status."""
-
-    goal_id: str = Field(..., min_length=1)
-    expected_goal_id: str = Field(..., min_length=1)
-    status: str = Field(..., min_length=1)
-    audit: List[GoalAuditRowRequest] = Field(default_factory=list)
-    recap: Optional[str] = None
-
-
-class UpdateGoalStatusResponse(BaseModel):
-    """Response after changing a goal status."""
-
-    goal: Dict[str, Any]
-    snapshot: GoalSnapshotResponse
-
-
-class UpdateGoalResponse(BaseModel):
-    """Response after editing a goal."""
-
-    goal: Dict[str, Any]
-    snapshot: GoalSnapshotResponse
-
-
-# ---- Live trading channel: consent commit + kill switch ----
-
-
-class CommitMandateRequest(BaseModel):
-    """Surface-originated mandate commit (Consent §1 / §3).
-
-    This is the ONLY write path that activates a live-trading mandate. It is a
-    privileged HTTP action the user surface sends on an explicit click/keypress
-    — NOT a tool the agent model can call. ``consent_ack`` MUST be ``true``.
-    """
-
-    broker: str = Field(..., min_length=1, max_length=64)
-    proposal_id: str = Field(..., pattern=r"^mp_[0-9a-f]{32}$")
-    selected_ordinal: int = Field(..., ge=1, le=10)
-    adjustments: Optional[Dict[str, Any]] = None
-    consent_ack: bool = Field(..., description="Explicit affirmative; must be true")
-    session_id: Optional[str] = None
-    account_ref: str = Field("", max_length=128)
-    lifetime_days: int = Field(30, ge=1, le=365)
-
-
-class LiveHaltRequest(BaseModel):
-    """Trip or clear the live kill switch (Consent §4).
-
-    Tripping/clearing is a privileged surface action, never an agent tool. When
-    ``broker`` is omitted the GLOBAL switch is used (halts every broker).
-    """
-
-    broker: Optional[str] = Field(None, max_length=64)
-    reason: str = Field("user requested halt", max_length=500)
-    session_id: Optional[str] = None
-
-
-class LiveAuthorizeRequest(BaseModel):
-    """Kick off (or describe) the OAuth bootstrap for a live broker (C2).
-
-    TideTrading never holds funds and never operates a venue, so the OAuth
-    bootstrap runs through the broker's own user-authorized device flow on the
-    client (CLI / desktop MCP), not a server-side redirect. This endpoint is the
-    web on-ramp: it tells a Web UI user exactly how to discover/start the flow.
-    """
-
-    broker: str = Field(..., min_length=1, max_length=64)
-
-
-class LiveRunnerControlRequest(BaseModel):
-    """Start or stop the persistent live runner for one broker (SPEC §7.5).
-
-    The runner wakes on schedule/market events and trades autonomously inside a
-    committed mandate. Starting it is a privileged surface action, never an
-    agent tool. A committed, unexpired mandate must already exist.
-    """
-
-    broker: str = Field(..., min_length=1, max_length=64)
-    session_id: Optional[str] = None
-
-
-class BrokerAuthState(BaseModel):
-    """Per-broker authorization snapshot for ``GET /live/status``."""
-
-    broker: str
-    oauth_token_present: bool = Field(..., description="Whether an OAuth token cache exists")
-    is_live_broker: bool = Field(..., description="Whether this key is a recognized live broker")
-
-
-class MandateLimits(BaseModel):
-    """Flattened active-mandate limits surfaced to the UI (Mandate layer a/b)."""
-
-    max_order_notional_usd: float
-    max_total_exposure_usd: float
-    max_leverage: float
-    max_trades_per_day: int
-    allowed_instruments: List[str]
-    account_funding_usd: float
-
-
-class ActiveMandateState(BaseModel):
-    """Active-mandate snapshot with the expiry countdown (SPEC §9 dec. 2)."""
-
-    broker: str
-    account_ref: str
-    created_at: str
-    expires_at: str
-    expires_in_seconds: Optional[int] = Field(
-        None, description="Seconds until expiry; negative when already expired"
-    )
-    expired: bool
-    limits: MandateLimits
-
-
-class RunnerLivenessState(BaseModel):
-    """Runner liveness snapshot via the §7.5 liveness contract."""
-
-    broker: str
-    alive: bool
-    last_tick: Optional[float] = Field(None, description="Unix epoch of last heartbeat tick")
-    last_tick_age_seconds: Optional[float] = None
-
-
-class LiveBrokerStatus(BaseModel):
-    """Combined live-channel status for a single broker."""
-
-    auth: BrokerAuthState
-    mandate: Optional[ActiveMandateState] = None
-    runner: RunnerLivenessState
-    halted: bool = Field(..., description="Per-broker OR global kill switch is tripped")
-
-
-class LiveStatusResponse(BaseModel):
-    """Top-level live-channel status (C2)."""
-
-    global_halted: bool = Field(..., description="Whether the GLOBAL kill switch is tripped")
-    brokers: List[LiveBrokerStatus]
-
+# Live-trading Pydantic models are defined in src/api/live_routes.py.
 
 
 # ============================================================================
@@ -792,8 +333,8 @@ class LiveStatusResponse(BaseModel):
 # ============================================================================
 
 app = FastAPI(
-    title="TideTrading API",
-    description="TideTrading API: natural-language finance research, backtesting, and swarm workflows",
+    title="Vibe-Trading API",
+    description="Vibe-Trading API: natural-language finance research, backtesting, and swarm workflows",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -875,6 +416,14 @@ def _is_allowed_loopback_host(host: str) -> bool:
     return normalized in _DEFAULT_LOOPBACK_HOSTS or normalized in _EXTRA_LOOPBACK_HOSTS
 
 
+def _is_loopback_bind_host(host: str) -> bool:
+    """Return whether ``host`` resolves to a loopback interface."""
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 # CORS: override with CORS_ORIGINS (comma-separated explicit origins)
 _CORS_ORIGINS = _parse_cors_origins(os.getenv("CORS_ORIGINS"))
 
@@ -953,188 +502,19 @@ async def _spa_html_deep_link_fallback(request: Request, call_next):
     return await call_next(request)
 
 
-FEISHU_SECRET_PLACEHOLDERS: set[str] = {"", "your-feishu-app-secret"}
-FEISHU_CHANNELS_JSON = Path(__file__).resolve().parent / "sessions" / "feishu_channels.json"
+# ============================================================================
+# Channel routes - defined in src/api/channels_routes.py
+# Lifecycle functions imported early for startup/shutdown hooks
+# ============================================================================
 
-
-def _get_feishu_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return FEISHU_CHANNELS_JSON
-    return get_runtime_root() / "feishu_channels.json"
-
-
-def _load_feishu_channels() -> list[dict[str, Any]]:
-    """Load Feishu channels from the persistent JSON file. Handles legacy migration."""
-    channels = []
-    path = _get_feishu_channels_json_path()
-    if path.exists():
-        try:
-            channels = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.error("Failed to read %s: %s", path, e)
-
-    # Auto-migration from legacy .env values
-    if not channels and path == FEISHU_CHANNELS_JSON:
-        env_values = _read_settings_env_values()
-        app_id = env_values.get("FEISHU_APP_ID", "").strip()
-        app_secret = env_values.get("FEISHU_APP_SECRET", "").strip()
-        if app_id and app_secret:
-            allowed_users = env_values.get("FEISHU_ALLOWED_USERS", "").strip()
-            allow_all_users = env_values.get("FEISHU_ALLOW_ALL_USERS", "false").strip().lower() == "true"
-            channels = [{
-                "id": "legacy_default",
-                "name": "默认飞书通道",
-                "app_id": app_id,
-                "app_secret": app_secret,
-                "allowed_users": allowed_users,
-                "allow_all_users": allow_all_users,
-                "enabled": True
-            }]
-            _save_feishu_channels(channels)
-            # Remove legacy keys from .env
-            try:
-                updates = {
-                    "FEISHU_APP_ID": "",
-                    "FEISHU_APP_SECRET": "",
-                    "FEISHU_ALLOWED_USERS": "",
-                    "FEISHU_ALLOW_ALL_USERS": "false"
-                }
-                _write_env_values(ENV_PATH, updates)
-                for key in updates:
-                    os.environ.pop(key, None)
-            except Exception as e:
-                logger.error("Failed to clear legacy Feishu env variables: %s", e)
-
-    return channels
-
-
-def _save_feishu_channels(channels: list[dict[str, Any]]) -> None:
-    """Save Feishu channels to the persistent JSON file."""
-    path = _get_feishu_channels_json_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-WECHAT_CHANNELS_JSON = _get_active_runtime_dir() / "wechat_channels.json"
-
-def _get_wechat_channels_json_path() -> Path:
-    """Get path to the WeChat channels persistent JSON file based on active tenant."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return WECHAT_CHANNELS_JSON
-    return get_runtime_root() / "wechat_channels.json"
-
-
-def _load_wechat_channels() -> list[dict[str, Any]]:
-    """Load WeChat channels from the persistent JSON file."""
-    channels = []
-    path = _get_wechat_channels_json_path()
-    if path.exists():
-        try:
-            channels = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.error("Failed to read %s: %s", path, e)
-    return channels
-
-
-def _save_wechat_channels(channels: list[dict[str, Any]]) -> None:
-    """Save WeChat channels to the persistent JSON file."""
-    path = _get_wechat_channels_json_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-async def _reload_platform_manager() -> None:
-    """Stop the running platform manager and start it with the latest active channel adapters."""
-    global _platform_manager
-    session_service = _get_session_service()
-    logger.warning("[Platform] Reloading platform manager (session_service=%s)...", session_service is not None)
-    if session_service:
-        try:
-            if _platform_manager:
-                await _platform_manager.stop()
-            
-            from src.platforms import PlatformManager, FeishuAdapter, WechatAdapter
-            _platform_manager = PlatformManager(session_service, tenant_id="default")
-            
-            tenants = ["default"]
-            try:
-                for k in _load_tenant_keys():
-                    if k.get("is_active", True):
-                        tenants.append(k["tenant_id"])
-            except Exception as e:
-                logger.error("Failed to load tenant keys during platform reload: %s", e)
-
-            from src.config.paths import active_tenant_var
-            original_tenant = active_tenant_var.get()
-            
-            registered_count = 0
-            try:
-                for t in tenants:
-                    active_tenant_var.set(t)
-                    
-                    # 1. Load Feishu channels
-                    channels = _load_feishu_channels()
-                    for chan in channels:
-                        if chan.get("enabled", True):
-                            adapter = FeishuAdapter(
-                                channel_id=chan["id"],
-                                name=chan["name"],
-                                app_id=chan["app_id"],
-                                app_secret=chan["app_secret"],
-                                allowed_users=chan.get("allowed_users", ""),
-                                allow_all_users=chan.get("allow_all_users", False),
-                                tenant_id=t,
-                            )
-                            _platform_manager.register_adapter(adapter)
-                            registered_count += 1
-
-                    # 2. Load WeChat channels
-                    wechat_chans = _load_wechat_channels()
-                    for wchan in wechat_chans:
-                        if wchan.get("enabled", True):
-                            w_adapter = WechatAdapter(
-                                channel_id=wchan["id"],
-                                name=wchan["name"],
-                                ilink_bot_token=wchan.get("ilink_bot_token", ""),
-                                ilink_base_url=wchan.get("ilink_base_url", ""),
-                                ilink_bot_id=wchan.get("ilink_bot_id", ""),
-                                ilink_user_id=wchan.get("ilink_user_id", ""),
-                                tenant_id=t,
-                            )
-                            _platform_manager.register_adapter(w_adapter)
-                            registered_count += 1
-            finally:
-                active_tenant_var.set(original_tenant)
-
-            logger.warning(f"[Platform] Registered {registered_count} adapter(s) across all active tenants. Starting...")
-            await _platform_manager.start()
-            logger.warning(f"[Platform] Platform manager started successfully.")
-        except Exception as e:
-            logger.exception("[Platform] Failed to reload platform manager: %s", e)
-
-
-_platform_manager = None
-_xueqiu_watcher = None
-XUEQIU_QR_SESSIONS = {}
-
-
-
-def _get_xueqiu_watcher():
-    global _xueqiu_watcher
-    if _xueqiu_watcher is None:
-        from src.platforms.xueqiu_watcher import XueqiuWatcher
-        from src.platforms.event_dispatcher import MultiTenantEventDispatcher
-        _xueqiu_watcher = XueqiuWatcher()
-        dispatcher = MultiTenantEventDispatcher(
-            config_provider=_xueqiu_watcher.config_provider,
-            watcher=_xueqiu_watcher
-        )
-        _xueqiu_watcher.add_event_listener(dispatcher.handle_event)
-    return _xueqiu_watcher
+from src.api.channels_routes import (  # noqa: E402
+    _start_channel_runtime,
+    _stop_channel_runtime,
+)
+from src.api.scheduled_routes import (  # noqa: E402
+    _start_scheduled_research_executor,
+    _stop_scheduled_research_executor,
+)
 
 
 @app.on_event("startup")
@@ -1142,178 +522,22 @@ async def _run_startup_preflight() -> None:
     """Run preflight checks on server startup."""
     from src.preflight import run_preflight
 
-    _init_admin_auth_db()
     run_preflight(console)
     _start_scheduled_research_executor()
-
-    # Initialize Platform Manager for multi-channel messaging (e.g. Feishu Bot)
-    await _reload_platform_manager()
-
-    # Initialize and start Xueqiu combinations watcher
-    try:
-        _get_xueqiu_watcher().start()
-        logger.info("[XueqiuWatcher] Startup check completed.")
-    except Exception as e:
-        logger.error("[XueqiuWatcher] Failed to start watcher: %s", e)
-
-    # Initialize and start SharedMemoryHub cache refresher
-    try:
-        from src.market.shared_data_hub import SharedMemoryHub
-        SharedMemoryHub().start()
-        logger.info("[SharedMemoryHub] Startup cache refresher and connection pool initialized.")
-    except Exception as e:
-        logger.error("[SharedMemoryHub] Failed to start cache refresher: %s", e)
-
-    # Initialize and start CloseDataMaintenanceService
-    try:
-        from src.market.close_maintenance import CloseDataMaintenanceService
-        CloseDataMaintenanceService().start()
-        logger.info("[CloseMaintenance] 收盘数据维护服务已在系统启动时载入。")
-    except Exception as e:
-        logger.error("[CloseMaintenance] 启动收盘数据维护服务失败: %s", e)
-
-    # Initialize and start ThsSyncService
-    try:
-        from src.market.ths_sync import ThsSyncService
-        ThsSyncService().start()
-        logger.info("[ThsSync] 同花顺同步服务已在系统启动时载入。")
-    except Exception as e:
-        logger.error("[ThsSync] 启动同花顺同步服务失败: %s", e)
-
-    # Initialize and start WatchlistMonitorService
-    try:
-        from src.market.watchlist_monitor import WatchlistMonitorService
-        WatchlistMonitorService().start()
-        logger.info("[WatchlistMonitor] 自选股实时预警服务已在系统启动时载入。")
-    except Exception as e:
-        logger.error("[WatchlistMonitor] 启动自选股实时预警服务失败: %s", e)
+    if os.getenv("VIBE_TRADING_CHANNELS_AUTO_START", "").strip().lower() in {"1", "true", "yes"}:
+        await _start_channel_runtime()
 
 
 @app.on_event("shutdown")
 async def _stop_scheduled_research_on_shutdown() -> None:
     """Stop the scheduled research executor on server shutdown."""
+    await _stop_channel_runtime()
     await _stop_scheduled_research_executor()
-
-    # Stop Xueqiu combinations watcher
-    global _xueqiu_watcher
-    if _xueqiu_watcher:
-        try:
-            await _xueqiu_watcher.stop()
-            logger.info("[XueqiuWatcher] Watcher stopped.")
-        except Exception as e:
-            logger.error("[XueqiuWatcher] Error stopping watcher: %s", e)
-
-    global _platform_manager
-    if _platform_manager:
-        try:
-            await _platform_manager.stop()
-            logger.info("[Platform] Platforms manager stopped.")
-        except Exception as e:
-            logger.exception("[Platform] Error stopping platforms manager: %s", e)
-
-    # Stop CloseDataMaintenanceService
-    try:
-        from src.market.close_maintenance import CloseDataMaintenanceService
-        await CloseDataMaintenanceService().stop()
-        logger.info("[CloseMaintenance] 收盘数据维护服务已停止。")
-    except Exception as e:
-        logger.error("[CloseMaintenance] 停止收盘数据维护服务失败: %s", e)
-
-    # Stop ThsSyncService
-    try:
-        from src.market.ths_sync import ThsSyncService
-        await ThsSyncService().stop()
-        logger.info("[ThsSync] 同花顺同步服务已停止。")
-    except Exception as e:
-        logger.error("[ThsSync] 停止同花顺同步服务失败: %s", e)
-
-    # Stop WatchlistMonitorService
-    try:
-        from src.market.watchlist_monitor import WatchlistMonitorService
-        await WatchlistMonitorService().stop()
-        logger.info("[WatchlistMonitor] 自选股实时预警服务已停止。")
-    except Exception as e:
-        logger.error("[WatchlistMonitor] 停止自选股实时预警服务失败: %s", e)
-
-    # Stop SharedMemoryHub and TdxGateway connection pool
-    try:
-        from src.market.shared_data_hub import SharedMemoryHub
-        SharedMemoryHub().stop()
-        logger.info("[SharedMemoryHub] Cache refresher stopped.")
-    except Exception as e:
-        logger.error("[SharedMemoryHub] Error stopping cache refresher: %s", e)
-
-    try:
-        from src.market.tdx_bridge import TdxGateway
-        TdxGateway().stop()
-        logger.info("[TdxGateway] Connection pool stopped.")
-    except Exception as e:
-        logger.error("[TdxGateway] Error stopping connection pool: %s", e)
-
 
 
 # ============================================================================
 # API Key Authentication
 # ============================================================================
-
-import hashlib
-import secrets
-
-_ADMIN_SESSION_TOKENS: set[str] = set()
-
-def hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    key = hashlib.pbkdf2_hmac(
-        'sha256',
-        password.encode('utf-8'),
-        salt.encode('utf-8'),
-        100000
-    )
-    return f"pbkdf2_sha256$100000${salt}${key.hex()}"
-
-def verify_password(password: str, encoded: str) -> bool:
-    if not encoded:
-        return False
-    try:
-        algorithm, iterations, salt, hash_val = encoded.split('$', 3)
-        assert algorithm == 'pbkdf2_sha256'
-        iterations = int(iterations)
-        key = hashlib.pbkdf2_hmac(
-            'sha256',
-            password.encode('utf-8'),
-            salt.encode('utf-8'),
-            iterations
-        )
-        return key.hex() == hash_val
-    except Exception:
-        return False
-
-def _init_admin_auth_db():
-    from src.config.paths import get_tenant_db_path
-    import sqlite3
-    db_path = get_tenant_db_path("default")
-    try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS admin_auth (
-                username TEXT PRIMARY KEY,
-                password_hash TEXT NOT NULL
-            )
-        """)
-        cursor.execute("SELECT password_hash FROM admin_auth WHERE username = 'admin'")
-        row = cursor.fetchone()
-        if not row:
-            pwd_hash = hash_password("admin")
-            cursor.execute("INSERT INTO admin_auth (username, password_hash) VALUES ('admin', ?)", (pwd_hash,))
-            conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.error("Failed to initialize admin_auth table: %s", e)
-
-def _is_request_admin(request: Request) -> bool:
-    admin_token = request.headers.get("x-admin-token")
-    return bool(admin_token and admin_token in _ADMIN_SESSION_TOKENS)
 
 _security = HTTPBearer(auto_error=False)
 _API_KEY = os.getenv("API_AUTH_KEY")
@@ -1321,13 +545,9 @@ _SHELL_TOOLS_ENV = "VIBE_TRADING_ENABLE_SHELL_TOOLS"
 _DOCKER_LOOPBACK_ENV = "VIBE_TRADING_TRUST_DOCKER_LOOPBACK"
 
 
-def _configured_api_keys() -> list[str]:
-    """Return configured admin API keys."""
-    raw = os.getenv("API_AUTH_KEYS")
-    if raw:
-        return [k.strip() for k in raw.split(",") if k.strip()]
-    single = os.getenv("API_AUTH_KEY")
-    return [single.strip()] if single else []
+def _configured_api_key() -> str:
+    """Return the current API auth key, if configured."""
+    return os.getenv("API_AUTH_KEY") or _API_KEY or ""
 
 
 async def require_auth(
@@ -1345,6 +565,58 @@ async def require_auth(
         HTTPException: 401 when API_AUTH_KEY is set but the token is missing or wrong.
     """
     _validate_api_auth(request=request, cred=cred)
+
+
+async def require_local_or_auth(
+    request: Request,
+    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
+) -> None:
+    """Protect settings access when dev-mode auth is disabled."""
+    if _is_request_admin(request):
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
+        return
+    admin_keys = _configured_api_keys()
+    tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
+    if admin_keys or tenant_keys:
+        await require_auth(request, cred)
+        return
+    if not _is_local_or_lan_client(request):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Settings access requires API_AUTH_KEY or a local loopback client",
+        )
+
+
+async def require_settings_write_auth(
+    request: Request,
+    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
+) -> None:
+    """Require explicit authorization before changing settings. Supports multi-tenant writes."""
+    await require_auth(request, cred)
+
+
+async def require_admin(
+    request: Request,
+    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
+) -> None:
+    """Require that the client has administrative privileges (default tenant)."""
+    if _is_request_admin(request):
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
+        return
+
+    admin_keys = _configured_api_keys()
+    if admin_keys:
+        await require_auth(request, cred)
+        from src.config.paths import active_tenant_var
+        if active_tenant_var.get() == "default":
+            return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Admin privileges required",
+    )
 
 
 async def require_event_stream_auth(
@@ -1389,7 +661,7 @@ def _is_loopback_origin(origin: str) -> bool:
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         return False
     host = parsed.hostname.rstrip(".").lower()
-    if host == "localhost" or host in _EXTRA_LOOPBACK_HOSTS:
+    if host == "localhost":
         return True
     try:
         return ipaddress.ip_address(host).is_loopback
@@ -1442,33 +714,105 @@ def _require_shutdown_authorization(
     request: Request,
     cred: Optional[HTTPAuthorizationCredentials],
 ) -> None:
-    """Authorize the local shutdown control-plane action."""
-    from src.config.paths import active_tenant_var
+    """Authorize the local shutdown control-plane action.
+
+    Loopback peer IP alone is not enough for this browser-reachable, destructive
+    action. When API_AUTH_KEY is configured, require the Bearer token even for
+    loopback requests; otherwise preserve local dev-mode shutdown for direct
+    loopback clients while rejecting cross-site browser requests.
+    """
     _reject_cross_site_browser_request(request)
-    
-    if _is_request_admin(request):
-        active_tenant_var.set("default")
+    api_key = _configured_api_key()
+    if api_key:
+        token = _auth_credential_from_header_or_query(cred, None, allow_query=False)
+        if not token or not hmac.compare_digest(token, api_key):
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
         return
-
-    admin_keys = _configured_api_keys()
-    tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
-    has_keys = bool(admin_keys) or bool(tenant_keys)
-
-    if has_keys:
-        matched = _validate_api_key(cred, None, allow_query=False)
-        _set_tenant_from_matched_key(matched)
-        return
-
-    if not _is_local_or_lan_client(request):
+    if not _is_local_client(request):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="API_AUTH_KEY is required for non-local API access",
         )
-    active_tenant_var.set("default")
 
 
 _SAFE_BROWSER_METHODS = {"GET", "HEAD", "OPTIONS"}
 
+
+def _validate_api_auth(
+    *,
+    request: Request,
+    cred: Optional[HTTPAuthorizationCredentials],
+    query_api_key: Optional[str] = None,
+    allow_query: bool = False,
+) -> None:
+    """Validate configured auth, preserving loopback-only dev mode."""
+    # CORS protects response reads, not blind side effects. Reject unsafe
+    # browser-originated cross-site requests before honoring loopback dev-mode
+    # trust, otherwise a malicious page can drive local POST/PUT/DELETE routes.
+    if request.method.upper() not in _SAFE_BROWSER_METHODS:
+        _reject_cross_site_browser_request(request)
+
+    # Loopback clients are always trusted, even when API_AUTH_KEY is set.
+    # The key only gates non-local (LAN/remote) access.
+    if _is_local_client(request):
+        return
+
+    api_key = _configured_api_key()
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API_AUTH_KEY is required for non-local API access",
+    token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
+    if not token or not hmac.compare_digest(token, api_key):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+_ADMIN_SESSION_TOKENS: set[str] = set()
+
+def _is_request_admin(request: Request) -> bool:
+    admin_token = request.headers.get("x-admin-token")
+    return bool(admin_token and admin_token in _ADMIN_SESSION_TOKENS)
+
+def _load_tenant_keys() -> list[dict]:
+    """Load tenant API keys from ~/.tide/tenants/tenant_keys.json."""
+    import json
+    path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error(f"Failed to load tenant keys: {e}")
+        return []
+
+def _save_tenant_keys(keys: list[dict]) -> None:
+    """Save tenant API keys to ~/.tide/tenants/tenant_keys.json."""
+    import json
+    path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(keys, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        logger.error(f"Failed to save tenant keys: {e}")
+
+def _configured_api_keys() -> list[str]:
+    """Return configured admin API keys."""
+    raw = os.getenv("API_AUTH_KEYS")
+    if raw:
+        return [k.strip() for k in raw.split(",") if k.strip()]
+    single = os.getenv("API_AUTH_KEY")
+    return [single.strip()] if single else []
+
+def _set_tenant_from_matched_key(matched: str) -> None:
+    import hashlib
+    from src.config.paths import active_tenant_var
+    if not matched:
+        active_tenant_var.set("default")
+        return
+    admin_keys = _configured_api_keys()
+    if any(hmac.compare_digest(matched, k) for k in admin_keys):
+        active_tenant_var.set("default")
+    else:
+        tenant_id = "tenant_" + hashlib.sha256(matched.encode("utf-8")).hexdigest()[:12]
+        active_tenant_var.set(tenant_id)
 
 def _validate_api_key(
     cred: Optional[HTTPAuthorizationCredentials],
@@ -1492,69 +836,8 @@ def _validate_api_key(
             return k
     raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
-
-def _validate_api_auth(
-    *,
-    request: Request,
-    cred: Optional[HTTPAuthorizationCredentials],
-    query_api_key: Optional[str] = None,
-    allow_query: bool = False,
-) -> None:
-    """Validate configured auth, preserving loopback-only dev mode."""
-    if request.method.upper() not in _SAFE_BROWSER_METHODS:
-        _reject_cross_site_browser_request(request)
-
-    # 1. New: Check for Admin Session Token elevation
-    if _is_request_admin(request):
-        from src.config.paths import active_tenant_var
-        active_tenant_var.set("default")
-        return
-
-    admin_keys = _configured_api_keys()
-    tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
-    has_keys = bool(admin_keys) or bool(tenant_keys)
-
-    # 2. Original loopback dev-mode bypass
-    if _is_local_or_lan_client(request):
-        token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
-        if token:
-            matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
-            _set_tenant_from_matched_key(matched)
-        else:
-            if has_keys:
-                raise HTTPException(status_code=401, detail="Authentication required")
-            from src.config.paths import active_tenant_var
-            active_tenant_var.set("default")
-        return
-
-    if not has_keys:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="API_AUTH_KEY is required for non-local API access",
-        )
-
-    matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
-    _set_tenant_from_matched_key(matched)
-
-
-
-def _is_local_client(request: Request) -> bool:
-    """Return whether the request originates from a loopback client."""
-    host = request.client.host if request.client else ""
-    if host in {"localhost", "testclient"}:
-        return True
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    if ip.is_loopback:
-        return True
-    return _trusted_docker_loopback_ip(ip)
-
-
 def _is_local_or_lan_client(request: Request) -> bool:
     """Return whether the request originates from a local loopback or LAN client, both by connection IP and Host header."""
-    # 1. Check connection IP (request.client.host)
     host = request.client.host if request.client else ""
     is_conn_local = False
     if host in {"localhost", "testclient", "testserver"}:
@@ -1576,7 +859,6 @@ def _is_local_or_lan_client(request: Request) -> bool:
     if not is_conn_local:
         return False
 
-    # 2. Check Host header (e.g. to catch public IP access like 8.129.0.26 via port forwarding)
     req_host = request.headers.get("host", "")
     normalized_host = _host_without_port(req_host)
 
@@ -1593,9 +875,65 @@ def _is_local_or_lan_client(request: Request) -> bool:
             ip in ipaddress.ip_network("192.168.0.0/16")
         )
     except ValueError:
-        # If Host header is a domain name, check if it's localhost or testclient or testserver.
-        # Other domains (e.g. public domains) are considered non-local.
         return False
+
+_SAFE_BROWSER_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+def _validate_api_auth(
+    *,
+    request: Request,
+    cred: Optional[HTTPAuthorizationCredentials],
+    query_api_key: Optional[str] = None,
+    allow_query: bool = False,
+) -> None:
+    """Validate configured auth, preserving loopback-only dev mode."""
+    if request.method.upper() not in _SAFE_BROWSER_METHODS:
+        _reject_cross_site_browser_request(request)
+
+    # 1. Check for Admin Session Token elevation
+    if _is_request_admin(request):
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
+        return
+
+    admin_keys = _configured_api_keys()
+    tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
+    has_keys = bool(admin_keys) or bool(tenant_keys)
+
+    # 2. Loopback/LAN client tenant-aware routing
+    if _is_local_or_lan_client(request):
+        token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
+        if token:
+            matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
+            _set_tenant_from_matched_key(matched)
+        else:
+            if has_keys:
+                raise HTTPException(status_code=401, detail="Authentication required")
+            from src.config.paths import active_tenant_var
+            active_tenant_var.set("default")
+        return
+
+    if not has_keys:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API_AUTH_KEY is required for non-local API access",
+        )
+
+    matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
+    _set_tenant_from_matched_key(matched)
+
+def _is_local_client(request: Request) -> bool:
+    """Return whether the request originates from a loopback client."""
+    host = request.client.host if request.client else ""
+    if host in {"localhost", "testclient"}:
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    return _trusted_docker_loopback_ip(ip)
 
 
 def _env_flag_enabled(name: str) -> bool:
@@ -1644,43 +982,29 @@ def _env_shell_tools_enabled() -> bool:
 
 
 def _shell_tools_enabled_for_request(request: Request) -> bool:
-    """Return whether this API request may expose shell tools to the agent.
-
-    Decision order:
-    1. If this is a regular tenant session (not default), shell tools must be disabled for security.
-    2. If ``VIBE_TRADING_ENABLE_SHELL_TOOLS`` is explicitly set, honour it
-       (explicit opt-out takes precedence).
-    3. If ``API_AUTH_KEY`` is configured the API requires authentication;
-       callers that passed auth are trusted, so shell tools default on.
-    4. Otherwise shell tools stay off (secure default).
-    """
-    from src.config.paths import active_tenant_var
-    if active_tenant_var.get() != "default":
-        return False
-    explicit = os.getenv(_SHELL_TOOLS_ENV)
-    if explicit is not None:
-        return _env_flag_enabled(_SHELL_TOOLS_ENV)
-    # Authenticated API → implicitly trust the caller
-    if _configured_api_keys():
-        return True
-    return False
+    """Return whether this API request may expose shell tools to the agent."""
+    # Shell-capable tools execute commands on the host as the API process user.
+    # Do not infer that privilege from peer IP alone: browser DNS rebinding can
+    # make attacker-controlled pages appear as loopback clients. Operators who
+    # intentionally want API-started agents or swarm workers to receive shell
+    # tools must opt in explicitly.
+    return _env_shell_tools_enabled()
 
 
 async def require_local_or_auth(
     request: Request,
     cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
 ) -> None:
-    """Protect settings access when dev-mode auth is disabled."""
-    if _is_request_admin(request):
-        from src.config.paths import active_tenant_var
-        active_tenant_var.set("default")
-        return
-    admin_keys = _configured_api_keys()
-    tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
-    if admin_keys or tenant_keys:
+    """Protect settings access when dev-mode auth is disabled.
+
+    If API_AUTH_KEY is configured, require the bearer token. If not, allow only
+    loopback clients so an API server bound to 0.0.0.0 cannot accept remote
+    credential reads or writes in dev mode.
+    """
+    if _configured_api_key():
         await require_auth(request, cred)
         return
-    if not _is_local_or_lan_client(request):
+    if not _is_local_client(request):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Settings access requires API_AUTH_KEY or a local loopback client",
@@ -1691,33 +1015,25 @@ async def require_settings_write_auth(
     request: Request,
     cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
 ) -> None:
-    """Require explicit authorization before changing settings. Supports multi-tenant writes."""
-    await require_auth(request, cred)
+    """Require explicit authorization before changing credential-routing settings.
 
-
-async def require_admin(
-    request: Request,
-    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
-) -> None:
-    """Require that the client has administrative privileges (default tenant)."""
-    if _is_request_admin(request):
-        from src.config.paths import active_tenant_var
-        active_tenant_var.set("default")
+    Settings writes can redirect stored provider credentials to a different
+    endpoint. When an API key is configured, loopback peer IP alone is not a
+    sufficient user-intent signal because a browser can reach local APIs after
+    DNS rebinding.
+    """
+    api_key = _configured_api_key()
+    if api_key:
+        token = _auth_credential_from_header_or_query(cred, None, allow_query=False)
+        if not token or not hmac.compare_digest(token, api_key):
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
         return
 
-    # Check if they authenticated with the admin API key
-    admin_keys = _configured_api_keys()
-    if admin_keys:
-        await require_auth(request, cred)
-        from src.config.paths import active_tenant_var
-        if active_tenant_var.get() == "default":
-            return
-
-    # Otherwise, they are NOT admin! Raise 403 Forbidden.
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Admin privileges required",
-    )
+    if not _is_local_client(request):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Settings writes require API_AUTH_KEY or a local loopback client",
+        )
 
 
 # ============================================================================
@@ -1728,39 +1044,12 @@ async def require_admin(
 # Helper Functions
 # ============================================================================
 
-LLM_PROVIDER_CONFIG_PATH = AGENT_DIR / "src" / "providers" / "llm_providers.json"
-
-
-def _load_llm_providers() -> List[LLMProviderOption]:
-    """Load provider metadata from JSON so additions stay data-driven."""
-    try:
-        raw = json.loads(LLM_PROVIDER_CONFIG_PATH.read_text(encoding="utf-8"))
-        providers = [LLMProviderOption(**item) for item in raw]
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load LLM provider config: {LLM_PROVIDER_CONFIG_PATH}") from exc
-
-    seen: set[str] = set()
-    for provider in providers:
-        if provider.name in seen:
-            raise RuntimeError(f"Duplicate LLM provider name: {provider.name}")
-        seen.add(provider.name)
-    if not providers:
-        raise RuntimeError("LLM provider config must not be empty")
-    return providers
-
-
-LLM_PROVIDERS = _load_llm_providers()
-LLM_PROVIDER_BY_NAME = {provider.name: provider for provider in LLM_PROVIDERS}
-LLM_REASONING_EFFORTS = {"", "low", "medium", "high", "max"}
-LLM_API_KEY_PLACEHOLDERS = {"", "sk-or-v1-your-key-here", "sk-xxx", "xxx", "gsk_xxx"}
-TUSHARE_TOKEN_PLACEHOLDERS = {"", "your-tushare-token"}
 
 
 def _ensure_agent_env_file() -> Path:
     """Ensure the project-local agent/.env exists."""
-    ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
     if not ENV_PATH.exists():
-        ENV_PATH.write_text("# Created by TideTrading Web UI settings.\n", encoding="utf-8")
+        ENV_PATH.write_text("# Created by Vibe-Trading Web UI settings.\n", encoding="utf-8")
     return ENV_PATH
 
 
@@ -1788,36 +1077,6 @@ def _read_env_values(path: Path) -> Dict[str, str]:
         if key:
             values[key] = _strip_env_value(value)
     return values
-
-
-def _read_settings_env_values() -> Dict[str, str]:
-    """Read settings with support for default-admin config inheritance."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    
-    # If ENV_PATH is monkeypatched in tests (not _DynamicEnvPath), use it as the admin env.
-    if not isinstance(ENV_PATH, _DynamicEnvPath):
-        admin_env = ENV_PATH
-    else:
-        admin_env = _get_active_runtime_dir() / ".env"
-        if not admin_env.exists():
-            admin_env = AGENT_DIR / ".env"
-
-    base_values = {}
-    if admin_env.exists():
-        base_values = _read_env_values(admin_env)
-    elif ENV_EXAMPLE_PATH.exists():
-        base_values = _read_env_values(ENV_EXAMPLE_PATH)
-
-    if tenant == "default":
-        return base_values
-
-    tenant_values = {}
-    if ENV_PATH.exists():
-        tenant_values = _read_env_values(ENV_PATH)
-        
-    merged = {**base_values, **tenant_values}
-    return merged
 
 
 def _project_relative_path(path: Path) -> str:
@@ -1865,25 +1124,6 @@ def _write_env_values(path: Path, updates: Dict[str, str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _delete_env_values(path: Path, keys_to_delete: list[str]) -> None:
-    """Delete keys from a dotenv file."""
-    if not path.exists():
-        return
-    lines = path.read_text(encoding="utf-8").splitlines()
-    new_lines = []
-    to_delete_set = set(keys_to_delete)
-    for line in lines:
-        stripped = line.lstrip()
-        if stripped.startswith("#") or "=" not in stripped:
-            new_lines.append(line)
-            continue
-        key = stripped.split("=", 1)[0].strip()
-        if key in to_delete_set:
-            continue
-        new_lines.append(line)
-    path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-
-
 def _is_configured_secret(value: str, placeholders: set[str]) -> bool:
     """Return True when a secret is set and not a documented placeholder."""
     normalized = value.strip().strip('"').strip("'")
@@ -1904,385 +1144,6 @@ def _coerce_int(value: str, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
-
-
-def mask_api_key(key: str) -> str:
-    """Mask a single API key, showing only the first few and last few characters."""
-    k = key.strip()
-    if not k:
-        return ""
-    if len(k) <= 8:
-        return "****"
-    return f"{k[:4]}...{k[-4:]}"
-
-
-def mask_api_keys(keys_str: str) -> str:
-    """Mask a single key or comma-separated list of keys."""
-    if not keys_str:
-        return ""
-    keys = [k.strip() for k in keys_str.split(",") if k.strip()]
-    if not keys:
-        return ""
-    return ", ".join(mask_api_key(k) for k in keys)
-
-
-def _build_llm_settings_response(values: Optional[Dict[str, str]] = None, is_public: bool = False) -> LLMSettingsResponse:
-    """Build the public settings payload from dotenv values."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-
-    is_custom = True
-    if tenant != "default":
-        tenant_env = get_runtime_root() / ".env"
-        if not tenant_env.exists():
-            is_custom = False
-        else:
-            tenant_vals = _read_env_values(tenant_env)
-            is_custom = "LANGCHAIN_PROVIDER" in tenant_vals
-
-    if tenant != "default":
-        if is_custom:
-            env_values = values if values is not None else tenant_vals
-        else:
-            env_values = {}
-    else:
-        env_values = values if values is not None else _read_settings_env_values()
-
-    provider_name = env_values.get("LANGCHAIN_PROVIDER", "openai").strip().lower()
-    provider = LLM_PROVIDER_BY_NAME.get(provider_name, LLM_PROVIDER_BY_NAME["openai"])
-    api_key = env_values.get(provider.api_key_env or "", "") if provider.api_key_env else ""
-    api_key_configured = _is_configured_secret(api_key, LLM_API_KEY_PLACEHOLDERS)
-    
-    api_key_hint = None
-    if provider.auth_type == "oauth":
-        try:
-            from src.providers.openai_codex import get_openai_codex_login_status
-            token = get_openai_codex_login_status()
-        except Exception:
-            token = None
-        api_key_configured = bool(token)
-        api_key_hint = None
-    else:
-        if api_key_configured and not is_public:
-            api_key_hint = mask_api_keys(api_key)
-
-    return LLMSettingsResponse(
-        provider=provider.name,
-        model_name=env_values.get("LANGCHAIN_MODEL_NAME", provider.default_model),
-        base_url=env_values.get(provider.base_url_env, provider.default_base_url),
-        api_key_env=provider.api_key_env,
-        api_key_configured=api_key_configured,
-        api_key_hint=api_key_hint,
-        api_key_required=provider.api_key_required,
-        temperature=_coerce_float(env_values.get("LANGCHAIN_TEMPERATURE", "0.0"), 0.0),
-        timeout_seconds=_coerce_int(env_values.get("TIMEOUT_SECONDS", "120"), 120),
-        max_retries=_coerce_int(env_values.get("MAX_RETRIES", "2"), 2),
-        reasoning_effort=env_values.get("LANGCHAIN_REASONING_EFFORT", "").strip().lower(),
-        sse_timeout_seconds=_coerce_int(env_values.get("VIBE_TRADING_SSE_TIMEOUT", "90"), 90),
-        env_path=_project_relative_path(ENV_PATH),
-        is_custom=is_custom,
-        providers=LLM_PROVIDERS,
-    )
-
-
-
-def _baostock_supported() -> bool:
-    """Check whether the project has a BaoStock loader implementation."""
-    loader_dir = AGENT_DIR / "backtest" / "loaders"
-    return any((loader_dir / name).exists() for name in ("baostock.py", "baostock_loader.py"))
-
-
-def _baostock_installed() -> bool:
-    """Check whether the optional BaoStock package is importable."""
-    import importlib.util
-
-    return importlib.util.find_spec("baostock") is not None
-
-
-IWENCAI_KEY_PLACEHOLDERS: set[str] = {"", "your-iwencai-key"}
-FRED_API_KEY_PLACEHOLDERS: set[str] = {"", "your-fred-api-key"}
-THS_COOKIE_PLACEHOLDERS: set[str] = {"", "your-ths-cookie"}
-
-
-def _build_data_source_settings_response(values: Optional[Dict[str, str]] = None, is_public: bool = False) -> DataSourceSettingsResponse:
-    """Build the public data source settings payload."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-
-    is_custom = True
-    tenant_vals = {}
-    if tenant != "default":
-        tenant_env = get_runtime_root() / ".env"
-        if not tenant_env.exists():
-            is_custom = False
-        else:
-            tenant_vals = _read_env_values(tenant_env)
-            is_custom = any(k in tenant_vals for k in ["TUSHARE_TOKEN", "FRED_API_KEY", "VIBE_TRADING_IWENCAI_KEY", "THS_COOKIE"])
-
-    if tenant != "default":
-        if is_custom:
-            env_values = values if values is not None else tenant_vals
-        else:
-            env_values = {}
-    else:
-        env_values = values if values is not None else _read_settings_env_values()
-
-    token = env_values.get("TUSHARE_TOKEN", "")
-    token_configured = _is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS)
-    iwencai_key = env_values.get("VIBE_TRADING_IWENCAI_KEY", "")
-    iwencai_key_configured = _is_configured_secret(iwencai_key, IWENCAI_KEY_PLACEHOLDERS)
-    fred_key = env_values.get("FRED_API_KEY", "")
-    fred_key_configured = _is_configured_secret(fred_key, FRED_API_KEY_PLACEHOLDERS)
-    ths_cookie = env_values.get("THS_COOKIE", "")
-    ths_cookie_configured = _is_configured_secret(ths_cookie, THS_COOKIE_PLACEHOLDERS)
-    supported = _baostock_supported()
-    installed = _baostock_installed()
-    if supported:
-        baostock_message = "BaoStock loader is available."
-    elif installed:
-        baostock_message = "BaoStock package is installed, but this project has no BaoStock loader."
-    else:
-        baostock_message = "No BaoStock loader is registered in this project."
-
-    tushare_token_hint = None
-    iwencai_key_hint = None
-    fred_api_key_hint = None
-    ths_cookie_hint = None
-    if not is_public:
-        if token_configured:
-            tushare_token_hint = mask_api_keys(token)
-        if iwencai_key_configured:
-            iwencai_key_hint = mask_api_keys(iwencai_key)
-        if fred_key_configured:
-            fred_api_key_hint = mask_api_keys(fred_key)
-        if ths_cookie_configured:
-            ths_cookie_hint = mask_api_keys(ths_cookie)
-
-    return DataSourceSettingsResponse(
-        tushare_token_configured=token_configured,
-        tushare_token_hint=tushare_token_hint,
-        iwencai_key_configured=iwencai_key_configured,
-        iwencai_key_hint=iwencai_key_hint,
-        fred_api_key_configured=fred_key_configured,
-        fred_api_key_hint=fred_api_key_hint,
-        ths_cookie_configured=ths_cookie_configured,
-        ths_cookie_hint=ths_cookie_hint,
-        baostock_supported=supported,
-        baostock_installed=installed,
-        baostock_message=baostock_message,
-        env_path=_project_relative_path(ENV_PATH),
-        is_custom=is_custom,
-    )
-
-
-
-def _sync_runtime_env(provider: LLMProviderOption, updates: Dict[str, str]) -> None:
-    """Apply saved LLM settings to the running API process."""
-    for key, value in updates.items():
-        if value:
-            os.environ[key] = value
-        else:
-            os.environ.pop(key, None)
-
-    if provider.api_key_env:
-        key_value = os.environ.get(provider.api_key_env, "")
-        if _is_configured_secret(key_value, LLM_API_KEY_PLACEHOLDERS):
-            os.environ["OPENAI_API_KEY"] = key_value
-        else:
-            os.environ.pop("OPENAI_API_KEY", None)
-    elif provider.auth_type == "oauth":
-        os.environ.pop("OPENAI_API_KEY", None)
-    else:
-        os.environ["OPENAI_API_KEY"] = "ollama"
-
-    base_url = os.environ.get(provider.base_url_env, "")
-    if base_url:
-        os.environ["OPENAI_API_BASE"] = base_url
-        os.environ["OPENAI_BASE_URL"] = base_url
-    else:
-        os.environ.pop("OPENAI_API_BASE", None)
-        os.environ.pop("OPENAI_BASE_URL", None)
-
-
-def _load_json_file(path: Path) -> Optional[Dict[str, Any]]:
-    """Load JSON from disk if present."""
-    try:
-        if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
-    return None
-
-
-def _load_csv_to_dict(path: Path, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-    """Load CSV rows into a list of dictionaries."""
-    try:
-        if not path.exists():
-            return []
-        with path.open("r", encoding="utf-8", newline="") as handle:
-            rows = [dict(row) for row in csv.DictReader(handle)]
-        if limit is not None:
-            rows = rows[:limit]
-        return rows
-    except Exception:
-        return []
-
-
-
-def _build_response_from_run_dir(
-    run_dir: Path,
-    elapsed: float,
-    *,
-    include_analysis: bool = False,
-    chart_symbol: Optional[str] = None,
-    chart_payload: str = "full",
-    chart_symbols_out: Optional[List[str]] = None,
-) -> RunResponse:
-    """Build a run response from a persisted run directory."""
-    run_id = run_dir.name
-
-    response = RunResponse(
-        status="unknown",
-        run_id=run_id,
-        elapsed_seconds=elapsed,
-        run_directory=str(run_dir),
-    )
-
-    state_data = _load_json_file(run_dir / "state.json")
-    if state_data:
-        state_status = str(state_data.get("status") or "").lower()
-        if state_status == "success":
-            response.status = "success"
-        elif state_status == "failed":
-            response.status = "failed"
-            response.reason = state_data.get("reason", "")
-        else:
-            response.status = state_status or "unknown"
-    else:
-        response.status = "unknown"
-
-    planner_path = run_dir / "planner_output.json"
-    response.planner_output = _load_json_file(planner_path)
-
-    design_path = run_dir / "design_spec.json"
-    response.strategy_spec = _load_json_file(design_path)
-
-    rag_path = run_dir / "rag_metadata.json"
-    rag_data = _load_json_file(rag_path)
-    if rag_data:
-        response.rag_selection = RAGSelection(
-            selected_api=rag_data.get("selected_api") or rag_data.get("api_code", ""),
-            selected_name=rag_data.get("selected_name") or rag_data.get("api_name", ""),
-            selected_score=float(rag_data.get("selected_score") or rag_data.get("score", 0.0)),
-        )
-
-    metrics_path = run_dir / "artifacts" / "metrics.csv"
-    if metrics_path.exists():
-        metrics_dict_list = _load_csv_to_dict(metrics_path, limit=1)
-        if metrics_dict_list:
-            row = metrics_dict_list[0]
-            try:
-                # Pass ALL CSV columns to BacktestMetrics (extra="allow")
-                parsed: dict = {}
-                for k, v in row.items():
-                    if not k or not v:
-                        continue
-                    try:
-                        parsed[k] = int(float(v)) if k == "trade_count" or k == "max_consecutive_loss" else float(v)
-                    except (ValueError, TypeError):
-                        continue
-                if "final_value" in parsed:
-                    response.metrics = BacktestMetrics(**parsed)
-            except (ValueError, TypeError):
-                pass
-
-
-    artifacts_dir = run_dir / "artifacts"
-    if artifacts_dir.exists():
-        for file_path in artifacts_dir.iterdir():
-            if file_path.is_file():
-                file_type = file_path.suffix.lstrip(".")
-                response.artifacts.append(
-                    Artifact(
-                        name=file_path.name,
-                        path=str(file_path),
-                        type=file_type if file_type else "unknown",
-                        size=file_path.stat().st_size,
-                        exists=True,
-                    )
-                )
-
-    equity_path = run_dir / "artifacts" / "equity.csv"
-    if equity_path.exists():
-        response.artifacts_equity_csv = _load_csv_to_dict(equity_path)
-
-    metrics_csv_path = run_dir / "artifacts" / "metrics.csv"
-    if metrics_csv_path.exists():
-        response.artifacts_metrics_csv = _load_csv_to_dict(metrics_csv_path)
-
-    run_card_path = run_dir / "run_card.json"
-    if run_card_path.exists():
-        try:
-            response.run_card = json.loads(run_card_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    llm_usage_path = run_dir / "llm_usage.json"
-    if llm_usage_path.exists():
-        try:
-            response.llm_usage = json.loads(llm_usage_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    trades_path = run_dir / "artifacts" / "trades.csv"
-    if trades_path.exists():
-        response.artifacts_trades_csv = _load_csv_to_dict(trades_path)
-
-    validation_path = run_dir / "artifacts" / "validation.json"
-    if validation_path.exists():
-        try:
-            response.validation = json.loads(validation_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    if response.artifacts_equity_csv:
-        filtered_equity = []
-        for row in response.artifacts_equity_csv[:1000]:
-            filtered_row: Dict[str, Any] = {}
-            if "timestamp" in row:
-                filtered_row["time"] = row["timestamp"]
-            if "equity" in row:
-                filtered_row["equity"] = row["equity"]
-            if "drawdown" in row:
-                filtered_row["drawdown"] = row["drawdown"]
-            filtered_equity.append(filtered_row)
-        response.equity_curve = filtered_equity
-
-    if response.artifacts_trades_csv:
-        response.trade_log = response.artifacts_trades_csv[:500]
-
-    if include_analysis:
-        analysis = build_run_analysis(
-            run_dir,
-        symbols=[chart_symbol] if chart_symbol else None,
-        include_payload=chart_payload != "summary" or bool(chart_symbol),
-        include_symbol_list=chart_symbols_out is not None,
-    )
-        if chart_symbols_out is not None:
-            chart_symbols_out.extend(analysis.get("chart_symbols") or [])
-        response.run_stage = analysis.get("run_stage")
-        response.run_context = analysis.get("run_context")
-        response.price_series = analysis.get("price_series")
-        response.indicator_series = analysis.get("indicator_series")
-        response.trade_markers = analysis.get("trade_markers")
-        response.run_logs = analysis.get("run_logs")
-
-    return response
-
-
-def _run_response_payload(response: RunResponse) -> Dict[str, Any]:
-    """Return a JSON-ready payload for opt-in run response variants."""
-    return response.model_dump(mode="json")
 
 
 # ============================================================================
@@ -2311,2738 +1172,26 @@ def _validate_path_param(value: str, kind: str) -> None:
 
 
 # ============================================================================
-# API Endpoints
+# Runs routes - defined in src/api/runs_routes.py
 # ============================================================================
 
-@app.get("/runs/{run_id}/code", dependencies=[Depends(require_auth)])
-async def get_run_code(run_id: str):
-    """Return strategy source files for a run.
+from src.api.runs_routes import register_runs_routes  # noqa: E402
+register_runs_routes(app)
 
-    Args:
-        run_id: Run identifier.
-
-    Returns:
-        Map filename -> source text.
-    """
-    _validate_path_param(run_id, "run_id")
-    run_dir = _get_runs_dir() / run_id / "code"
-    if not run_dir.exists():
-        legacy_dir = RUNS_DIR / run_id / "code"
-        if legacy_dir.exists():
-            run_dir = legacy_dir
-        else:
-            raise HTTPException(status_code=404, detail=f"Code directory for run {run_id} not found")
-    result = {}
-    for f in ["signal_engine.py"]:
-        p = run_dir / f
-        if p.exists():
-            result[f] = p.read_text(encoding="utf-8")
-    return result
-
-
-@app.get("/runs/{run_id}/pine", dependencies=[Depends(require_auth)])
-async def get_run_pine(run_id: str):
-    """Return Pine Script file for a run.
-
-    Args:
-        run_id: Run identifier.
-
-    Returns:
-        Object with pine script content and exists flag.
-    """
-    _validate_path_param(run_id, "run_id")
-    pine_path = _get_runs_dir() / run_id / "artifacts" / "strategy.pine"
-    if not pine_path.exists():
-        legacy_path = RUNS_DIR / run_id / "artifacts" / "strategy.pine"
-        if legacy_path.exists():
-            pine_path = legacy_path
-        else:
-            return {"exists": False, "content": None}
-    return {
-        "exists": True,
-        "content": pine_path.read_text(encoding="utf-8"),
-    }
-
-
-@app.get("/runs/{run_id}", response_model=RunResponse, dependencies=[Depends(require_auth)])
-async def get_run_result(
-    run_id: str,
-    chart_symbol: Optional[str] = Query(None, description="Opt in to chart payloads for a single symbol"),
-    chart_payload: Optional[str] = Query(
-        None,
-        description="Optional chart payload mode. Use 'summary' to omit chart rows and trade markers.",
-    ),
-):
-    """Fetch details for a historical run by ``run_id``.
-
-    The default response stays unchanged for existing consumers. Chart-heavy
-    optimizations are opt-in via query parameters.
-    """
-    _validate_path_param(run_id, "run_id")
-    if chart_payload not in (None, "summary"):
-        raise HTTPException(status_code=400, detail="invalid chart_payload")
-    run_dir = _get_runs_dir() / run_id
-
-    if not run_dir.exists():
-        legacy_dir = RUNS_DIR / run_id
-        if legacy_dir.exists():
-            run_dir = legacy_dir
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Run {run_id} not found"
-            )
-
-    wants_chart_meta = bool(chart_payload or chart_symbol)
-    chart_symbols: List[str] = []
-    response = _build_response_from_run_dir(
-        run_dir,
-        elapsed=0.0,
-        include_analysis=True,
-        chart_symbol=chart_symbol,
-        chart_payload=chart_payload or "full",
-        chart_symbols_out=chart_symbols if wants_chart_meta else None,
-    )
-
-    if wants_chart_meta:
-        payload = _run_response_payload(response)
-        payload["chart_symbols"] = chart_symbols
-        return JSONResponse(payload)
-
-    return response
-
-
-@app.get("/runs", response_model=List[RunInfo], dependencies=[Depends(require_auth)])
-async def list_runs(limit: int = 20):
-    """List recent runs with summary fields."""
-    limit = min(max(1, limit), 100)
-    runs_dir = _get_runs_dir()
-
-    candidates = {}
-    if runs_dir.exists():
-        for d in runs_dir.iterdir():
-            if d.is_dir():
-                candidates[d.name] = d
-
-    if RUNS_DIR.exists() and RUNS_DIR.resolve() != runs_dir.resolve():
-        for d in RUNS_DIR.iterdir():
-            if d.is_dir() and d.name not in candidates:
-                candidates[d.name] = d
-
-    run_dirs = sorted(
-        candidates.values(),
-        key=lambda x: x.name,
-        reverse=True
-    )
-
-    results = []
-    for d in run_dirs[:limit]:
-        run_id = d.name
-
-        # Status from state.json or artifacts
-        status_val = "unknown"
-        state_file = _load_json_file(d / "state.json")
-        if state_file:
-            status_val = str(state_file.get("status") or "unknown").lower()
-        elif (d / "artifacts" / "equity.csv").exists():
-            status_val = "success"
-        elif (d / "review_report.json").exists():
-            status_val = "success"
-
-        # Parse created_at from run_id (YYYYMMDD_HHMMSS or run_YYYYMMDD_HHMMSS)
-        created_at = "Unknown"
-        if run_id.startswith("run_"):
-            parts = run_id.split('_')
-            if len(parts) >= 3:
-                d_str, t_str = parts[1], parts[2]
-                if len(d_str) == 8 and len(t_str) == 6:
-                    created_at = f"{d_str[:4]}-{d_str[4:6]}-{d_str[6:8]} {t_str[:2]}:{t_str[2:4]}:{t_str[4:6]}"
-        elif "_" in run_id:
-            parts = run_id.split('_')
-            if len(parts) >= 2:
-                d_str, t_str = parts[0], parts[1]
-                if len(d_str) == 8 and len(t_str) == 6:
-                    created_at = f"{d_str[:4]}-{d_str[4:6]}-{d_str[6:8]} {t_str[:2]}:{t_str[2:4]}:{t_str[4:6]}"
-
-        if created_at == "Unknown":
-            mtime = datetime.fromtimestamp(d.stat().st_mtime)
-            created_at = mtime.strftime("%Y-%m-%d %H:%M:%S")
-
-        prompt = None
-        req_file = d / "req.json"
-        planner_file = d / "planner_output.json"
-        if req_file.exists():
-            try:
-                req_data = json.loads(req_file.read_text(encoding="utf-8"))
-                prompt = req_data.get("prompt")
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        if not prompt and planner_file.exists():
-            try:
-                planner_data = json.loads(planner_file.read_text(encoding="utf-8"))
-                prompt = planner_data.get("user_goal") or planner_data.get("goal")
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        if not prompt:
-            prompt_file = d / "user_prompt.txt"
-            if prompt_file.exists():
-                prompt = prompt_file.read_text(encoding="utf-8").strip()
-
-        total_return = None
-        sharpe = None
-        metrics_file = d / "artifacts" / "metrics.csv"
-        if metrics_file.exists():
-            try:
-                import csv
-                with open(metrics_file, 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        total_return = float(row.get('total_return', 0) or 0)
-                        sharpe = float(row.get('sharpe', 0) or 0)
-                        break
-            except (OSError, ValueError):
-                pass
-
-        run_context = load_run_context(d)
-        results.append(RunInfo(
-            run_id=run_id,
-            status=status_val,
-            created_at=created_at,
-            prompt=prompt or "Manual Analysis",
-            total_return=total_return,
-            sharpe=sharpe,
-            codes=run_context.get("codes") or [],
-            start_date=run_context.get("start_date"),
-            end_date=run_context.get("end_date"),
-        ))
-
-    return results
-
-
-@app.get(
-    "/settings/profile",
-    response_model=ProfileResponse,
-    dependencies=[Depends(require_local_or_auth)],
+# Re-export for test access via api_server.*
+from src.api.runs_routes import (  # noqa: F401, E402
+    _load_json_file,
+    _load_csv_to_dict,
+    _build_response_from_run_dir,
 )
-async def get_settings_profile(request: Request):
-    """Return login identity and active workspace/tenant info."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    
-    is_admin = _is_request_admin(request)
-    
-    # Require explicit admin session elevation or admin API key auth for admin role
-    has_admin_api_key = False
-    admin_keys = _configured_api_keys()
-    if admin_keys:
-        auth_header = request.headers.get("authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
-            if token in admin_keys:
-                has_admin_api_key = True
-                
-    role = "admin" if (is_admin or has_admin_api_key) else "tenant"
-    name = "Admin"
-    
-    if tenant != "default" and not is_admin:
-        for item in _load_tenant_keys():
-            if item.get("tenant_id") == tenant:
-                name = item.get("name")
-                break
-    
-    return ProfileResponse(
-        role=role,
-        tenant_id="default" if is_admin else tenant,
-        name=name,
-        is_local=is_admin or _is_local_or_lan_client(request)
-    )
-
-
-@app.post(
-    "/settings/register",
-    response_model=TenantKeyItem,
-)
-async def register_tenant(payload: CreateTenantKeyRequest):
-    """Public tenant self-registration endpoint."""
-    import secrets
-    import datetime
-    
-    name = payload.name.strip()
-    # 1. 验证格式与长度 (2-20字符，中英文、数字、下划线、减号、空格)
-    if not re.match(r"^[\u4e00-\u9fa5a-zA-Z0-9_\-\s]{2,20}$", name):
-        raise HTTPException(
-            status_code=400,
-            detail="Nickname must be 2-20 characters, containing only letters, numbers, Chinese, spaces, dashes or underscores."
-        )
-        
-    # 2. 查重
-    keys = _load_tenant_keys()
-    normalized_name = name.lower()
-    for k in keys:
-        if k["name"].strip().lower() == normalized_name:
-            raise HTTPException(status_code=400, detail="Tenant name already exists")
-            
-    # 3. 生成密钥与 tenant_id
-    raw_key = "vibe_t_" + secrets.token_hex(16)
-    tenant_id = "tenant_" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:12]
-    
-    new_key = {
-        "key": raw_key,
-        "tenant_id": tenant_id,
-        "name": name,
-        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "is_active": True,
-    }
-    keys.append(new_key)
-    _save_tenant_keys(keys)
-    
-    # 4. 创建隔离目录
-    tenant_dir = _get_active_runtime_dir() / "tenants" / tenant_id
-    tenant_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 初始化专属的配置说明文件
-    env_file = tenant_dir / ".env"
-    if not env_file.exists():
-        env_file.write_text(f"# Created for tenant: {name}\n", encoding="utf-8")
-        
-    return TenantKeyItem(**new_key)
-
-
-@app.get(
-    "/admin/tenants/keys",
-    response_model=List[TenantKeyItem],
-    dependencies=[Depends(require_admin)],
-)
-async def get_tenant_keys():
-    """List all configured tenant API keys."""
-    keys = _load_tenant_keys()
-    return [TenantKeyItem(**k) for k in keys]
-
-
-@app.post(
-    "/admin/tenants/keys",
-    response_model=TenantKeyItem,
-    dependencies=[Depends(require_admin)],
-)
-async def create_tenant_key(payload: CreateTenantKeyRequest):
-    """Generate a new tenant API key and setup workspace."""
-    import secrets
-    import datetime
-    
-    raw_key = "vibe_t_" + secrets.token_hex(16)
-    tenant_id = "tenant_" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:12]
-    
-    keys = _load_tenant_keys()
-    new_key = {
-        "key": raw_key,
-        "tenant_id": tenant_id,
-        "name": payload.name.strip(),
-        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "is_active": True,
-    }
-    keys.append(new_key)
-    _save_tenant_keys(keys)
-    
-    tenant_dir = _get_active_runtime_dir() / "tenants" / tenant_id
-    tenant_dir.mkdir(parents=True, exist_ok=True)
-    
-    return TenantKeyItem(**new_key)
-
-
-@app.post("/settings/admin-elevate")
-async def admin_elevate(payload: AdminElevateRequest):
-    """Elevate request to admin status using username and password."""
-    if payload.username != "admin":
-        raise HTTPException(status_code=401, detail="用户名或密码不正确")
-    
-    from src.config.paths import get_tenant_db_path
-    import sqlite3
-    db_path = get_tenant_db_path("default")
-    
-    try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-        cursor.execute("SELECT password_hash FROM admin_auth WHERE username = 'admin'")
-        row = cursor.fetchone()
-        conn.close()
-    except Exception as e:
-        logger.error("Database query failed: %s", e)
-        raise HTTPException(status_code=500, detail="数据库查询失败")
-        
-    if not row:
-        raise HTTPException(status_code=500, detail="管理员账户未初始化")
-        
-    pwd_hash = row[0]
-    if not verify_password(payload.password, pwd_hash):
-        raise HTTPException(status_code=401, detail="用户名或密码不正确")
-        
-    token = secrets.token_hex(32)
-    _ADMIN_SESSION_TOKENS.add(token)
-    return {"status": "success", "admin_token": token}
-
-
-@app.post("/settings/admin-change-password")
-async def admin_change_password(request: Request, payload: AdminChangePasswordRequest):
-    """Change admin password."""
-    if not _is_request_admin(request):
-        raise HTTPException(status_code=403, detail="管理员权限不足")
-    
-    from src.config.paths import get_tenant_db_path
-    import sqlite3
-    db_path = get_tenant_db_path("default")
-    
-    try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-        cursor.execute("SELECT password_hash FROM admin_auth WHERE username = 'admin'")
-        row = cursor.fetchone()
-    except Exception as e:
-        logger.error("Database query failed: %s", e)
-        raise HTTPException(status_code=500, detail="数据库查询失败")
-        
-    if not row:
-        if conn:
-            conn.close()
-        raise HTTPException(status_code=500, detail="管理员账户未初始化")
-        
-    pwd_hash = row[0]
-    if not verify_password(payload.old_password, pwd_hash):
-        conn.close()
-        raise HTTPException(status_code=400, detail="原密码不正确")
-        
-    try:
-        new_hash = hash_password(payload.new_password)
-        cursor.execute("UPDATE admin_auth SET password_hash = ? WHERE username = 'admin'", (new_hash,))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.error("Database update failed: %s", e)
-        raise HTTPException(status_code=500, detail="数据库更新失败")
-        
-    return {"status": "success", "detail": "密码修改成功"}
-
-
-@app.post("/settings/admin-deelevate")
-async def admin_deelevate(request: Request):
-    """Remove admin elevation token."""
-    token = request.headers.get("x-admin-token")
-    if token and token in _ADMIN_SESSION_TOKENS:
-        _ADMIN_SESSION_TOKENS.remove(token)
-    return {"status": "success"}
-
-
-@app.put(
-    "/admin/tenants/keys/{tenant_id}",
-    response_model=TenantKeyItem,
-    dependencies=[Depends(require_admin)],
-)
-async def update_tenant_key(tenant_id: str, payload: UpdateTenantKeyRequest):
-    """Update status or name of an existing tenant key."""
-    keys = _load_tenant_keys()
-    matched = None
-    for k in keys:
-        if k["tenant_id"] == tenant_id:
-            matched = k
-            break
-    if not matched:
-        raise HTTPException(status_code=404, detail="Tenant key not found")
-    
-    if payload.name is not None:
-        matched["name"] = payload.name.strip()
-    if payload.is_active is not None:
-        matched["is_active"] = payload.is_active
-        
-    _save_tenant_keys(keys)
-    return TenantKeyItem(**matched)
-
-
-@app.delete(
-    "/admin/tenants/keys/{tenant_id}",
-    dependencies=[Depends(require_admin)],
-)
-async def delete_tenant_key(tenant_id: str):
-    """Delete a tenant key (invalidating it instantly)."""
-    keys = _load_tenant_keys()
-    filtered_keys = [k for k in keys if k["tenant_id"] != tenant_id]
-    if len(filtered_keys) == len(keys):
-        raise HTTPException(status_code=404, detail="Tenant key not found")
-    _save_tenant_keys(filtered_keys)
-    return {"status": "success"}
-
-
-@app.get(
-    "/admin/system/version",
-    dependencies=[Depends(require_admin)],
-)
-async def get_system_version(request: Request):
-    """Get the current and latest Git repository version."""
-    import subprocess
-    import re
-
-    def _is_newer_version(latest: str, current: str) -> bool:
-        try:
-            t_latest = tuple(int(x) for x in re.findall(r'\d+', latest))
-            t_current = tuple(int(x) for x in re.findall(r'\d+', current))
-            if t_latest and t_current:
-                return t_latest > t_current
-        except Exception:
-            pass
-        return latest != current
-
-    current_ver = APP_VERSION
-    if not current_ver.startswith("v"):
-        current_ver = f"v{current_ver}"
-
-    latest_ver = current_ver
-    has_update = False
-    git_success = False
-
-    try:
-        subprocess.run(
-            ["git", "fetch", "--all", "--tags"],
-            capture_output=True,
-            timeout=5,
-            cwd=str(AGENT_DIR.parent)
-        )
-        res = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-            cwd=str(AGENT_DIR.parent)
-        )
-        if res.returncode == 0:
-            tag = res.stdout.strip()
-            if tag:
-                latest_ver = tag
-                has_update = _is_newer_version(latest_ver, current_ver)
-                git_success = True
-    except Exception:
-        pass
-
-    if not git_success:
-        # Fallback to GitHub API since we are likely running in a Docker container without git
-        try:
-            import urllib.request
-            import json
-            req = urllib.request.Request(
-                "https://api.github.com/repos/skloxo/TideTrading/releases/latest",
-                headers={"User-Agent": "TideTrading"}
-            )
-            with urllib.request.urlopen(req, timeout=3) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode("utf-8"))
-                    tag = data.get("tag_name")
-                    if tag:
-                        latest_ver = tag
-                        has_update = _is_newer_version(latest_ver, current_ver)
-        except Exception:
-            pass
-
-    return {
-        "current_version": current_ver,
-        "latest_version": latest_ver,
-        "has_update": has_update
-    }
-
-
-@app.post(
-    "/admin/system/update",
-    dependencies=[Depends(require_admin)],
-)
-async def trigger_system_update(request: Request):
-    """Trigger system update in the background via update.sh or a trigger file."""
-    import subprocess
-    import shutil
-    import os
-
-    if os.path.exists('/.dockerenv') or os.environ.get("VIBE_TRADING_TRUST_DOCKER_LOOPBACK") == "1":
-        trigger_file = AGENT_DIR / "runs" / ".trigger_upgrade"
-        try:
-            with open(trigger_file, "w") as f:
-                f.write("upgrade")
-            return {
-                "status": "success",
-                "message": "已成功在后台触发系统升级，请稍候约1分钟，服务正在自动拉取代码、重建容器并重启..."
-            }
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"写入升级信号文件失败: {str(e)}"
-            )
-
-    update_script = AGENT_DIR.parent / "update.sh"
-    if not update_script.exists():
-        update_script = AGENT_DIR / "update.sh"
-        if not update_script.exists():
-            raise HTTPException(
-                status_code=500,
-                detail="Update script (update.sh) not found in workspace."
-            )
-
-    success = False
-    if shutil.which("systemd-run"):
-        try:
-            res = subprocess.run(
-                ["systemd-run", "--user", "bash", str(update_script)],
-                capture_output=True, text=True,
-                cwd=str(AGENT_DIR.parent), timeout=5
-            )
-            if res.returncode == 0:
-                success = True
-        except Exception:
-            pass
-
-    if not success:
-        try:
-            subprocess.Popen(
-                ["bash", str(update_script)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                cwd=str(AGENT_DIR.parent),
-                start_new_session=True
-            )
-            success = True
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to execute update script: {str(e)}"
-            )
-
-    return {
-        "status": "updating",
-        "message": "System update triggered. Service will restart shortly."
-    }
-
-
-@app.get(
-    "/admin/monitor/stats",
-    response_model=MonitorStatsResponse,
-    dependencies=[Depends(require_admin)],
-)
-async def get_monitor_stats():
-    """Get service metrics, database runs, sessions, and active tenants."""
-    import os
-    # 1. Active tenants
-    keys = _load_tenant_keys()
-    active_tenants = [
-        {
-            "tenant_id": k.get("tenant_id"),
-            "name": k.get("name"),
-            "created_at": k.get("created_at"),
-            "is_active": k.get("is_active", True)
-        }
-        for k in keys
-    ]
-    
-    # 2. Total sessions
-    total_sessions = 0
-    sessions_dir = _get_sessions_dir()
-    if sessions_dir.exists():
-        try:
-            total_sessions = sum(1 for d in sessions_dir.iterdir() if d.is_dir())
-        except Exception:
-            pass
-            
-    # 3. Total runs
-    total_runs = 0
-    runs_dir = _get_runs_dir()
-    if runs_dir.exists():
-        try:
-            total_runs = sum(1 for d in runs_dir.iterdir() if d.is_dir())
-        except Exception:
-            pass
-            
-    # 4. Memory usage
-    memory_usage_mb = 0.0
-    try:
-        if os.path.exists("/proc/self/status"):
-            with open("/proc/self/status", "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("VmRSS:"):
-                        parts = line.split()
-                        if len(parts) >= 2:
-                            memory_usage_mb = float(parts[1]) / 1024.0
-                            break
-    except Exception:
-        pass
-
-    # 5. Service status info
-    services_info = {}
-    
-    # 5.1 Data Maintenance
-    try:
-        from src.market.close_maintenance import CloseDataMaintenanceService
-        from src.config.paths import get_market_db_path
-        import sqlite3
-        
-        db_path = get_market_db_path()
-        db_size_mb = 0.0
-        if db_path.exists():
-            db_size_mb = db_path.stat().st_size / (1024.0 * 1024.0)
-            
-        historical_range = "未开始"
-        today_status = "待维护"
-        total_stocks = 0
-        
-        if db_path.exists():
-            try:
-                conn = sqlite3.connect(db_path)
-                cur = conn.cursor()
-                # Total stocks
-                cur.execute("SELECT COUNT(*) FROM stock_meta")
-                total_stocks = cur.fetchone()[0]
-                
-                # Date range
-                cur.execute("SELECT MIN(date), MAX(date) FROM kline_daily")
-                min_d, max_d = cur.fetchone()
-                if min_d and max_d:
-                    historical_range = f"{min_d} ~ {max_d}"
-                    
-                    # Today status
-                    # Find latest open trading day in calendar <= today
-                    from datetime import date
-                    today_str = str(date.today())
-                    cur.execute("SELECT MAX(date) FROM trade_calendar WHERE is_open = 1 AND date <= ?", (today_str,))
-                    latest_trading_day = cur.fetchone()[0]
-                    if latest_trading_day:
-                        if max_d >= latest_trading_day:
-                            today_status = "已完成"
-                        else:
-                            from datetime import datetime, time
-                            now = datetime.now()
-                            cur.execute("SELECT is_open FROM trade_calendar WHERE date = ?", (today_str,))
-                            row = cur.fetchone()
-                            is_today_open = row[0] if row else 0
-                            
-                            if is_today_open and now.time() >= time(15, 35):
-                                today_status = "同步延迟/失败"
-                            else:
-                                today_status = "等待下午收盘"
-                    else:
-                        today_status = "未同步历法"
-                conn.close()
-            except Exception:
-                pass
-                
-        maintenance_running = False
-        try:
-            maintenance_running = CloseDataMaintenanceService()._running
-        except Exception:
-            pass
-            
-        services_info["data_maintenance"] = {
-            "name": "收盘行情同步与 Gap Healing",
-            "running": maintenance_running,
-            "historical_range": historical_range,
-            "today_status": today_status,
-            "total_stocks": total_stocks,
-            "db_size_mb": round(db_size_mb, 2)
-        }
-    except Exception:
-        pass
-
-    # 5.2 THS Watchlist Sync
-    try:
-        from src.market.ths_sync import ThsSyncService
-        ths_running = False
-        try:
-            ths_running = ThsSyncService()._running
-        except Exception:
-            pass
-        services_info["ths_sync"] = {
-            "name": "同花顺自选股双向同步",
-            "running": ths_running
-        }
-    except Exception:
-        pass
-
-    # 5.3 Watchlist Monitor
-    try:
-        from src.market.watchlist_monitor import WatchlistMonitorService
-        monitor_running = False
-        try:
-            monitor_running = WatchlistMonitorService()._running
-        except Exception:
-            pass
-        services_info["watchlist_monitor"] = {
-            "name": "自选股秒级高频预警",
-            "running": monitor_running
-        }
-    except Exception:
-        pass
-
-    # 5.4 Xueqiu Combination Watcher
-    try:
-        xueqiu_running = False
-        try:
-            watcher = _get_xueqiu_watcher()
-            xueqiu_running = watcher is not None and watcher._task is not None and not watcher._task.done()
-        except Exception:
-            pass
-        
-        cached_count = 0
-        if hasattr(app.state, "xueqiu_global_details_cache"):
-            cached_count = len(app.state.xueqiu_global_details_cache)
-            
-        services_info["xueqiu_watcher"] = {
-            "name": "雪球大V组合盯哨",
-            "running": xueqiu_running,
-            "cached_count": cached_count
-        }
-    except Exception:
-        pass
-
-    # 5.5 Swarm Multi-Agent Engine
-    try:
-        services_info["swarm_engine"] = {
-            "name": "Swarm 智能体协作引擎",
-            "running": True,
-            "active_runtimes": len(_swarm_runtime_cache)
-        }
-    except Exception:
-        pass
-
-    # 5.6 MCP Tool Gateway
-    try:
-        # Check if the mcp service is loaded or reachable
-        services_info["mcp_gateway"] = {
-            "name": "MCP 外部组件网关",
-            "running": True
-        }
-    except Exception:
-        pass
-
-        
-    return MonitorStatsResponse(
-        active_tenants=active_tenants,
-        total_sessions=total_sessions,
-        total_runs=total_runs,
-        memory_usage_mb=memory_usage_mb,
-        services=services_info,
-    )
-
-
-@app.get(
-    "/admin/monitor/logs",
-    response_model=List[LogEntry],
-    dependencies=[Depends(require_admin)],
-)
-async def get_monitor_logs(
-    limit: int = Query(100, ge=1, le=1000),
-    level: Optional[str] = Query(None),
-    keyword: Optional[str] = Query(None),
-):
-    """Retrieve uvicorn root logs from the MemoryLogHandler."""
-    return memory_log_handler.get_logs(limit=limit, level=level, keyword=keyword)
-
-
-@app.get(
-    "/settings/llm",
-    response_model=LLMSettingsResponse,
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_llm_settings(request: Request):
-    """Return project-local LLM settings for the Web UI."""
-    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
-    return _build_llm_settings_response(is_public=is_public)
-
-
-@app.put("/settings/llm", response_model=LLMSettingsResponse, dependencies=[Depends(require_settings_write_auth)])
-async def update_llm_settings(request: Request, payload: UpdateLLMSettingsRequest):
-    """Persist project-local LLM settings and update the running process."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
-
-    if payload.use_default:
-        if tenant != "default":
-            LLM_KEYS_TO_CLEAN = [
-                "LANGCHAIN_PROVIDER",
-                "LANGCHAIN_MODEL_NAME",
-                "LANGCHAIN_TEMPERATURE",
-                "TIMEOUT_SECONDS",
-                "MAX_RETRIES",
-                "LANGCHAIN_REASONING_EFFORT",
-                "OPENAI_API_KEY",
-                "OPENAI_BASE_URL",
-                "OPENROUTER_API_KEY",
-                "OPENROUTER_BASE_URL",
-                "GEMINI_API_KEY",
-                "GEMINI_BASE_URL",
-                "ANTHROPIC_API_KEY",
-                "ANTHROPIC_BASE_URL",
-                "DEEPSEEK_API_KEY",
-                "DEEPSEEK_BASE_URL",
-                "QWEN_API_KEY",
-                "QWEN_BASE_URL",
-                "OLLAMA_BASE_URL",
-            ]
-            _delete_env_values(ENV_PATH, LLM_KEYS_TO_CLEAN)
-            for key in LLM_KEYS_TO_CLEAN:
-                os.environ.pop(key, None)
-            return _build_llm_settings_response(_read_settings_env_values(), is_public=is_public)
-        else:
-            raise HTTPException(status_code=400, detail="Admin cannot revert to global default")
-
-    if not payload.provider or not payload.model_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provider and Model name are required")
-
-    provider_name = payload.provider.strip().lower()
-    provider = LLM_PROVIDER_BY_NAME.get(provider_name)
-    if provider is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported LLM provider")
-
-    model_name = payload.model_name.strip()
-    if not model_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Model name is required")
-
-    if payload.temperature < 0 or payload.temperature > 2:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Temperature must be between 0 and 2")
-
-    reasoning_effort = (payload.reasoning_effort or "").strip().lower()
-    if reasoning_effort not in LLM_REASONING_EFFORTS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reasoning effort must be low, medium, high, or max")
-
-    current_values = _read_settings_env_values()
-    base_url = (payload.base_url if payload.base_url is not None else provider.default_base_url).strip()
-    if provider.auth_type == "oauth":
-        try:
-            from src.providers.openai_codex import validate_codex_base_url
-
-            base_url = validate_codex_base_url(base_url)
-        except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    updates: Dict[str, str] = {
-        "LANGCHAIN_PROVIDER": provider.name,
-        "LANGCHAIN_MODEL_NAME": model_name,
-        provider.base_url_env: base_url,
-        "LANGCHAIN_TEMPERATURE": str(payload.temperature),
-        "TIMEOUT_SECONDS": str(payload.timeout_seconds),
-        "MAX_RETRIES": str(payload.max_retries),
-    }
-    if reasoning_effort or "LANGCHAIN_REASONING_EFFORT" in current_values:
-        updates["LANGCHAIN_REASONING_EFFORT"] = reasoning_effort
-
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    tenant_vals = {}
-    if tenant != "default":
-        tenant_env = get_runtime_root() / ".env"
-        if tenant_env.exists():
-            tenant_vals = _read_env_values(tenant_env)
-    else:
-        tenant_vals = current_values
-
-    if provider.api_key_env:
-        if payload.clear_api_key:
-            updates[provider.api_key_env] = ""
-        elif payload.api_key is not None and payload.api_key.strip():
-            api_key = payload.api_key.strip()
-            if api_key == "********":
-                if provider.api_key_env in tenant_vals:
-                    updates[provider.api_key_env] = tenant_vals[provider.api_key_env]
-            else:
-                updates[provider.api_key_env] = api_key if _is_configured_secret(api_key, LLM_API_KEY_PLACEHOLDERS) else ""
-        elif provider.api_key_env in tenant_vals and _is_configured_secret(
-            tenant_vals[provider.api_key_env],
-            LLM_API_KEY_PLACEHOLDERS,
-        ):
-            updates[provider.api_key_env] = tenant_vals[provider.api_key_env]
-    elif payload.clear_api_key:
-        os.environ.pop("OPENAI_API_KEY", None)
-
-    _write_env_values(ENV_PATH, updates)
-    _sync_runtime_env(provider, updates)
-    return _build_llm_settings_response(_read_env_values(ENV_PATH), is_public=is_public)
-
-
-
-@app.get(
-    "/settings/data-sources",
-    response_model=DataSourceSettingsResponse,
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_data_source_settings(request: Request):
-    """Return project-local data source credentials for the Web UI."""
-    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
-    return _build_data_source_settings_response(is_public=is_public)
-
-
-@app.put(
-    "/settings/data-sources",
-    response_model=DataSourceSettingsResponse,
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def update_data_source_settings(request: Request, payload: UpdateDataSourceSettingsRequest):
-    """Persist project-local data source credentials and update the running process."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    is_public = not (_is_request_admin(request) or _is_local_or_lan_client(request))
-
-    if payload.use_default:
-        if tenant != "default":
-            DATA_SOURCE_KEYS = ["TUSHARE_TOKEN", "VIBE_TRADING_IWENCAI_KEY", "FRED_API_KEY", "THS_COOKIE"]
-            _delete_env_values(ENV_PATH, DATA_SOURCE_KEYS)
-            for key in DATA_SOURCE_KEYS:
-                os.environ.pop(key, None)
-            return _build_data_source_settings_response(_read_settings_env_values(), is_public=is_public)
-        else:
-            raise HTTPException(status_code=400, detail="Admin cannot revert to global default")
-
-    current_values = _read_settings_env_values()
-    updates: Dict[str, str] = {}
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    tenant_vals = {}
-    if tenant != "default":
-        tenant_env = get_runtime_root() / ".env"
-        if tenant_env.exists():
-            tenant_vals = _read_env_values(tenant_env)
-    else:
-        tenant_vals = current_values
-
-
-    if payload.clear_tushare_token:
-        updates["TUSHARE_TOKEN"] = ""
-    elif payload.tushare_token is not None and payload.tushare_token.strip():
-        val = payload.tushare_token.strip()
-        if val == "********":
-            if "TUSHARE_TOKEN" in tenant_vals:
-                updates["TUSHARE_TOKEN"] = tenant_vals["TUSHARE_TOKEN"]
-        else:
-            updates["TUSHARE_TOKEN"] = val
-    elif "TUSHARE_TOKEN" in tenant_vals:
-        updates["TUSHARE_TOKEN"] = tenant_vals["TUSHARE_TOKEN"]
-
-    if payload.clear_iwencai_key:
-        updates["VIBE_TRADING_IWENCAI_KEY"] = ""
-    elif payload.iwencai_key is not None and payload.iwencai_key.strip():
-        val = payload.iwencai_key.strip()
-        if val == "********":
-            if "VIBE_TRADING_IWENCAI_KEY" in tenant_vals:
-                updates["VIBE_TRADING_IWENCAI_KEY"] = tenant_vals["VIBE_TRADING_IWENCAI_KEY"]
-        else:
-            updates["VIBE_TRADING_IWENCAI_KEY"] = val
-    elif "VIBE_TRADING_IWENCAI_KEY" in tenant_vals:
-        updates["VIBE_TRADING_IWENCAI_KEY"] = tenant_vals["VIBE_TRADING_IWENCAI_KEY"]
-
-    if payload.clear_fred_api_key:
-        updates["FRED_API_KEY"] = ""
-    elif payload.fred_api_key is not None and payload.fred_api_key.strip():
-        val = payload.fred_api_key.strip()
-        if val == "********":
-            if "FRED_API_KEY" in tenant_vals:
-                updates["FRED_API_KEY"] = tenant_vals["FRED_API_KEY"]
-        else:
-            updates["FRED_API_KEY"] = val
-    elif "FRED_API_KEY" in tenant_vals:
-        updates["FRED_API_KEY"] = tenant_vals["FRED_API_KEY"]
-
-    if payload.clear_ths_cookie:
-        updates["THS_COOKIE"] = ""
-    elif payload.ths_cookie is not None and payload.ths_cookie.strip():
-        val = payload.ths_cookie.strip()
-        if val == "********":
-            if "THS_COOKIE" in tenant_vals:
-                updates["THS_COOKIE"] = tenant_vals["THS_COOKIE"]
-        else:
-            updates["THS_COOKIE"] = val
-    elif "THS_COOKIE" in tenant_vals:
-        updates["THS_COOKIE"] = tenant_vals["THS_COOKIE"]
-
-
-    if updates:
-        _write_env_values(ENV_PATH, updates)
-        token = updates.get("TUSHARE_TOKEN", "").strip()
-        if _is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS):
-            os.environ["TUSHARE_TOKEN"] = token
-        else:
-            os.environ.pop("TUSHARE_TOKEN", None)
-        iwencai_key = updates.get("VIBE_TRADING_IWENCAI_KEY", "").strip()
-        if _is_configured_secret(iwencai_key, IWENCAI_KEY_PLACEHOLDERS):
-            os.environ["VIBE_TRADING_IWENCAI_KEY"] = iwencai_key
-        else:
-            os.environ.pop("VIBE_TRADING_IWENCAI_KEY", None)
-        fred_key = updates.get("FRED_API_KEY", "").strip()
-        if _is_configured_secret(fred_key, FRED_API_KEY_PLACEHOLDERS):
-            os.environ["FRED_API_KEY"] = fred_key
-        else:
-            os.environ.pop("FRED_API_KEY", None)
-        ths_cookie = updates.get("THS_COOKIE", "").strip()
-        if _is_configured_secret(ths_cookie, THS_COOKIE_PLACEHOLDERS):
-            os.environ["THS_COOKIE"] = ths_cookie
-        else:
-            try:
-                del os.environ["THS_COOKIE"]
-            except KeyError:
-                pass
-
-    return _build_data_source_settings_response(_read_env_values(ENV_PATH), is_public=is_public)
-
-
-@app.post("/settings/ths/test", dependencies=[Depends(require_settings_write_auth)])
-async def test_ths_cookie(payload: Dict[str, str]):
-    cookie = payload.get("cookie", "").strip()
-    if not cookie:
-        raise HTTPException(status_code=400, detail="Cookie cannot be empty")
-    from src.market.ths_sync import ThsSyncManager, ThsSyncService
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    
-    loop = asyncio.get_running_loop()
-    manager = ThsSyncManager(tenant_id=tenant)
-    res = await loop.run_in_executor(None, manager.test_connection, cookie)
-    
-    if res.get("success"):
-        ThsSyncService()._failure_counts[tenant] = 0
-        
-    return res
-
-
-@app.post("/settings/ths/sync", dependencies=[Depends(require_settings_write_auth)])
-async def manual_ths_sync(request: Request):
-    """手动立即触发当前租户的同花顺自选股同步。"""
-    from src.market.ths_sync import ThsSyncService
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    service = ThsSyncService()
-    result = await service.manual_sync_tenant(tenant)
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("message", "同步失败"))
-    return result
-
-
-FEISHU_SECRET_PLACEHOLDERS: set[str] = {"", "your-feishu-app-secret"}
-
-
-@app.get(
-    "/settings/platforms/feishu/channels",
-    response_model=List[FeishuChannelResponse],
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def list_feishu_channels():
-    """Return all Feishu channels configuration."""
-    channels = _load_feishu_channels()
-    return [
-        FeishuChannelResponse(
-            id=c["id"],
-            name=c["name"],
-            app_id=c["app_id"],
-            app_secret_configured=bool(c.get("app_secret")) and c.get("app_secret") not in FEISHU_SECRET_PLACEHOLDERS,
-            allowed_users=c.get("allowed_users", ""),
-            allow_all_users=c.get("allow_all_users", False),
-            enabled=c.get("enabled", True),
-        )
-        for c in channels
-    ]
-
-
-@app.post(
-    "/settings/platforms/feishu/channels",
-    response_model=FeishuChannelResponse,
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def create_feishu_channel(payload: CreateFeishuChannelRequest):
-    """Add a new Feishu channel configuration."""
-    import secrets
-    channels = _load_feishu_channels()
-    
-    new_id = f"chan_{secrets.token_hex(4)}"
-    new_channel = {
-        "id": new_id,
-        "name": payload.name.strip() or f"飞书通道_{new_id[:4]}",
-        "app_id": payload.app_id.strip(),
-        "app_secret": payload.app_secret.strip(),
-        "allowed_users": payload.allowed_users.strip(),
-        "allow_all_users": payload.allow_all_users,
-        "enabled": payload.enabled,
-    }
-    
-    channels.append(new_channel)
-    _save_feishu_channels(channels)
-    
-    await _reload_platform_manager()
-    
-    return FeishuChannelResponse(
-        id=new_channel["id"],
-        name=new_channel["name"],
-        app_id=new_channel["app_id"],
-        app_secret_configured=bool(new_channel["app_secret"]) and new_channel["app_secret"] not in FEISHU_SECRET_PLACEHOLDERS,
-        allowed_users=new_channel["allowed_users"],
-        allow_all_users=new_channel["allow_all_users"],
-        enabled=new_channel["enabled"],
-    )
-
-
-@app.put(
-    "/settings/platforms/feishu/channels/{channel_id}",
-    response_model=FeishuChannelResponse,
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def update_feishu_channel(channel_id: str, payload: UpdateFeishuChannelRequest):
-    """Update an existing Feishu channel configuration."""
-    channels = _load_feishu_channels()
-    target_idx = None
-    for idx, c in enumerate(channels):
-        if c["id"] == channel_id:
-            target_idx = idx
-            break
-            
-    if target_idx is None:
-        raise HTTPException(status_code=404, detail="Feishu channel not found")
-        
-    c = channels[target_idx]
-    c["name"] = payload.name.strip()
-    c["app_id"] = payload.app_id.strip()
-    c["allowed_users"] = payload.allowed_users.strip()
-    c["allow_all_users"] = payload.allow_all_users
-    c["enabled"] = payload.enabled
-    
-    if payload.app_secret is not None:
-        app_secret = payload.app_secret.strip()
-        if app_secret and app_secret not in FEISHU_SECRET_PLACEHOLDERS:
-            c["app_secret"] = app_secret
-        elif app_secret == "":
-            c["app_secret"] = ""
-            
-    _save_feishu_channels(channels)
-    
-    await _reload_platform_manager()
-    
-    return FeishuChannelResponse(
-        id=c["id"],
-        name=c["name"],
-        app_id=c["app_id"],
-        app_secret_configured=bool(c["app_secret"]) and c["app_secret"] not in FEISHU_SECRET_PLACEHOLDERS,
-        allowed_users=c["allowed_users"],
-        allow_all_users=c["allow_all_users"],
-        enabled=c["enabled"],
-    )
-
-
-@app.delete(
-    "/settings/platforms/feishu/channels/{channel_id}",
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def delete_feishu_channel(channel_id: str):
-    """Delete a Feishu channel configuration."""
-    channels = _load_feishu_channels()
-    initial_len = len(channels)
-    channels = [c for c in channels if c["id"] != channel_id]
-    
-    if len(channels) == initial_len:
-        raise HTTPException(status_code=404, detail="Feishu channel not found")
-        
-    _save_feishu_channels(channels)
-    
-    await _reload_platform_manager()
-    
-    return {"status": "success"}
-
-
-active_ilink_logins: dict[str, dict] = {}
-
-
-@app.get(
-    "/settings/platforms/wechat/channels",
-    response_model=List[WechatChannelResponse],
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def list_wechat_channels():
-    """Return all WeChat channels configuration."""
-    channels = _load_wechat_channels()
-    return [
-        WechatChannelResponse(
-            id=c["id"],
-            name=c["name"],
-            mode="ilink",
-            enabled=c.get("enabled", True),
-            ilink_bot_token=c.get("ilink_bot_token", ""),
-            ilink_base_url=c.get("ilink_base_url", ""),
-            ilink_bot_id=c.get("ilink_bot_id", ""),
-            ilink_user_id=c.get("ilink_user_id", ""),
-        )
-        for c in channels
-    ]
-
-
-@app.post(
-    "/settings/platforms/wechat/channels",
-    response_model=WechatChannelResponse,
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def create_wechat_channel(payload: CreateWechatChannelRequest):
-    """Add a new WeChat channel configuration."""
-    import secrets
-    channels = _load_wechat_channels()
-    
-    new_id = f"chan_{secrets.token_hex(4)}"
-    new_channel = {
-        "id": new_id,
-        "name": payload.name.strip() or f"微信通道_{new_id[:4]}",
-        "mode": "ilink",
-        "enabled": payload.enabled,
-        "ilink_bot_token": (payload.ilink_bot_token or "").strip(),
-        "ilink_base_url": (payload.ilink_base_url or "https://ilinkai.weixin.qq.com").strip(),
-        "ilink_bot_id": (payload.ilink_bot_id or "").strip(),
-        "ilink_user_id": (payload.ilink_user_id or "").strip(),
-    }
-    
-    channels.append(new_channel)
-    _save_wechat_channels(channels)
-    
-    await _reload_platform_manager()
-    
-    if payload.enabled and new_channel["ilink_user_id"]:
-        from src.config.paths import active_tenant_var
-        tid = active_tenant_var.get() or "default"
-        adapter_key = f"wechat_{tid}_{new_channel['id']}"
-        if _platform_manager and adapter_key in _platform_manager._adapters:
-            adapter = _platform_manager._adapters[adapter_key]
-            welcome_msg = "你好，我是量化金融研究助手，我已经成功接收到您的消息并连接成功。"
-            
-            async def _send_welcome():
-                try:
-                    for _ in range(5):
-                        if adapter._last_context_tokens.get(new_channel["ilink_user_id"]):
-                            break
-                        await asyncio.sleep(2.0)
-                    else:
-                        logger.warning(f"[WeChat iLink] No context token found for {new_channel['ilink_user_id']} after waiting, trying send_message anyway.")
-                    await adapter.send_message(new_channel["ilink_user_id"], welcome_msg)
-                    logger.warning(f"[WeChat iLink] Sent proactive welcome message to {new_channel['ilink_user_id']}")
-                except Exception as ex:
-                    import traceback
-                    logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
-                    
-            asyncio.create_task(_send_welcome())
-    
-    return WechatChannelResponse(
-        id=new_channel["id"],
-        name=new_channel["name"],
-        mode="ilink",
-        enabled=new_channel["enabled"],
-        ilink_bot_token=new_channel["ilink_bot_token"],
-        ilink_base_url=new_channel["ilink_base_url"],
-        ilink_bot_id=new_channel["ilink_bot_id"],
-        ilink_user_id=new_channel["ilink_user_id"],
-    )
-
-
-@app.put(
-    "/settings/platforms/wechat/channels/{channel_id}",
-    response_model=WechatChannelResponse,
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def update_wechat_channel(channel_id: str, payload: UpdateWechatChannelRequest):
-    """Update an existing WeChat channel configuration."""
-    channels = _load_wechat_channels()
-    target_idx = None
-    for idx, c in enumerate(channels):
-        if c["id"] == channel_id:
-            target_idx = idx
-            break
-            
-    if target_idx is None:
-        raise HTTPException(status_code=404, detail="WeChat channel not found")
-        
-    c = channels[target_idx]
-    c["name"] = payload.name.strip()
-    c["mode"] = "ilink"
-    c["enabled"] = payload.enabled
-    
-    old_token = c.get("ilink_bot_token", "")
-    old_user_id = c.get("ilink_user_id", "")
-    old_enabled = c.get("enabled", False)
-
-    if payload.ilink_bot_token is not None:
-        c["ilink_bot_token"] = payload.ilink_bot_token.strip()
-    if payload.ilink_base_url is not None:
-        c["ilink_base_url"] = payload.ilink_base_url.strip() or "https://ilinkai.weixin.qq.com"
-    if payload.ilink_bot_id is not None:
-        c["ilink_bot_id"] = payload.ilink_bot_id.strip()
-    if payload.ilink_user_id is not None:
-        c["ilink_user_id"] = payload.ilink_user_id.strip()
-            
-    _save_wechat_channels(channels)
-    
-    await _reload_platform_manager()
-
-    token_changed = (payload.ilink_bot_token is not None and payload.ilink_bot_token.strip() != old_token)
-    user_id_changed = (payload.ilink_user_id is not None and payload.ilink_user_id.strip() != old_user_id)
-    enabled_changed = (payload.enabled != old_enabled)
-
-    if c["enabled"] and c["ilink_user_id"] and (token_changed or user_id_changed or (enabled_changed and c["enabled"])):
-        from src.config.paths import active_tenant_var
-        tid = active_tenant_var.get() or "default"
-        adapter_key = f"wechat_{tid}_{c['id']}"
-        if _platform_manager and adapter_key in _platform_manager._adapters:
-            adapter = _platform_manager._adapters[adapter_key]
-            welcome_msg = "你好，我是量化金融研究助手，我已经成功接收到您的消息并连接成功。"
-            
-            async def _send_welcome():
-                try:
-                    for _ in range(5):
-                        if adapter._last_context_tokens.get(c["ilink_user_id"]):
-                            break
-                        await asyncio.sleep(2.0)
-                    else:
-                        logger.warning(f"[WeChat iLink] No context token found for {c['ilink_user_id']} after waiting, trying send_message anyway.")
-                    await adapter.send_message(c["ilink_user_id"], welcome_msg)
-                    logger.warning(f"[WeChat iLink] Sent proactive welcome message to {c['ilink_user_id']}")
-                except Exception as ex:
-                    import traceback
-                    logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
-                    
-            asyncio.create_task(_send_welcome())
-    
-    return WechatChannelResponse(
-        id=c["id"],
-        name=c["name"],
-        mode="ilink",
-        enabled=c["enabled"],
-        ilink_bot_token=c.get("ilink_bot_token", ""),
-        ilink_base_url=c.get("ilink_base_url", ""),
-        ilink_bot_id=c.get("ilink_bot_id", ""),
-        ilink_user_id=c.get("ilink_user_id", ""),
-    )
-
-
-@app.delete(
-    "/settings/platforms/wechat/channels/{channel_id}",
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def delete_wechat_channel(channel_id: str):
-    """Delete a WeChat channel configuration."""
-    channels = _load_wechat_channels()
-    initial_len = len(channels)
-    channels = [c for c in channels if c["id"] != channel_id]
-    
-    if len(channels) == initial_len:
-        raise HTTPException(status_code=404, detail="WeChat channel not found")
-        
-    _save_wechat_channels(channels)
-    
-    await _reload_platform_manager()
-    
-    return {"status": "success"}
-
-
-active_transient_logins: dict[str, dict] = {}
-
-
-@app.get(
-    "/settings/platforms/wechat/transient/qrcode",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_wechat_transient_qrcode(mode: str = "ilink"):
-    """Fetch WeChat login QR code transiently without requiring an existing channel."""
-    import secrets
-    import time
-    import httpx
-    import urllib.parse
-
-    temp_id = f"temp_{secrets.token_hex(8)}"
-
-    if mode == "ilink":
-        try:
-            async with httpx.AsyncClient() as client:
-                res = await client.post(
-                    "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3",
-                    json={"local_token_list": []},
-                    timeout=10,
-                )
-                res.raise_for_status()
-                data = res.json()
-            qrcode = data.get("qrcode")
-            qrcode_img_content = data.get("qrcode_img_content")
-            if qrcode and qrcode_img_content:
-                active_transient_logins[temp_id] = {
-                    "qrcode": qrcode,
-                    "qrcode_url": qrcode_img_content,
-                    "started_at": time.time(),
-                    "api_base_url": "https://ilinkai.weixin.qq.com",
-                    "mode": "ilink",
-                }
-                qr_image_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote_plus(qrcode_img_content)}"
-                return {"status": "waiting", "qrcode": qr_image_url, "temp_id": temp_id}
-            else:
-                raise HTTPException(status_code=500, detail="微信 iLink 官方网关返回空数据，请稍后重试。")
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            logger.exception("Failed to fetch official iLink QR code")
-            raise HTTPException(status_code=500, detail=f"获取微信官方 iLink 二维码失败: {e}\nTraceback:\n{tb}")
-
-    raise HTTPException(status_code=400, detail="Unsupported mode")
-
-
-@app.get(
-    "/settings/platforms/wechat/transient/status",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_wechat_transient_status(temp_id: str):
-    """Fetch WeChat login status transiently."""
-    login_context = active_transient_logins.get(temp_id)
-    if not login_context:
-        return {"status": "waiting"}
-
-    mode = login_context.get("mode")
-    if mode == "ilink":
-        qrcode = login_context["qrcode"]
-        api_base_url = login_context.get("api_base_url", "https://ilinkai.weixin.qq.com")
-
-        import httpx
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                res = await client.get(
-                    f"{api_base_url}/ilink/bot/get_qrcode_status?qrcode={qrcode}",
-                )
-                res.raise_for_status()
-                data = res.json()
-        except Exception as e:
-            logger.warning("Failed to poll official iLink QR status: %s", e)
-            return {"status": "waiting"}
-
-        try:
-            status = data.get("status")
-            if status == "scaned_but_redirect" and data.get("redirect_host"):
-                new_host = f"https://{data.get('redirect_host')}"
-                login_context["api_base_url"] = new_host
-                return {"status": "scanned"}
-            elif status == "wait":
-                return {"status": "waiting"}
-            elif status == "scaned":
-                return {"status": "scanned"}
-            elif status == "expired":
-                return {"status": "expired"}
-            elif status in ("confirmed", "binded_redirect"):
-                bot_token = data.get("bot_token")
-                baseurl = data.get("baseurl") or api_base_url
-                ilink_bot_id = data.get("ilink_bot_id")
-                ilink_user_id = data.get("ilink_user_id")
-
-                active_transient_logins.pop(temp_id, None)
-
-                return {
-                    "status": "success",
-                    "bot_token": bot_token,
-                    "baseurl": baseurl,
-                    "ilink_bot_id": ilink_bot_id,
-                    "ilink_user_id": ilink_user_id,
-                }
-        except Exception as e:
-            logger.warning("Failed to process official iLink QR status data: %s", e)
-            return {"status": "waiting"}
-
-    return {"status": "waiting"}
-
-
-@app.get(
-    "/settings/platforms/wechat/channels/{channel_id}/qrcode",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_wechat_channel_qrcode(channel_id: str):
-    """Fetch WeChat login QR code from the iLink official gateway."""
-    channels = _load_wechat_channels()
-    channel = next((c for c in channels if c["id"] == channel_id), None)
-    if not channel:
-        raise HTTPException(status_code=404, detail="微信通道不存在")
-        
-    import httpx
-    import time
-    
-    token = channel.get("ilink_bot_token", "").strip()
-    local_tokens = [token] if token else []
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.post(
-                "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3",
-                json={"local_token_list": local_tokens},
-                timeout=10,
-            )
-            res.raise_for_status()
-            data = res.json()
-        qrcode = data.get("qrcode")
-        qrcode_img_content = data.get("qrcode_img_content")
-        if qrcode and qrcode_img_content:
-            active_ilink_logins[channel_id] = {
-                "qrcode": qrcode,
-                "qrcode_url": qrcode_img_content,
-                "started_at": time.time(),
-                "api_base_url": "https://ilinkai.weixin.qq.com",
-            }
-            import urllib.parse
-            qr_image_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={urllib.parse.quote_plus(qrcode_img_content)}"
-            return {"status": "waiting", "qrcode": qr_image_url}
-        else:
-            raise HTTPException(status_code=500, detail="微信 iLink 官方网关返回空数据，请稍后重试。")
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        logger.exception("Failed to fetch official iLink QR code")
-        raise HTTPException(status_code=500, detail=f"获取微信官方 iLink 二维码失败: {e}\nTraceback:\n{tb}")
-
-
-@app.get(
-    "/settings/platforms/wechat/channels/{channel_id}/status",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_wechat_channel_status(channel_id: str):
-    """Fetch WeChat login status from the iLink official gateway."""
-    channels = _load_wechat_channels()
-    channel = next((c for c in channels if c["id"] == channel_id), None)
-    if not channel:
-        raise HTTPException(status_code=404, detail="WeChat channel not found")
-        
-    login_context = active_ilink_logins.get(channel_id)
-    if not login_context:
-        return {"status": "waiting"}
-        
-    qrcode = login_context["qrcode"]
-    api_base_url = login_context.get("api_base_url", "https://ilinkai.weixin.qq.com")
-    
-    import httpx
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(
-                f"{api_base_url}/ilink/bot/get_qrcode_status?qrcode={qrcode}",
-            )
-            res.raise_for_status()
-            data = res.json()
-    except Exception as e:
-        logger.warning("Failed to poll official iLink QR status: %s", e)
-        return {"status": "waiting"}
-
-    try:
-        status = data.get("status")
-        if status == "scaned_but_redirect" and data.get("redirect_host"):
-            new_host = f"https://{data.get('redirect_host')}"
-            login_context["api_base_url"] = new_host
-            return {"status": "scanned"}
-        elif status == "wait":
-            return {"status": "waiting"}
-        elif status == "scaned":
-            return {"status": "scanned"}
-        elif status == "expired":
-            return {"status": "expired"}
-        elif status in ("confirmed", "binded_redirect"):
-            bot_token = data.get("bot_token")
-            baseurl = data.get("baseurl") or api_base_url
-            ilink_bot_id = data.get("ilink_bot_id")
-            ilink_user_id = data.get("ilink_user_id")
-            
-            for c in channels:
-                if c["id"] == channel_id:
-                    if bot_token:
-                        c["ilink_bot_token"] = bot_token
-                    if baseurl:
-                        c["ilink_base_url"] = baseurl
-                    if ilink_bot_id:
-                        c["ilink_bot_id"] = ilink_bot_id
-                    if ilink_user_id:
-                        c["ilink_user_id"] = ilink_user_id
-                    c["enabled"] = True
-                    break
-            _save_wechat_channels(channels)
-            active_ilink_logins.pop(channel_id, None)
-            
-            await _reload_platform_manager()
-            
-            if ilink_user_id:
-                from src.config.paths import active_tenant_var
-                tid = active_tenant_var.get() or "default"
-                adapter_key = f"wechat_{tid}_{channel_id}"
-                if _platform_manager and adapter_key in _platform_manager._adapters:
-                    adapter = _platform_manager._adapters[adapter_key]
-                    welcome_msg = "你好，我是量化金融研究助手，我已经成功接收到您的消息并连接成功。"
-                    
-                    async def _send_welcome():
-                        try:
-                            # Sleep briefly to make sure the poller loop has fully started and registered the adapter
-                            for _ in range(5):
-                                if adapter._last_context_tokens.get(ilink_user_id):
-                                    break
-                                await asyncio.sleep(2.0)
-                            else:
-                                logger.warning(f"[WeChat iLink] No context token found for {ilink_user_id} after waiting, trying send_message anyway.")
-                            await adapter.send_message(ilink_user_id, welcome_msg)
-                            logger.warning(f"[WeChat iLink] Sent proactive welcome message to {ilink_user_id}")
-                        except Exception as ex:
-                            import traceback
-                            logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
-                            
-                    asyncio.create_task(_send_welcome())
-                    
-            return {"status": "logged_in"}
-    except Exception as e:
-        logger.warning("Failed to process official iLink QR status data: %s", e)
-        return {"status": "waiting"}
-    return {"status": "waiting"}
-
-
-@app.get(
-    "/settings/feature-flags",
-    response_model=FeatureFlagsResponse,
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_feature_flags():
-    """Return current feature flag state."""
-    return FeatureFlagsResponse(
-        shell_tools_enabled=_env_shell_tools_enabled(),
-        scheduler_enabled=_scheduled_research_scheduler_enabled(),
-        session_runtime_enabled=os.getenv("ENABLE_SESSION_RUNTIME", "true").lower() == "true",
-        env_path=_project_relative_path(ENV_PATH),
-    )
-
-
-@app.get(
-    "/settings/dashboard-layout",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_dashboard_layout():
-    """Load dashboard layout configuration for the active tenant."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    layout_path = AGENT_DIR / "runs" / f"dashboard_layout_{tenant}.json"
-    if layout_path.exists():
-        try:
-            with open(layout_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.warning("Failed to read dashboard layout for tenant %s: %s", tenant, e)
-    return {}
-
-
-@app.put(
-    "/settings/dashboard-layout",
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def update_dashboard_layout(payload: dict):
-    """Save dashboard layout configuration for the active tenant."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    layout_path = AGENT_DIR / "runs" / f"dashboard_layout_{tenant}.json"
-    try:
-        os.makedirs(layout_path.parent, exist_ok=True)
-        with open(layout_path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        return {"status": "success"}
-    except Exception as e:
-        logger.error("Failed to save dashboard layout for tenant %s: %s", tenant, e)
-        raise HTTPException(status_code=500, detail=f"Failed to save layout: {e}")
-
-
-@app.get(
-    "/settings/dashboard/graph",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_dashboard_graph():
-    """Load ECharts relation graph topology for the active tenant."""
-    from src.config.paths import active_tenant_var
-    from src.swarm.simulation_graph import SimulationGraphManager
-    tenant = active_tenant_var.get()
-    try:
-        manager = SimulationGraphManager(tenant)
-        return manager.load()
-    except Exception as e:
-        logger.error("Failed to load dashboard graph for tenant %s: %s", tenant, e)
-        return {"nodes": [], "links": []}
-
-
-@app.get(
-    "/settings/dashboard/react-logs",
-    dependencies=[Depends(require_event_stream_auth)],
-)
-async def get_dashboard_react_logs(request: Request, stream: bool = True):
-    """Get ReACT logs for the active tenant. Supports optional SSE streaming."""
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    log_path = AGENT_DIR / "runs" / f"agent_log_{tenant}.jsonl"
-
-    if not stream:
-        logs = []
-        if log_path.exists():
-            try:
-                with open(log_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if line.strip():
-                            logs.append(json.loads(line.strip()))
-            except Exception as e:
-                logger.warning("Failed to read ReACT logs array for tenant %s: %s", tenant, e)
-        return logs
-
-    # SSE Streaming mode
-    from fastapi.responses import StreamingResponse
-    import asyncio
-
-    async def event_generator():
-        # Yield existing log lines first
-        if log_path.exists():
-            try:
-                with open(log_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if line.strip():
-                            yield f"data: {line.strip()}\n\n"
-            except Exception:
-                pass
-        
-        # Poll for new additions
-        last_size = log_path.stat().st_size if log_path.exists() else 0
-        while True:
-            if await request.is_disconnected():
-                break
-            if log_path.exists():
-                curr_size = log_path.stat().st_size
-                if curr_size > last_size:
-                    try:
-                        with open(log_path, "r", encoding="utf-8") as f:
-                            f.seek(last_size)
-                            for line in f:
-                                if line.strip():
-                                    yield f"data: {line.strip()}\n\n"
-                        last_size = curr_size
-                    except Exception:
-                        pass
-            await asyncio.sleep(1)
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@app.post(
-    "/settings/dashboard/agent-chat",
-    dependencies=[Depends(require_auth)],
-)
-async def dashboard_agent_chat(payload: dict):
-    """Direct NLP chat with specific Swarm Agent presets."""
-    agent_id = payload.get("agent_id", "")
-    message = payload.get("message", "")
-    if not agent_id or not message:
-        raise HTTPException(status_code=400, detail="agent_id and message are required")
-
-    AGENT_PERSONAS = {
-        "yuzi": "你是游资·游侠，热衷于超短线交易和炒作题材（如低空经济、AI算力）。你言辞犀利、行动迅速，极度关注涨停板和资金流入。请用大字报风格和黑客终端语气分析万丰奥威或其它股票，必须包含具体的阻力位、买入点 and 游资博弈心理。",
-        "beixiang": "你是北向资金（机构投资者代表），倾向于长线价值投资与宏观配置。你行事稳健，注重筹码分布、基本面估值以及ETF异动，用理性、专业、机构视角的语气来分析市场和个股的估值水平及资金安全垫。",
-        "SwarmConductor": "你是多智能体投研管线的指挥官（SwarmConductor），负责汇总技术面、基本面和风控面的辩论共识。用全面、不偏不倚的分析语气，客观权衡板块题材机会与回撤风险，给出综合结论。"
-    }
-
-    persona = AGENT_PERSONAS.get(agent_id, AGENT_PERSONAS["SwarmConductor"])
-    
-    from src.providers.chat import ChatLLM
-    try:
-        llm = ChatLLM()
-        messages = [
-            {"role": "system", "content": persona},
-            {"role": "user", "content": message}
-        ]
-        response = llm.chat(messages)
-        return {"response": response.content or "(无回复)"}
-    except Exception as e:
-        logger.error("Agent chat failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"LLM chat call failed: {e}")
-
-
-@app.get(
-    "/settings/dashboard/market-data",
-    dependencies=[Depends(require_local_or_auth)],
-)
-def get_dashboard_market_data():
-    """Load real-time market data (watchlist, sectors, longhubang, limitup) for A-shares."""
-    from src.swarm.market_board import (
-        fetch_tencent_quotes,
-        fetch_eastmoney_sectors,
-        fetch_eastmoney_longhu,
-        fetch_eastmoney_limitup,
-        fetch_dynamic_yuzi,
-        fetch_dynamic_portfolio,
-        fetch_dynamic_kol_and_alerts,
-        fetch_dynamic_lattice
-    )
-    from src.config.paths import active_tenant_var, get_runtime_root
-    import sqlite3
-    
-    tenant = active_tenant_var.get() or "default"
-    db_path = get_runtime_root() / f"stocks_{tenant}.db"
-    
-    watchlist_symbols = []
-    if db_path.exists():
-        try:
-            conn = sqlite3.connect(str(db_path))
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Watchlist'")
-            if cursor.fetchone():
-                cursor.execute("SELECT code FROM Watchlist")
-                watchlist_symbols = [row["code"] for row in cursor.fetchall()]
-            conn.close()
-        except Exception as e:
-            logger.error("Failed to query Watchlist from DB: %s", e)
-            
-    if watchlist_symbols:
-        cleaned_symbols = [s.split(".")[0].strip() for s in watchlist_symbols]
-        cleaned_symbols = list(filter(None, dict.fromkeys(cleaned_symbols)))
-    else:
-        cleaned_symbols = ["300750", "600519", "002594", "301550", "601398"]
-
-    try:
-        watchlist = fetch_tencent_quotes(cleaned_symbols)
-        sectors = fetch_eastmoney_sectors()
-        longhu = fetch_eastmoney_longhu()
-        limitup = fetch_eastmoney_limitup()
-        
-        # Freshly added dynamic dashboard datasets
-        yuzi = fetch_dynamic_yuzi()
-        portfolio_data = fetch_dynamic_portfolio(tenant)
-        kol_and_alerts = fetch_dynamic_kol_and_alerts(cleaned_symbols)
-        lattice = fetch_dynamic_lattice()
-        
-        sentiment_score = 50
-        up_count = sum(1 for s in sectors if s["change"] > 0)
-        if sectors:
-            sentiment_score = int((up_count / len(sectors)) * 100)
-            
-        return {
-            "watchlist": watchlist,
-            "sectors": sectors,
-            "longhu": longhu,
-            "limitup": limitup,
-            "yuzi": yuzi,
-            "portfolio": portfolio_data.get("positions", []),
-            "netAsset": portfolio_data.get("netAsset", 0.0),
-            "kol": kol_and_alerts.get("opinions", []),
-            "alerts": kol_and_alerts.get("alerts", []),
-            "lattice": lattice,
-            "sentiment": {
-                "score": sentiment_score,
-                "description": "多头偏强" if sentiment_score > 60 else "空头偏强" if sentiment_score < 40 else "震荡平衡"
-            }
-        }
-    except Exception as e:
-        logger.error("Failed to load dashboard market data: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Liveness probe."""
-    return HealthResponse(
-        status="healthy",
-        service="TideTrading API",
-        timestamp=datetime.now().isoformat()
-    )
-
-
-_changelog_cache = {
-    "zh": {"mtime": 0.0, "data": []},
-    "en": {"mtime": 0.0, "data": []}
-}
-
-def _parse_readme_changelog(filepath: Path, max_entries: int = 10) -> list:
-    if not filepath.exists():
-        return []
-    try:
-        content = filepath.read_text(encoding="utf-8")
-        lines = content.splitlines()
-        
-        in_changelog = False
-        entries = []
-        current_entry = None
-        
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("## 📰 最新动态") or stripped.startswith("## 最新动态"):
-                in_changelog = True
-                continue
-            elif in_changelog and stripped.startswith("## "):
-                break
-            elif in_changelog and stripped.startswith("---"):
-                if entries:
-                    break
-            
-            if in_changelog:
-                m = re.match(r'^\s*[-\*]\s+\*\*(\d{4}-\d{2}-\d{2})\*\*\s+🚀\s+\*\*(v[\d\.]+)\s*—\s*(.*?)\*\*：?', line)
-                if m:
-                    if len(entries) >= max_entries:
-                        break
-                    date_str, ver_str, title_str = m.groups()
-                    current_entry = {
-                        "v": ver_str,
-                        "date": date_str,
-                        "title": title_str.strip(),
-                        "body": []
-                    }
-                    entries.append(current_entry)
-                elif current_entry is not None:
-                    if line.strip():
-                        subbed = re.sub(r'^\s*[-\*]\s+', '', line).rstrip()
-                        cleaned_line = f"* {subbed}"
-                        current_entry["body"].append(cleaned_line)
-        
-        formatted_entries = []
-        for entry in entries:
-            body_text = "\n".join(entry["body"])
-            formatted_entries.append({
-                "v": entry["v"],
-                "date": entry["date"],
-                "title": entry["title"],
-                "body": body_text
-            })
-        return formatted_entries
-    except Exception as e:
-        logger.error("Failed to parse changelog from %s: %s", filepath, e)
-        return []
-
-@app.get("/api/system/changelog")
-async def get_system_changelog(lang: Optional[str] = Query(None, description="Language code: zh or en")):
-    """Get the latest parsed system changelog entries from README files."""
-    language = "zh"
-    if lang:
-        if "en" in lang.lower():
-            language = "en"
-    
-    filename = "README_zh.md" if language == "zh" else "README.md"
-    readme_path = AGENT_DIR.parent / filename
-    if not readme_path.exists() and language == "zh":
-        readme_path = AGENT_DIR.parent / "README.md"
-    
-    if not readme_path.exists():
-        return {"changelog": []}
-    
-    try:
-        mtime = os.path.getmtime(readme_path)
-        cache = _changelog_cache[language]
-        if cache["mtime"] != mtime or not cache["data"]:
-            parsed_data = _parse_readme_changelog(readme_path)
-            _changelog_cache[language] = {
-                "mtime": mtime,
-                "data": parsed_data
-            }
-        return {"changelog": _changelog_cache[language]["data"]}
-    except Exception as e:
-        logger.error("Failed to fetch changelog: %s", e)
-        return {"changelog": []}
-
-
-
-@app.get(
-    "/settings/xueqiu",
-    response_model=XueqiuSettingsResponse,
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_xueqiu_settings():
-    """Return Xueqiu portfolio monitoring settings for the Web UI."""
-    from src.config.paths import get_data_dir
-    data_dir = get_data_dir()
-    path = data_dir / "xueqiu_monitor.json"
-    if not path.exists():
-        return XueqiuSettingsResponse()
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        
-        # Check token expiration status in alert_status
-        token_expired = False
-        alert_path = data_dir / "xueqiu_alert_status.json"
-        if alert_path.exists():
-            try:
-                alert_status = json.loads(alert_path.read_text(encoding="utf-8")) or {}
-                # If any of the configured xq_tokens is in alert_status, mark as expired
-                for token in data.get("xq_tokens", []):
-                    if token in alert_status:
-                        token_expired = True
-                        break
-            except Exception:
-                pass
-                
-        data["token_expired"] = token_expired
-        return XueqiuSettingsResponse(**data)
-    except Exception as e:
-        logger.error("Failed to load Xueqiu settings: %s", e)
-        return XueqiuSettingsResponse()
-
-
-def initialize_new_combos_task(added_combos: dict, xq_tokens: list, data_dir):
-    """Background task to query and populate historical rebalancing logs for newly added combos."""
-    if not added_combos:
-        return
-    watcher = _get_xueqiu_watcher()
-    if not watcher:
-        return
-        
-    tokens = [t.strip() for t in xq_tokens if t.strip()]
-    if not tokens:
-        tokens = DEFAULT_XQ_TOKENS
-        
-    for name, cid in added_combos.items():
-        try:
-            logger.info("Background initializing history for combo %s (%s)", name, cid)
-            watcher.initialize_combo_history(cid, name, tokens, data_dir)
-        except Exception as e:
-            logger.error("Failed to initialize combo history in background for %s: %s", cid, e)
-
-
-def initialize_new_influencers_task(added_influencers: dict, xq_tokens: list, data_dir):
-    """Background task to query and save initial watchlist snapshot for newly added influencers."""
-    if not added_influencers:
-        return
-    watcher = _get_xueqiu_watcher()
-    if not watcher:
-        return
-    tokens = [t.strip() for t in xq_tokens if t.strip()]
-    if not tokens:
-        tokens = DEFAULT_XQ_TOKENS
-    for name, uid in added_influencers.items():
-        try:
-            logger.info("Background initializing watchlist snapshot for influencer %s (%s)", name, uid)
-            watcher.initialize_influencer_watchlist(uid, name, tokens, data_dir)
-        except Exception as e:
-            logger.error("Failed to initialize watchlist snapshot in background for %s: %s", uid, e)
-
-
-@app.put(
-    "/settings/xueqiu",
-    response_model=XueqiuSettingsResponse,
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def update_xueqiu_settings(payload: UpdateXueqiuSettingsRequest, background_tasks: BackgroundTasks):
-    """Persist Xueqiu portfolio monitoring settings."""
-    from src.config.paths import get_data_dir
-    data_dir = get_data_dir()
-    path = data_dir / "xueqiu_monitor.json"
-    
-    # Detect new combos
-    old_combos = {}
-    old_watch_uids = {}
-    if path.exists():
-        try:
-            old_data = json.loads(path.read_text(encoding="utf-8"))
-            old_combos = old_data.get("combos", {})
-            old_watch_uids = old_data.get("watch_uids", {})
-        except Exception:
-            pass
-            
-    # Detect combos and influencers that need history/snapshot initialization
-    logs_path = data_dir / "xueqiu_rebalancing_logs.json"
-    existing_combo_ids = set()
-    if logs_path.exists():
-        try:
-            existing_logs = json.loads(logs_path.read_text(encoding="utf-8")) or []
-            existing_combo_ids = {r.get("combo_id") for r in existing_logs if isinstance(r, dict) and r.get("combo_id")}
-        except Exception:
-            pass
-            
-    new_combos = payload.combos or {}
-    added_combos = {}
-    for name, cid in new_combos.items():
-        if cid not in old_combos.values() or cid not in existing_combo_ids:
-            added_combos[name] = cid
-
-    snapshots_path = data_dir / "xueqiu_watchlist_snapshots.json"
-    existing_watch_uids = set()
-    if snapshots_path.exists():
-        try:
-            existing_snaps = json.loads(snapshots_path.read_text(encoding="utf-8")) or {}
-            existing_watch_uids = set(existing_snaps.keys())
-        except Exception:
-            pass
-            
-    new_watch_uids = payload.watch_uids or {}
-    added_influencers = {}
-    for name, uid in new_watch_uids.items():
-        if uid not in old_watch_uids.values() or uid not in existing_watch_uids:
-            added_influencers[name] = uid
-    
-    data = {
-        "enabled": payload.enabled,
-        "feishu_webhook": payload.feishu_webhook,
-        "combos": payload.combos,
-        "xq_tokens": payload.xq_tokens,
-        "watch_uids": payload.watch_uids,
-    }
-    try:
-        data_dir.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        
-        # Clear alert status for newly updated tokens
-        alert_path = data_dir / "xueqiu_alert_status.json"
-        if alert_path.exists():
-            try:
-                alert_path.unlink()
-            except Exception:
-                pass
-    except Exception as e:
-        logger.error("Failed to save Xueqiu settings: %s", e)
-        raise HTTPException(status_code=500, detail=f"Failed to save settings: {e}")
-        
-    if added_combos:
-        background_tasks.add_task(initialize_new_combos_task, added_combos, payload.xq_tokens, data_dir)
-        
-    if added_influencers:
-        background_tasks.add_task(initialize_new_influencers_task, added_influencers, payload.xq_tokens, data_dir)
-        
-    return XueqiuSettingsResponse(**data)
-
-
-@app.post(
-    "/settings/xueqiu/test",
-    dependencies=[Depends(require_settings_write_auth)],
-)
-async def test_xueqiu_webhook(payload: TestXueqiuWebhookRequest):
-    """Send a test interactive card to verify the Feishu Webhook configuration."""
-    watcher = _get_xueqiu_watcher()
-    success = await watcher.test_webhook(payload.webhook_url)
-    if not success:
-        raise HTTPException(status_code=400, detail="Failed to deliver test card. Please check the Webhook URL.")
-    return {"status": "success"}
-
-
-@app.get(
-    "/settings/xueqiu/logs",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_xueqiu_logs():
-    """Return Xueqiu portfolio rebalancing logs for the Web UI."""
-    from src.config.paths import get_data_dir
-    path = get_data_dir() / "xueqiu_rebalancing_logs.json"
-    if not path.exists():
-        return []
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error("Failed to load Xueqiu logs: %s", e)
-        return []
-
-
-@app.get(
-    "/settings/xueqiu/inject",
-)
-async def inject_xueqiu_token(token: str, redirect: bool = False, key: str = None):
-    """Directly inject a Xueqiu token from a bookmarklet or script."""
-    from fastapi import Response
-    from fastapi.responses import RedirectResponse
-    from src.config.paths import active_tenant_var
-    
-    if key:
-        keys_list = _load_tenant_keys()
-        for k in keys_list:
-            if k.get("key") == key:
-                active_tenant_var.set(k["tenant_id"])
-                break
-                
-    token = token.strip()
-    if not token:
-        raise HTTPException(status_code=400, detail="Token cannot be empty")
-        
-    from src.config.paths import get_data_dir
-    data_dir = get_data_dir()
-    path = data_dir / "xueqiu_monitor.json"
-    
-    data = {"enabled": False, "feishu_webhook": "", "combos": {}, "xq_tokens": []}
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-            
-    tokens = data.get("xq_tokens", [])
-    if token not in tokens:
-        tokens.append(token)
-        data["xq_tokens"] = tokens
-        try:
-            path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        except Exception as e:
-            logger.error("Failed to inject token: %s", e)
-            raise HTTPException(status_code=500, detail=f"Failed to inject token: {e}")
-            
-    if redirect:
-        return RedirectResponse(url="/xueqiu")
-
-    # Return JSON with CORS headers to bypass browser restrictions silently
-    headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "*"
-    }
-    return Response(
-        content=json.dumps({"status": "success"}),
-        media_type="application/json",
-        headers=headers
-    )
-
-
-@app.get(
-    "/settings/xueqiu/combos/details",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_xueqiu_combos_details():
-    """Fetch current quote and holding details for all monitored portfolios of this tenant."""
-    import json
-    import random
-    import requests
-    import concurrent.futures
-    import time
-    from src.config.paths import get_data_dir
-    from src.platforms.xueqiu_watcher import USER_AGENT_POOL, DEFAULT_XQ_TOKENS
-    
-    data_dir = get_data_dir()
-    config_path = data_dir / "xueqiu_monitor.json"
-    
-    if not config_path.exists():
-        return []
-        
-    try:
-        config = json.loads(config_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error("Failed to read config: %s", e)
-        return []
-        
-    combos = config.get("combos", {})
-    if not combos:
-        return []
-        
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get()
-    mtime = config_path.stat().st_mtime if config_path.exists() else 0
-    current_time = time.time()
-    
-    if tenant in XUEQIU_COMBOS_CACHE:
-        cached_mtime, cached_time, cached_details = XUEQIU_COMBOS_CACHE[tenant]
-        if cached_mtime == mtime and (current_time - cached_time < 300):
-            logger.info("Serving xueqiu combo details from cache for tenant: %s", tenant)
-            return cached_details
-        
-    xq_tokens = [t.strip() for t in config.get("xq_tokens", []) if t.strip()]
-    if not xq_tokens:
-        xq_tokens = DEFAULT_XQ_TOKENS
-        
-    global XUEQIU_GLOBAL_DETAILS_CACHE
-    if not hasattr(app.state, "xueqiu_global_details_cache"):
-        app.state.xueqiu_global_details_cache = {}
-    details = []
-
-    def fetch_single(name: str, symbol: str):
-        current_time = time.time()
-        # 1. Try global shared cache first (valid for 5 minutes)
-        cached = app.state.xueqiu_global_details_cache.get(symbol)
-        if cached:
-            cached_time, cached_data = cached
-            if current_time - cached_time < 300:
-                logger.info("[XueqiuDetails] Shared Cache hit for symbol %s", symbol)
-                result = dict(cached_data)
-                result["name"] = name
-                return result
-
-        url = f"https://xueqiu.com/cubes/show.json?symbol={symbol}"
-        for retry in range(3):
-            token = xq_tokens[retry % len(xq_tokens)]
-            ua = random.choice(USER_AGENT_POOL)
-            cookie_header = token if ("xq_a_token=" in token or ";" in token) else f"xq_a_token={token};"
-            headers = {
-                "User-Agent": ua,
-                "Cookie": cookie_header,
-                "Accept": "application/json; text/plain, */*",
-                "Referer": f"https://xueqiu.com/P/{symbol}",
-            }
-            try:
-                r = requests.get(url, headers=headers, verify=False, timeout=8)
-                if r.status_code == 200:
-                    data = r.json()
-                    
-                    # Extract holdings
-                    view_rb = data.get("view_rebalancing")
-                    holdings_list = []
-                    
-                    if view_rb is not None:
-                        raw_holdings = view_rb.get("holdings", []) or []
-                        for h in raw_holdings:
-                            holdings_list.append({
-                                "stock_name": h.get("stock_name", ""),
-                                "stock_symbol": h.get("stock_symbol", ""),
-                                "weight": h.get("weight", 0.0)
-                            })
-                    else:
-                        # Fallback to current.json endpoint for holdings
-                        fallback_url = f"https://xueqiu.com/cubes/rebalancing/current.json?cube_symbol={symbol}"
-                        try:
-                            fallback_r = requests.get(fallback_url, headers=headers, verify=False, timeout=8)
-                            if fallback_r.status_code == 200:
-                                fallback_data = fallback_r.json()
-                                last_success = fallback_data.get("last_success_rb", {})
-                                raw_holdings = last_success.get("holdings", []) or []
-                                for h in raw_holdings:
-                                    holdings_list.append({
-                                        "stock_name": h.get("stock_name", ""),
-                                        "stock_symbol": h.get("stock_symbol", ""),
-                                        "weight": h.get("weight", 0.0)
-                                    })
-                            else:
-                                return {
-                                    "name": name,
-                                    "symbol": symbol,
-                                    "net_value": None,
-                                    "total_gain": None,
-                                    "daily_gain": None,
-                                    "monthly_gain": None,
-                                    "error": f"获取持仓失败 (API返回状态码: {fallback_r.status_code})"
-                                }
-                        except Exception as e:
-                            logger.error("Fallback error fetching current.json for %s: %s", symbol, e)
-                            return {
-                                "name": name,
-                                "symbol": symbol,
-                                "net_value": None,
-                                "total_gain": None,
-                                "daily_gain": None,
-                                "monthly_gain": None,
-                                "error": f"获取持仓失败 (网络或解析异常: {e})"
-                            }
-                        
-                    # Extract quote details with a fallback to nav_daily/all.json if they are None
-                    net_val = data.get("net_value")
-                    total_g = data.get("total_gain")
-                    daily_g = data.get("daily_gain")
-                    monthly_g = data.get("monthly_gain")
-                    
-                    if net_val is None or total_g is None or daily_g is None or monthly_g is None:
-                        nav_url = f"https://xueqiu.com/cubes/nav_daily/all.json?cube_symbol={symbol}"
-                        try:
-                            nav_r = requests.get(nav_url, headers=headers, verify=False, timeout=8)
-                            if nav_r.status_code == 200:
-                                nav_data = nav_r.json()
-                                portfolio_item = None
-                                for item in nav_data:
-                                    if isinstance(item, dict) and item.get("symbol") == symbol:
-                                        portfolio_item = item
-                                        break
-                                
-                                if portfolio_item:
-                                    points = portfolio_item.get("list", []) or []
-                                    if len(points) >= 1:
-                                        latest = points[-1]
-                                        if net_val is None:
-                                            net_val = latest.get("value")
-                                        if total_g is None:
-                                            total_g = latest.get("percent")
-                                        if daily_g is None and len(points) >= 2:
-                                            prev = points[-2]
-                                            if latest.get("value") and prev.get("value"):
-                                                daily_g = (latest["value"] - prev["value"]) / prev["value"] * 100
-                                        if monthly_g is None:
-                                            latest_time = latest.get("time")
-                                            if latest_time:
-                                                target_time = latest_time - 30 * 86400 * 1000
-                                                closest_point = None
-                                                min_diff = float('inf')
-                                                for p in points:
-                                                    p_time = p.get("time")
-                                                    if p_time:
-                                                        diff = abs(p_time - target_time)
-                                                        if diff < min_diff:
-                                                            min_diff = diff
-                                                            closest_point = p
-                                                if closest_point and closest_point.get("value") and latest.get("value"):
-                                                    if closest_point != latest:
-                                                        monthly_g = (latest["value"] - closest_point["value"]) / closest_point["value"] * 100
-                        except Exception as nav_e:
-                            logger.error("Fallback error fetching nav_daily for %s: %s", symbol, nav_e)
-                            
-                    res = {
-                        "name": name,
-                        "symbol": symbol,
-                        "net_value": net_val,
-                        "total_gain": total_g,
-                        "daily_gain": daily_g,
-                        "monthly_gain": monthly_g,
-                        "holdings": holdings_list
-                    }
-                    app.state.xueqiu_global_details_cache[symbol] = (current_time, res)
-                    return res
-                elif r.status_code == 429:
-                    continue
-            except Exception as e:
-                logger.error("Error fetching detail for %s: %s", symbol, e)
-
-        return {
-            "name": name,
-            "symbol": symbol,
-            "error": "Failed to fetch data from Xueqiu"
-        }
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(combos), 5)) as executor:
-        futures = {executor.submit(fetch_single, name, symbol): (name, symbol) for name, symbol in combos.items()}
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                res = future.result()
-                details.append(res)
-            except Exception as e:
-                name, symbol = futures[future]
-                logger.error("Failed to fetch concurrent details for %s: %s", symbol, e)
-                details.append({
-                    "name": name,
-                    "symbol": symbol,
-                    "error": f"Failed to fetch concurrently: {e}"
-                })
-            
-    details.sort(key=lambda x: x.get("name", ""))
-    XUEQIU_COMBOS_CACHE[tenant] = (mtime, current_time, details)
-    return details
-
-
-@app.get(
-    "/api/quote/realtime",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_realtime_quotes(codes: str):
-    """Batch fetch realtime L1 quotes for symbols."""
-    from src.market.shared_data_hub import SharedMemoryHub
-    
-    symbol_list = [s.strip() for s in codes.split(",") if s.strip()]
-    if not symbol_list:
-        return {}
-
-    try:
-        return SharedMemoryHub().get_quotes(symbol_list)
-    except Exception as e:
-        logger.error("Error fetching realtime quotes via SharedMemoryHub: %s", e)
-        return {}
-
-
-@app.get(
-    "/api/quote/realtime/{code}",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_realtime_quote(code: str):
-    """Fetch single realtime L1 quote."""
-    from src.market.shared_data_hub import SharedMemoryHub
-
-    try:
-        quotes = SharedMemoryHub().get_quotes([code])
-        return quotes.get(code, {})
-    except Exception as e:
-        logger.error("Error fetching single quote %s via SharedMemoryHub: %s", code, e)
-        return {}
-
-
-@app.get(
-    "/api/quote/gateway/status",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_quote_gateway_status():
-    """Get status of the market quote TCP connection pool."""
-    from src.market.tdx_bridge import TdxGateway
-    return TdxGateway().get_status()
-
-
-@app.get(
-    "/settings/xueqiu/qrcode",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_xueqiu_qrcode(request: Request):
-    """Generate a unique QR code session for simulated Xueqiu OAuth-style login."""
-    import uuid
-    import time
-    
-    qrcode_id = str(uuid.uuid4())
-    XUEQIU_QR_SESSIONS[qrcode_id] = {
-        "status": "waiting",
-        "token": None,
-        "created_at": time.time()
-    }
-    
-    base_url = str(request.base_url)
-    if not base_url.endswith("/"):
-        base_url += "/"
-    auth_url = f"{base_url}xueqiu/auth?id={qrcode_id}"
-    
-    return {
-        "qrcode_id": qrcode_id,
-        "auth_url": auth_url
-    }
-
-
-@app.get(
-    "/settings/xueqiu/qrcode/status",
-    dependencies=[Depends(require_local_or_auth)],
-)
-async def get_xueqiu_qrcode_status(id: str):
-    """Poll QR code status and automatically inject token upon success."""
-    session = XUEQIU_QR_SESSIONS.get(id)
-    if not session:
-        return {"status": "expired"}
-        
-    status = session["status"]
-    if status == "confirmed" and session.get("token"):
-        token = session["token"]
-        
-        from src.config.paths import get_data_dir
-        data_dir = get_data_dir()
-        path = data_dir / "xueqiu_monitor.json"
-        
-        data = {"enabled": False, "feishu_webhook": "", "combos": {}, "xq_tokens": []}
-        if path.exists():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-                
-        tokens = data.get("xq_tokens", [])
-        if token not in tokens:
-            tokens.append(token)
-            data["xq_tokens"] = tokens
-            try:
-                path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-            except Exception as e:
-                logger.error("Failed to auto-save token from QR code: %s", e)
-                
-        XUEQIU_QR_SESSIONS.pop(id, None)
-        return {"status": "confirmed", "token": token}
-        
-    return {"status": status}
-
-
-@app.post(
-    "/settings/xueqiu/qrcode/confirm",
-)
-async def confirm_xueqiu_qrcode(payload: ConfirmQRCodeRequest):
-    """Simulate user scans QR code and confirms login, sending token."""
-    qrcode_id = payload.qrcode_id
-    token = payload.token.strip()
-    if not token:
-        raise HTTPException(status_code=400, detail="Token cannot be empty")
-        
-    session = XUEQIU_QR_SESSIONS.get(qrcode_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="QR code session not found or expired")
-        
-    session["status"] = "confirmed"
-    session["token"] = token
-    return {"status": "success"}
-
-
-@app.post(
-    "/settings/xueqiu/qrcode/scan",
-)
-async def scan_xueqiu_qrcode(id: str = Query(...)):
-    """Simulate scan event (status becomes 'scanned')."""
-    session = XUEQIU_QR_SESSIONS.get(id)
-    if not session:
-        raise HTTPException(status_code=404, detail="QR code session not found or expired")
-        
-    session["status"] = "scanned"
-    return {"status": "success"}
-
-
-
-@app.get("/correlation")
-async def get_correlation_matrix(
-    codes: str = Query(..., description="Comma-separated asset codes, e.g. BTC-USDT,ETH-USDT,SPY"),
-    days: int = Query(90, description="Lookback window in days", ge=7, le=365),
-    method: str = Query("pearson", description="Correlation method: pearson or spearman"),
-):
-    """Compute cross-asset correlation matrix from daily returns.
-
-    Fetches price data for each code via available data loaders,
-    computes pairwise correlation of daily returns over the lookback window.
-    """
-    from backtest.correlation import compute_correlation_matrix
-
-    def _normalize_code(c: str) -> str:
-        raw = c.strip().upper()
-        if not raw:
-            return ""
-        if "." in raw or "-" in raw:
-            return raw
-        # If it is a bare digit code, determine market based on A-share patterns
-        if raw.isdigit():
-            if raw.startswith(("6", "9", "5")):
-                return f"{raw}.SH"
-            elif raw.startswith(("0", "3", "1")):
-                return f"{raw}.SZ"
-            elif raw.startswith(("4", "8")):
-                return f"{raw}.BJ"
-        return raw
-
-    code_list = [_normalize_code(c) for c in codes.split(",") if c.strip()]
-    code_list = [c for c in code_list if c]
-    if len(code_list) < 2:
-        raise HTTPException(status_code=400, detail="At least 2 asset codes required")
-    if len(code_list) > 20:
-        raise HTTPException(status_code=400, detail="Maximum 20 assets per request")
-    if method not in ("pearson", "spearman"):
-        raise HTTPException(status_code=400, detail="method must be 'pearson' or 'spearman'")
-
-    try:
-        result = compute_correlation_matrix(codes=code_list, days=days, method=method)
-        return result
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Correlation computation failed: {exc}")
-
-
-def _terminate_current_process() -> None:
-    """Stop the current API process after the response has been sent."""
-    time.sleep(0.25)
-    os.kill(os.getpid(), signal.SIGTERM)
-
-
-@app.post("/system/shutdown")
-async def shutdown_local_api(
-    background_tasks: BackgroundTasks,
-    request: Request,
-    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
-):
-    """Shut down the local API server after explicit local authorization."""
-    _require_shutdown_authorization(request=request, cred=cred)
-    client_host = request.client.host if request.client else ""
-    if client_host not in {"127.0.0.1", "::1", "localhost"}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Local access only")
-
-    background_tasks.add_task(_terminate_current_process)
-    return {
-        "status": "shutting-down",
-        "service": "TideTrading API",
-        "timestamp": datetime.now().isoformat(),
-    }
-
-
-@app.get("/skills")
-async def list_skills():
-    """List registered skills (name and description)."""
-    from src.agent.skills import SkillsLoader
-
-    loader = SkillsLoader()
-    return [
-        {
-            "name": s.name,
-            "description": s.description,
-        }
-        for s in loader.skills
-    ]
-
-
-@app.get("/api")
-async def api_info():
-    """Service metadata."""
-    return {
-        "service": "TideTrading API",
-        "version": APP_VERSION,
-        "docs": "/docs",
-        "health": "/health",
-    }
 
 
 # ============================================================================
-# Session API
+# Session service (shared by session routes, channels, scheduled, live)
 # ============================================================================
 
 _session_services: dict[str, Any] = {}
-_goal_stores: dict[str, Any] = {}
 _session_service = True  # Dummy truthy value for test compatibility
-_goal_store = True       # Dummy truthy value for test compatibility
 
 
 def _get_session_service():
@@ -5066,7 +1215,7 @@ def _get_session_service():
     from src.session.events import EventBus
     from src.session.service import SessionService
 
-    store = SessionStore(base_dir=_get_sessions_dir())
+    store = SessionStore(base_dir=SESSIONS_DIR)
     event_bus = EventBus()
 
     try:
@@ -5078,1516 +1227,170 @@ def _get_session_service():
     svc = SessionService(
         store=store,
         event_bus=event_bus,
-        runs_dir=_get_runs_dir(),
+        runs_dir=RUNS_DIR,
     )
     _session_services[tenant] = svc
     return svc
 
 
 def _get_goal_store():
-    """Return the shared finance goal store."""
-    global _goal_store, _goal_stores
-    if _goal_store is None:
-        _goal_stores.clear()
-        _goal_store = True
-
-    from src.config.paths import active_tenant_var
-    tenant = active_tenant_var.get() or "default"
-
-    if tenant in _goal_stores:
-        return _goal_stores[tenant]
-
-    from src.goal import GoalStore
-
-    store = GoalStore()
-    _goal_stores[tenant] = store
-    return store
+    from src.api.sessions_routes import _get_goal_store
+    return _get_goal_store()
 
 
-def _get_existing_session_or_404(session_id: str):
+_channel_runtime = None
+_channel_bus = None
+_channel_manager = None
+
+
+def _get_channel_runtime():
+    """Lazy-init IM channel runtime without starting platform adapters."""
+    global _channel_runtime, _channel_bus, _channel_manager
+    if _channel_runtime is not None:
+        return _channel_runtime
+
+    from src.channels.bus.queue import MessageBus
+    from src.channels.config import load_channels_config
+    from src.channels.manager import ChannelManager
+    from src.channels.runtime import ChannelRuntime
+
     svc = _get_session_service()
     if not svc:
         raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    session = svc.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    return svc, session
 
-
-@app.post("/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_auth)])
-async def create_session(request: CreateSessionRequest):
-    """Create a chat session."""
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    session = svc.create_session(title=request.title, config=request.config)
-    return SessionResponse(
-        session_id=session.session_id,
-        title=session.title,
-        status=session.status.value,
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-        last_attempt_id=session.last_attempt_id,
+    _channel_bus = MessageBus()
+    config = load_channels_config()
+    _channel_manager = ChannelManager(config, _channel_bus, session_service=svc)
+    _channel_runtime = ChannelRuntime(
+        bus=_channel_bus,
+        session_service=svc,
+        manager=_channel_manager,
+        reply_timeout_s=config["reply_timeout_s"],
     )
+    return _channel_runtime
 
 
-@app.get("/sessions", response_model=List[SessionResponse], dependencies=[Depends(require_auth)])
-async def list_sessions(limit: int = Query(50, ge=1, le=200)):
-    """List sessions."""
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    sessions = svc.list_sessions(limit=limit)
-    return [
-        SessionResponse(
-            session_id=s.session_id,
-            title=s.title,
-            status=s.status.value,
-            created_at=s.created_at,
-            updated_at=s.updated_at,
-            last_attempt_id=s.last_attempt_id,
-        )
-        for s in sessions
-    ]
+# ============================================================================
+# Session routes - defined in src/api/sessions_routes.py
+# ============================================================================
 
+from src.api.sessions_routes import register_sessions_routes  # noqa: E402
 
-@app.get("/sessions/{session_id}", response_model=SessionResponse, dependencies=[Depends(require_auth)])
-async def get_session(session_id: str):
-    """Get one session by id."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    session = svc.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    return SessionResponse(
-        session_id=session.session_id,
-        title=session.title,
-        status=session.status.value,
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-        last_attempt_id=session.last_attempt_id,
-    )
+register_sessions_routes(app)
 
-
-@app.post(
-    "/sessions/{session_id}/goal",
-    response_model=GoalSnapshotResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_auth)],
+# Re-export for test monkeypatch compatibility
+from src.api.sessions_routes import (  # noqa: F401, E402
+    _goal_store,
+    _live_action_frame_from_tool_result,
+    _mandate_proposal_frame_from_tool_result,
 )
-async def create_session_goal(session_id: str, req: CreateGoalRequest):
-    """Create or replace the current finance research goal for a session."""
-    _validate_path_param(session_id, "session_id")
-    svc, _session = _get_existing_session_or_404(session_id)
-    from src.goal import RiskTier
-
-    criteria = [item.strip() for item in req.criteria if item.strip()]
-    if not criteria:
-        criteria = default_goal_criteria()
-    try:
-        risk_tier = RiskTier(req.risk_tier)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"invalid risk_tier: {req.risk_tier}") from exc
-    if risk_tier is RiskTier.LIVE_TRADING_OR_EXECUTION:
-        raise HTTPException(status_code=400, detail="live trading or execution goals are not supported")
-
-    goal_store = _get_goal_store()
-    try:
-        goal = goal_store.replace_goal(
-            session_id=session_id,
-            objective=req.objective,
-            criteria=criteria,
-            ui_summary=req.ui_summary,
-            source="api",
-            protocol=req.protocol,
-            risk_tier=risk_tier,
-            token_budget=req.token_budget,
-            turn_budget=req.turn_budget,
-            time_budget_seconds=req.time_budget_seconds,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    snapshot = goal_store.get_goal_snapshot(goal.goal_id)
-    if snapshot is None:
-        raise HTTPException(status_code=500, detail="Goal created but could not be reloaded")
-
-    if _session:
-        _session.title = req.objective.strip()[:50]
-        svc.store.update_session(_session)
-        svc._search_index.index_session(_session.session_id, _session.title)
-
-    svc.event_bus.emit(session_id, "goal.created", {"goal": snapshot["goal"]})
-    return snapshot
 
 
-@app.get(
-    "/sessions/{session_id}/goal",
-    response_model=GoalSnapshotResponse,
-    dependencies=[Depends(require_auth)],
+
+# ============================================================================
+# System routes - defined in src/api/system_routes.py
+# ============================================================================
+
+from src.api.system_routes import register_system_routes  # noqa: E402
+register_system_routes(app)
+
+# Re-export for test monkeypatch compatibility
+from src.api.system_routes import _terminate_current_process  # noqa: F401, E402
+
+
+# ============================================================================
+# Settings routes - defined in src/api/settings_routes.py
+# ============================================================================
+
+from src.api.settings_routes import register_settings_routes  # noqa: E402
+register_settings_routes(app)
+
+# Re-export for test monkeypatch compatibility
+from src.api.settings_routes import (  # noqa: F401, E402
+    _baostock_supported,
+    _baostock_installed,
+    _load_llm_providers,
 )
-async def get_session_goal(session_id: str):
-    """Return the current finance research goal snapshot for a session."""
-    _validate_path_param(session_id, "session_id")
-    _get_existing_session_or_404(session_id)
-    snapshot = _get_goal_store().get_current_snapshot(session_id)
-    if snapshot is None:
-        raise HTTPException(status_code=404, detail="No current goal")
-    return snapshot
 
 
-@app.patch(
-    "/sessions/{session_id}/goal",
-    response_model=UpdateGoalResponse,
-    dependencies=[Depends(require_auth)],
+# ============================================================================
+# Upload routes - defined in src/api/uploads_routes.py
+# ============================================================================
+
+from src.api.uploads_routes import register_uploads_routes  # noqa: E402
+register_uploads_routes(app)
+
+# Re-export upload constants for test access via ``api_server.*``.
+from src.api.uploads_routes import (  # noqa: E402
+    MAX_UPLOAD_SIZE,
+    UPLOADS_DIR,
+    _BLOCKED_UPLOAD_EXT,
+    _BLOCKED_UPLOAD_NAMES,
+    _SHADOW_ID_RE,
+    _UPLOAD_CHUNK_SIZE,
 )
-async def update_session_goal(session_id: str, req: UpdateGoalRequest):
-    """Edit the current finance research goal without replacing the session."""
-    _validate_path_param(session_id, "session_id")
-    svc, _session = _get_existing_session_or_404(session_id)
-    from src.goal import StaleGoalError
-
-    if req.objective is None and req.ui_summary is None:
-        raise HTTPException(status_code=400, detail="objective or ui_summary is required")
-
-    goal_store = _get_goal_store()
-    try:
-        goal = goal_store.update_goal(
-            session_id=session_id,
-            goal_id=req.goal_id,
-            expected_goal_id=req.expected_goal_id,
-            objective=req.objective,
-            ui_summary=req.ui_summary,
-        )
-    except StaleGoalError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    snapshot = goal_store.get_goal_snapshot(goal.goal_id)
-    if snapshot is None:
-        raise HTTPException(status_code=500, detail="Goal snapshot could not be reloaded")
-    svc.event_bus.emit(session_id, "goal.updated", {"goal": snapshot["goal"], "snapshot": snapshot})
-    return {"goal": snapshot["goal"], "snapshot": snapshot}
 
 
-@app.post(
-    "/sessions/{session_id}/goal/evidence",
-    response_model=AddGoalEvidenceResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_auth)],
+# ============================================================================
+# Channel routes registration - after require_auth is defined
+# ============================================================================
+
+from src.api.channels_routes import register_channels_routes  # noqa: E402
+
+register_channels_routes(app)
+
+# Re-export for test monkeypatch compatibility
+from src.api.channels_routes import (  # noqa: F401, E402
+    ChannelPairingCommandRequest,
 )
-async def add_session_goal_evidence(session_id: str, req: AddGoalEvidenceRequest):
-    """Append traceable evidence to the current finance research goal."""
-    _validate_path_param(session_id, "session_id")
-    svc, _session = _get_existing_session_or_404(session_id)
-    from dataclasses import asdict
-    from src.goal import EvidenceInput, StaleGoalError
-
-    goal_store = _get_goal_store()
-    try:
-        evidence = goal_store.append_evidence(
-            session_id=session_id,
-            goal_id=req.goal_id,
-            expected_goal_id=req.expected_goal_id,
-            evidence=EvidenceInput(
-                criterion_id=req.criterion_id,
-                claim_id=req.claim_id,
-                evidence_type=req.evidence_type,
-                text=req.text,
-                tool_call_id=req.tool_call_id,
-                run_id=req.run_id,
-                source_provider=req.source_provider,
-                source_type=req.source_type,
-                source_uri=req.source_uri,
-                symbol_universe=req.symbol_universe,
-                benchmark=req.benchmark,
-                timeframe=req.timeframe,
-                method=req.method,
-                assumptions=req.assumptions,
-                artifact_path=req.artifact_path,
-                artifact_hash=req.artifact_hash,
-                data_as_of=req.data_as_of,
-                confidence=req.confidence,
-                caveat=req.caveat,
-                contradicts_claim_ids=req.contradicts_claim_ids,
-            ),
-        )
-    except StaleGoalError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    snapshot = goal_store.get_goal_snapshot(req.goal_id)
-    if snapshot is None:
-        raise HTTPException(status_code=500, detail="Goal snapshot could not be reloaded")
-    svc.event_bus.emit(
-        session_id,
-        "goal.evidence",
-        {"evidence": asdict(evidence), "goal_id": req.goal_id},
-    )
-    return {"evidence": asdict(evidence), "snapshot": snapshot}
 
 
-@app.patch(
-    "/sessions/{session_id}/goal/status",
-    response_model=UpdateGoalStatusResponse,
-    dependencies=[Depends(require_auth)],
+
+# ============================================================================
+# Swarm routes - defined in src/api/swarm_routes.py
+# ============================================================================
+
+from src.api.swarm_routes import register_swarm_routes  # noqa: E402
+
+register_swarm_routes(app)
+
+# Re-export for test monkeypatch compatibility
+from src.api.swarm_routes import _get_swarm_runtime  # noqa: F401, E402
+
+
+# ============================================================================
+# Live trading routes - defined in src/api/live_routes.py
+# ============================================================================
+
+from src.api.live_routes import register_live_routes  # noqa: E402
+
+register_live_routes(app)
+
+# Re-export for test monkeypatch compatibility
+from src.api.live_routes import (  # noqa: F401, E402
+    CommitMandateRequest,
+    LiveHaltRequest,
+    LiveAuthorizeRequest,
+    LiveRunnerControlRequest,
+    BrokerAuthState,
+    MandateLimits,
+    ActiveMandateState,
+    RunnerLivenessState,
+    LiveBrokerStatus,
+    LiveStatusResponse,
+    LiveRunnerUnavailable,
+    _runner_tasks,
+    _runner_factory,
+    _emit_live_event,
+    _fetch_broker_ceilings,
+    _known_live_brokers,
+    _oauth_token_present,
+    _active_mandate_state,
+    _runner_liveness_state,
+    _live_broker_adapter,
+    _build_live_runner,
+    _drive_runner,
 )
-async def update_session_goal_status(session_id: str, req: UpdateGoalStatusRequest):
-    """Update the current finance research goal status."""
-    _validate_path_param(session_id, "session_id")
-    svc, _session = _get_existing_session_or_404(session_id)
-    from src.goal import AuditRow, GoalStatus, StaleGoalError
-
-    try:
-        next_status = GoalStatus(req.status)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"invalid goal status: {req.status}") from exc
-
-    goal_store = _get_goal_store()
-    try:
-        goal = goal_store.update_status(
-            session_id=session_id,
-            goal_id=req.goal_id,
-            expected_goal_id=req.expected_goal_id,
-            status=next_status,
-            audit=[
-                AuditRow(
-                    criterion_id=row.criterion_id,
-                    result=row.result,
-                    evidence_ids=row.evidence_ids,
-                    notes=row.notes,
-                )
-                for row in req.audit
-            ],
-            recap=req.recap,
-        )
-    except StaleGoalError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    snapshot = goal_store.get_goal_snapshot(goal.goal_id)
-    if snapshot is None:
-        raise HTTPException(status_code=500, detail="Goal snapshot could not be reloaded")
-    svc.event_bus.emit(session_id, "goal.updated", {"goal": snapshot["goal"], "snapshot": snapshot})
-    return {"goal": snapshot["goal"], "snapshot": snapshot}
-
-
-@app.delete("/sessions/{session_id}", dependencies=[Depends(require_auth)])
-async def delete_session(session_id: str):
-    """Delete a session."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    deleted = svc.delete_session(session_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    _get_goal_store().delete_session_goals(session_id)
-    return {"status": "deleted", "session_id": session_id}
-
-
-class UpdateSessionRequest(BaseModel):
-    """Session update fields."""
-    title: Optional[str] = None
-
-
-@app.patch("/sessions/{session_id}", dependencies=[Depends(require_auth)])
-async def update_session(session_id: str, req: UpdateSessionRequest):
-    """Update session fields (e.g. title)."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    session = svc.store.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    if req.title is not None:
-        session.title = req.title
-    from datetime import datetime
-    session.updated_at = datetime.now().isoformat()
-    svc.store.update_session(session)
-    return {"status": "updated", "session_id": session_id}
-
-
-@app.post("/sessions/{session_id}/messages", dependencies=[Depends(require_auth)])
-async def send_message(session_id: str, payload: SendMessageRequest, http_request: Request):
-    """Send a user message and start the agent loop (natural language strategy)."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    try:
-        result = await svc.send_message(
-            session_id=session_id,
-            content=payload.content,
-            include_shell_tools=_shell_tools_enabled_for_request(http_request),
-        )
-        return result
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-
-
-@app.post("/sessions/{session_id}/cancel", dependencies=[Depends(require_auth)])
-async def cancel_session(session_id: str):
-    """Cancel the in-flight agent loop for this session."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    cancelled = svc.cancel_current(session_id)
-    if not cancelled:
-        return {"status": "no_active_loop"}
-    return {"status": "cancelled"}
-
-
-@app.get("/sessions/{session_id}/messages", response_model=List[MessageResponse], dependencies=[Depends(require_auth)])
-async def get_messages(session_id: str, limit: int = Query(100, ge=1, le=1000)):
-    """List messages for a session."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    messages = svc.get_messages(session_id, limit=limit)
-    return [
-        MessageResponse(
-            message_id=m.message_id,
-            session_id=m.session_id,
-            role=m.role,
-            content=m.content,
-            created_at=m.created_at,
-            linked_attempt_id=m.linked_attempt_id,
-            metadata=m.metadata if m.metadata else None,
-        )
-        for m in messages
-    ]
-
-
-@app.get("/sessions/{session_id}/events", dependencies=[Depends(require_event_stream_auth)])
-async def session_events(
-    session_id: str,
-    request: Request,
-    last_event_id: Optional[str] = Query(None, alias="Last-Event-ID"),
-    replay: Optional[str] = Query(None),
-):
-    """SSE stream for agent events."""
-    _validate_path_param(session_id, "session_id")
-    svc = _get_session_service()
-    if not svc:
-        raise HTTPException(status_code=501, detail="Session runtime not enabled")
-    session = svc.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-
-    header_id = request.headers.get("Last-Event-ID")
-    event_id = header_id or last_event_id
-    replay_active = (replay or "").lower() == "active"
-    replay_all = False
-    if replay_active and not event_id and session.last_attempt_id:
-        attempt = svc.store.get_attempt(session_id, session.last_attempt_id)
-        attempt_status = getattr(attempt.status, "value", attempt.status) if attempt else None
-        replay_all = attempt_status == "running"
-
-    async def event_generator():
-        async for event in svc.event_bus.subscribe(
-            session_id,
-            last_event_id=event_id,
-            replay_all=replay_all,
-        ):
-            if await request.is_disconnected():
-                break
-            yield event.to_sse()
-            relayed = _mandate_proposal_frame_from_tool_result(event)
-            if relayed is not None:
-                yield relayed
-            live_action = _live_action_frame_from_tool_result(event)
-            if live_action is not None:
-                yield live_action
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
-# ============================================================================
-# File Upload
-# ============================================================================
-
-_BLOCKED_UPLOAD_EXT = {
-    # binaries / executables we should never accept
-    ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".app", ".dmg",
-    ".so", ".dll", ".dylib",
-    # executable-adjacent source, shell, config, and template files
-    ".py", ".pyw", ".sh", ".bash", ".zsh", ".fish", ".ps1",
-    ".yaml", ".yml", ".j2", ".jinja", ".jinja2", ".template",
-    # archives — don't auto-extract; user can unpack locally
-    ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz",
-}
-
-_BLOCKED_UPLOAD_NAMES = {
-    "dockerfile",
-    "containerfile",
-}
-
-
-_SHADOW_ID_RE = __import__("re").compile(r"^shadow_[0-9a-f]{8}$")
-
-
-@app.get("/shadow-reports/{shadow_id}", dependencies=[Depends(require_auth)])
-async def get_shadow_report(shadow_id: str, format: str = "html"):
-    """Serve a rendered Shadow Account report (HTML by default, PDF if available).
-
-    Reports live under ``~/.vibe-trading/shadow_reports/<shadow_id>.{html,pdf}``.
-    """
-    if not _SHADOW_ID_RE.match(shadow_id):
-        raise HTTPException(status_code=400, detail="invalid shadow_id")
-    if format not in ("html", "pdf"):
-        raise HTTPException(status_code=400, detail="format must be html or pdf")
-
-    reports_dir = _get_active_runtime_dir() / "shadow_reports"
-    path = reports_dir / f"{shadow_id}.{format}"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Shadow report not found: {shadow_id}.{format}")
-
-    media_type = "text/html; charset=utf-8" if format == "html" else "application/pdf"
-    # Inline so browsers render HTML/PDF directly instead of forcing download.
-    return FileResponse(
-        path,
-        media_type=media_type,
-        headers={"Content-Disposition": f'inline; filename="{shadow_id}.{format}"'},
-    )
-
-
-@app.post("/upload", dependencies=[Depends(require_auth)])
-async def upload_file(file: UploadFile):
-    """Upload any document or data file (max 50MB).
-
-    Accepts most common formats: PDF, Word, Excel, PowerPoint, images,
-    CSV/TSV, plain text, JSON, and TOML. Executables, executable-adjacent
-    source/config/template files, and archives are rejected.
-    """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Missing filename")
-    filename = Path(file.filename).name
-    ext = Path(filename).suffix.lower()
-    if ext in _BLOCKED_UPLOAD_EXT or filename.lower() in _BLOCKED_UPLOAD_NAMES:
-        raise HTTPException(
-            status_code=400,
-            detail="This file type is not allowed for upload.",
-        )
-
-    safe_name = f"{uuid.uuid4().hex}{ext}"
-    uploads_dir = _get_uploads_dir()
-    dest = uploads_dir / safe_name
-    total_size = 0
-
-    try:
-        uploads_dir.mkdir(parents=True, exist_ok=True)
-        with dest.open("wb") as handle:
-            while True:
-                chunk = await file.read(_UPLOAD_CHUNK_SIZE)
-                if not chunk:
-                    break
-                total_size += len(chunk)
-                if total_size > MAX_UPLOAD_SIZE:
-                    handle.close()
-                    if dest.exists():
-                        dest.unlink()
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"File too large (limit {MAX_UPLOAD_SIZE // (1024 * 1024)} MB)",
-                    )
-                handle.write(chunk)
-    except HTTPException:
-        raise
-    except OSError as exc:
-        if dest.exists():
-            dest.unlink()
-        raise HTTPException(
-            status_code=500,
-            detail="Upload failed while storing the file. Please retry or choose a different file.",
-        ) from exc
-    finally:
-        await file.close()
-
-    return {
-        "status": "ok",
-        "file_path": f"uploads/{safe_name}",
-        "filename": filename,
-    }
-
-
-# ============================================================================
-# Swarm API
-# ============================================================================
-
-# Per-tenant SwarmRuntime cache: {tenant_id: SwarmRuntime}
-_swarm_runtime_cache: dict = {}
-
-
-def _get_swarm_runtime():
-    """Lazy-init SwarmRuntime per active tenant to ensure isolation."""
-    from src.config.paths import active_tenant_var
-    from src.config import load_swarm_agent_config
-    from src.swarm.store import SwarmStore, swarm_runs_root
-    from src.swarm.runtime import SwarmRuntime
-
-    tenant = active_tenant_var.get() or "default"
-    if tenant in _swarm_runtime_cache:
-        return _swarm_runtime_cache[tenant]
-
-    swarm_dir = swarm_runs_root()
-    swarm_dir.mkdir(parents=True, exist_ok=True)
-    store = SwarmStore(base_dir=swarm_dir)
-    # Boot-time / operator-trusted: REST API callers cannot influence the
-    # config path. See docs/2026-05-25_swarm_mcp_tools_roadmap.md.
-    agent_config = load_swarm_agent_config()
-    runtime = SwarmRuntime(store=store, agent_config=agent_config)
-    _swarm_runtime_cache[tenant] = runtime
-    return runtime
-
-
-@app.get("/swarm/presets")
-async def list_swarm_presets():
-    """List Swarm YAML presets."""
-    from src.swarm.presets import list_presets
-    return list_presets()
-
-
-@app.post("/swarm/runs", dependencies=[Depends(require_auth)])
-async def create_swarm_run(payload: dict, http_request: Request):
-    """Start a swarm run: body must include preset_name and user_vars."""
-    runtime = _get_swarm_runtime()
-    preset_name = payload.get("preset_name", "")
-    user_vars = payload.get("user_vars", {})
-    try:
-        run = runtime.start_run(
-            preset_name,
-            user_vars,
-            include_shell_tools=_shell_tools_enabled_for_request(http_request),
-        )
-        return {"id": run.id, "status": run.status.value, "preset_name": run.preset_name}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/swarm/runs", dependencies=[Depends(require_auth)])
-async def list_swarm_runs(limit: int = Query(20, ge=1, le=100)):
-    """List swarm runs (newest first), reconciled."""
-    runtime = _get_swarm_runtime()
-    runs = runtime._store.list_runs(limit=limit)
-    items = []
-    for r in runs:
-        # Reconcile each row: a zombie running run will be auto-finalized so
-        # the dashboard never shows a permanent "running" stuck row.
-        reconciled = runtime._store.reconcile_run(r, write=True)
-        items.append(
-            {
-                "id": reconciled.id,
-                "preset_name": reconciled.preset_name,
-                "status": reconciled.status.value,
-                "is_stale": runtime._store.is_run_stale(reconciled),
-                "created_at": reconciled.created_at,
-                "completed_at": reconciled.completed_at,
-                "task_count": len(reconciled.tasks),
-                "completed_count": sum(1 for t in reconciled.tasks if t.status.value == "completed"),
-            }
-        )
-    return items
-
-
-@app.get("/swarm/runs/{run_id}", dependencies=[Depends(require_auth)])
-async def get_swarm_run(run_id: str):
-    """Swarm run detail including task statuses (reconciled)."""
-    _validate_path_param(run_id, "run_id")
-    runtime = _get_swarm_runtime()
-    loaded = runtime._store.load_run(run_id)
-    if not loaded:
-        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-
-    run = runtime._store.reconcile_run(loaded, write=True)
-
-    return {
-        "id": run.id,
-        "preset_name": run.preset_name,
-        "status": run.status.value,
-        "is_stale": runtime._store.is_run_stale(run),
-        "user_vars": run.user_vars,
-        "agents": [a.model_dump() for a in run.agents],
-        "tasks": [t.model_dump() for t in run.tasks],
-        "created_at": run.created_at,
-        "completed_at": run.completed_at,
-        "final_report": run.final_report,
-    }
-
-
-@app.get("/swarm/runs/{run_id}/events", dependencies=[Depends(require_event_stream_auth)])
-async def swarm_run_events(run_id: str, request: Request, last_index: int = Query(0, ge=0)):
-    """SSE stream for a swarm run."""
-    import asyncio
-
-    _validate_path_param(run_id, "run_id")
-    runtime = _get_swarm_runtime()
-
-    async def event_stream():
-        idx = last_index
-        while True:
-            if await request.is_disconnected():
-                break
-            events = runtime._store.read_events(run_id, after_index=idx)
-            for evt in events:
-                idx += 1
-                yield f"id: {idx}\nevent: {evt.type}\ndata: {json.dumps(evt.model_dump(), ensure_ascii=False)}\n\n"
-            run = runtime._store.load_run(run_id)
-            if run:
-                # Reconcile so a zombie running run can still close this SSE
-                # stream cleanly — without it, a dead host would keep the
-                # stream open forever and block the dashboard's "done" state.
-                reconciled = runtime._store.reconcile_run(run, write=True)
-                if reconciled.status.value in ("completed", "failed", "cancelled"):
-                    yield f"event: done\ndata: {{\"status\": \"{reconciled.status.value}\"}}\n\n"
-                    break
-            await asyncio.sleep(2)
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-
-@app.post("/swarm/runs/{run_id}/cancel", dependencies=[Depends(require_auth)])
-async def cancel_swarm_run(run_id: str):
-    """Cancel an active swarm run."""
-    _validate_path_param(run_id, "run_id")
-    runtime = _get_swarm_runtime()
-    ok = runtime.cancel_run(run_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail=f"No active run {run_id}")
-    return {"status": "cancelled"}
-
-
-@app.post("/swarm/runs/{run_id}/retry", dependencies=[Depends(require_auth)])
-async def retry_swarm_run(run_id: str, http_request: Request):
-    """Retry a failed, stale, or cancelled swarm run.
-
-    Creates a new run with the same preset and user_vars as the original.
-    """
-    _validate_path_param(run_id, "run_id")
-    runtime = _get_swarm_runtime()
-    loaded = runtime._store.load_run(run_id)
-    if not loaded:
-        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-
-    # Reconcile first so a stale "running" run whose host died gets demoted
-    # before we gate on status; only a genuinely active run blocks retry.
-    from src.swarm.models import RunStatus
-
-    reconciled = runtime._store.reconcile_run(loaded, write=True)
-    if reconciled.status == RunStatus.running:
-        raise HTTPException(status_code=409, detail="Cannot retry a running run. Cancel it first.")
-
-    try:
-        new_run = runtime.start_run(
-            reconciled.preset_name,
-            reconciled.user_vars or {},
-            include_shell_tools=_shell_tools_enabled_for_request(http_request),
-        )
-        return {"id": new_run.id, "status": new_run.status.value, "preset_name": new_run.preset_name}
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ============================================================================
-# Live trading channel — consent commit + kill switch
-# ============================================================================
-#
-# These are the privileged SURFACE actions of the live-trading channel
-# (live-trading SPEC, Consent §1/§3/§4). None is an agent tool:
-#   - POST /mandate/commit  -> the single mandate writer (commit_mandate)
-#   - POST /live/halt       -> trip the kill switch (P5 trip_halt)
-#   - POST /live/resume     -> clear the kill switch (P5 clear_halt)
-# Each best-effort relays a mandate.committed / live.halted / live.action event
-# through the EXISTING session EventBus, so the frontend's already-wired
-# /sessions/{id}/events SSE stream reflects the state change. No new bus.
-
-
-def _emit_live_event(session_id: Optional[str], event_type: str, data: Dict[str, Any]) -> None:
-    """Best-effort relay of a live-channel event through the existing bus.
-
-    The event flows out the existing ``/sessions/{session_id}/events`` SSE
-    stream. Notifications never gate autonomy (SPEC Consent §5): a relay failure
-    or a missing session is swallowed — the state change already happened on disk.
-
-    Args:
-        session_id: Target session, or ``None`` to skip relay.
-        event_type: SSE event name (``mandate.committed`` / ``live.halted`` /
-            ``live.resumed`` / ``live.action``).
-        data: JSON-serializable event payload.
-    """
-    if not session_id:
-        return
-    try:
-        svc = _get_session_service()
-        if svc and svc.get_session(session_id):
-            svc.event_bus.emit(session_id, event_type, data)
-    except Exception:  # pragma: no cover - relay is non-blocking by contract
-        logger.debug("live event relay failed for %s/%s", session_id, event_type, exc_info=True)
-
-
-# ---- C1: propose_mandate_profiles tool_result -> mandate.proposal SSE frame ----
-#
-# The agent surfaces a proposal by calling the read-only ``propose_mandate_profiles``
-# tool whose tool_result JSON body is ``{"type":"mandate.proposal", ...}`` (SPEC
-# Consent §1). The CLI / frontend listen for a TOP-LEVEL ``mandate.proposal`` SSE
-# event. ``src/agent/loop.py`` only emits a truncated ``tool_result`` event
-# (``preview = result[:200]``) and is PROTECTED — we do NOT edit it. Instead this
-# open-file SSE seam (TASKS "Remaining integration items" #1, the recommended
-# wiring) detects the propose tool's tool_result on the stream, recovers the
-# ``proposal_id`` from the preview, reloads the FULL persisted proposal from the
-# proposal store (written by the tool before it returned), and emits the
-# ``mandate.proposal`` frame. No protected touch.
-
-_PROPOSAL_TOOL_NAME = "propose_mandate_profiles"
-_PROPOSAL_ID_RE = re.compile(r'"proposal_id"\s*:\s*"(mp_[0-9a-f]{32})"')
-
-
-def _load_full_proposal(proposal_id: str) -> Optional[Dict[str, Any]]:
-    """Reload a persisted ``mandate.proposal`` payload by id, broker-agnostic.
-
-    The propose tool persists the full proposal under
-    ``<runtime_root>/live/<broker>/proposals/<proposal_id>.json`` before
-    returning. The SSE ``tool_result`` preview is too short to carry the full
-    body, so the relay reloads it from disk. The broker segment is unknown from
-    the preview alone, so every broker's proposals directory is searched.
-
-    Args:
-        proposal_id: The ``mp_...`` id parsed from the tool_result preview.
-
-    Returns:
-        The full proposal dict, or ``None`` when not found / unreadable.
-    """
-    try:
-        from src.live.paths import live_root
-
-        for proposal_path in live_root().glob(f"*/proposals/{proposal_id}.json"):
-            try:
-                data = json.loads(proposal_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            if isinstance(data, dict) and data.get("type") == "mandate.proposal":
-                return data
-    except Exception:  # pragma: no cover - relay must never break the stream
-        logger.debug("mandate.proposal reload failed for %s", proposal_id, exc_info=True)
-    return None
-
-
-def _mandate_proposal_frame_from_tool_result(event: Any) -> Optional[str]:
-    """Build a ``mandate.proposal`` SSE frame from a propose-tool tool_result.
-
-    Args:
-        event: An ``SSEEvent`` flowing through the session stream.
-
-    Returns:
-        A ready-to-yield SSE text frame for the ``mandate.proposal`` event, or
-        ``None`` when ``event`` is not a successful propose-tool result or the
-        proposal cannot be recovered.
-    """
-    data = getattr(event, "data", None)
-    if getattr(event, "event_type", None) != "tool_result" or not isinstance(data, dict):
-        return None
-    if data.get("tool") != _PROPOSAL_TOOL_NAME or data.get("status") != "ok":
-        return None
-    match = _PROPOSAL_ID_RE.search(str(data.get("preview") or ""))
-    if not match:
-        return None
-    proposal = _load_full_proposal(match.group(1))
-    if proposal is None:
-        return None
-
-    from src.session.events import SSEEvent
-
-    frame = SSEEvent(
-        event_type="mandate.proposal",
-        data=proposal,
-        session_id=getattr(event, "session_id", "") or "",
-    )
-    return frame.to_sse()
-
-
-_LIVE_ACTION_ID_RE = re.compile(r'"audit_id"\s*:\s*"(la_[0-9a-zA-Z]+)"')
-
-
-def _load_live_action_record(audit_id: str) -> Optional[Dict[str, Any]]:
-    """Reload a redacted live-action record from the ledger by ``audit_id``.
-
-    The order guard embeds its (already-redacted) audit record under the
-    ``live_action`` key of its tool_result, but the SSE ``tool_result`` preview
-    is truncated to ~200 chars, so the full record is reloaded from the
-    append-only ledger at ``<runtime_root>/live/audit.jsonl``.
-
-    Args:
-        audit_id: The ``la_...`` id parsed from the tool_result preview.
-
-    Returns:
-        The full redacted live-action record, or ``None`` when not found.
-    """
-    try:
-        from src.live.paths import live_root
-
-        ledger = live_root() / "audit.jsonl"
-        if not ledger.exists():
-            return None
-        for line in reversed(ledger.read_text(encoding="utf-8").splitlines()):
-            if audit_id not in line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(record, dict) and record.get("audit_id") == audit_id:
-                return record
-    except Exception:  # pragma: no cover - relay must never break the stream
-        logger.debug("live.action reload failed for %s", audit_id, exc_info=True)
-    return None
-
-
-def _live_action_frame_from_tool_result(event: Any) -> Optional[str]:
-    """Build a ``live.action`` SSE frame from an order-guard tool_result.
-
-    The order guard stamps a ``live_action`` audit record onto its tool_result
-    (and the ledger) for every live order placed/rejected. The interactive agent
-    loop only emits a truncated ``tool_result`` event and is PROTECTED, so this
-    open-file relay surfaces the live action as a top-level ``live.action`` event
-    for the timeline — without touching ``src/agent/loop.py``. (Autonomous-runner
-    actions already emit ``live.action`` natively via the runner's event bus.)
-
-    Args:
-        event: An ``SSEEvent`` flowing through the session stream.
-
-    Returns:
-        A ready-to-yield ``live.action`` SSE frame, or ``None`` when the event is
-        not an order-guard result carrying a recoverable live-action record.
-    """
-    data = getattr(event, "data", None)
-    if getattr(event, "event_type", None) != "tool_result" or not isinstance(data, dict):
-        return None
-    preview = str(data.get("preview") or "")
-    if '"live_action"' not in preview:
-        return None
-    match = _LIVE_ACTION_ID_RE.search(preview)
-    if not match:
-        return None
-    record = _load_live_action_record(match.group(1))
-    if record is None:
-        return None
-
-    from src.session.events import SSEEvent
-
-    frame = SSEEvent(
-        event_type="live.action",
-        data=record,
-        session_id=getattr(event, "session_id", "") or "",
-    )
-    return frame.to_sse()
-
-
-def _fetch_broker_ceilings(broker: str) -> Optional[Dict[str, Any]]:
-    """Best-effort fetch of broker-side account ceilings for the commit re-check.
-
-    Reads the broker's ``get_account`` tool and derives an authoritative ceiling
-    snapshot (buying power / funding) so the commit-time fit check binds to the
-    venue's real limits rather than an agent-proposed number. Returns ``None`` on
-    any failure (channel not configured, tool error, fields not recognized) so
-    the caller falls back to the proposal's own snapshot — a commit is never
-    blocked on a broker read. The exact Robinhood field names are finalized
-    post-access (L6); we probe the common ones.
-
-    Args:
-        broker: The live-broker key.
-
-    Returns:
-        A ceilings dict (canonical keys) or ``None`` to fall back.
-    """
-    try:
-        adapter = _live_broker_adapter(broker)
-    except LiveRunnerUnavailable:
-        return None
-    try:
-        result = adapter.call_tool("get_account", {})
-    except Exception:  # pragma: no cover - status/commit must never raise here
-        logger.debug("broker ceiling fetch failed for %s", broker, exc_info=True)
-        return None
-    if not isinstance(result, dict) or result.get("status") == "error":
-        return None
-    payload = result.get("result") if isinstance(result.get("result"), dict) else result
-    funding: Optional[float] = None
-    for key in ("account_funding_usd", "buying_power", "cash", "portfolio_value", "equity"):
-        raw = payload.get(key) if isinstance(payload, dict) else None
-        try:
-            if raw is not None:
-                funding = float(raw)
-                break
-        except (TypeError, ValueError):
-            continue
-    if funding is None or funding <= 0:
-        return None
-    # A single order can never exceed available funding; total exposure is capped
-    # at funding for a cash account. Leverage stays at 1.0 unless the broker
-    # reports margin (L6). These canonical keys are normalized by commit_mandate.
-    return {
-        "account_funding_usd": funding,
-        "max_order_notional_usd": funding,
-        "max_total_exposure_usd": funding,
-    }
-
-
-@app.post("/mandate/commit", dependencies=[Depends(require_auth)])
-async def commit_mandate_endpoint(payload: CommitMandateRequest):
-    """Commit a user-selected mandate profile — the only mandate write path.
-
-    Calls :func:`src.live.mandate.commit.commit_mandate`, which re-validates the
-    proposal is live and the resolved profile still fits the ceilings the user
-    saw. Requires ``consent_ack=true`` (rejected otherwise). On success emits a
-    ``mandate.committed`` + ``live.action`` event so all surfaces reflect the
-    newly active mandate.
-    """
-    if payload.consent_ack is not True:
-        raise HTTPException(status_code=400, detail="consent_ack must be true to commit a mandate")
-
-    from src.live.mandate.commit import CommitError, commit_mandate
-
-    # Prefer broker-DERIVED ceilings over the agent-supplied proposal snapshot:
-    # the commit re-check should bind to the venue's real account limits, not a
-    # number the model proposed. Best-effort — falls back to the proposal's own
-    # ceilings (commit_mandate handles ceilings_ref=None) when the broker channel
-    # is unavailable or the read fails (we never block a commit on a broker read).
-    broker_ceilings = _fetch_broker_ceilings(payload.broker)
-
-    try:
-        result = commit_mandate(
-            proposal_id=payload.proposal_id,
-            ordinal=payload.selected_ordinal,
-            adjustments=payload.adjustments,
-            consent_ack=payload.consent_ack,
-            broker=payload.broker,
-            account_ref=payload.account_ref,
-            session_id=payload.session_id,
-            ceilings_ref=broker_ceilings,
-            lifetime_days=payload.lifetime_days,
-        )
-    except CommitError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    _emit_live_event(payload.session_id, "mandate.committed", result)
-    _emit_live_event(
-        payload.session_id,
-        "live.action",
-        {"kind": "mandate_committed", "broker": result["broker"], "mandate_id": result["mandate_id"]},
-    )
-    return result
-
-
-@app.post("/live/halt", dependencies=[Depends(require_auth)])
-async def halt_live_endpoint(payload: LiveHaltRequest):
-    """Trip the live kill switch (privileged surface action, Consent §4).
-
-    Writes the HALT sentinel via :func:`src.live.halt.trip_halt`; the
-    enforcement gate then rejects every order attempt until resumed. Emits a
-    ``live.halted`` event so all surfaces reflect the halted state.
-    """
-    from src.live.halt import trip_halt
-
-    try:
-        path = trip_halt(by="frontend", reason=payload.reason, broker=payload.broker)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    result = {"halted": True, "broker": payload.broker, "reason": payload.reason, "sentinel": str(path)}
-    _emit_live_event(payload.session_id, "live.halted", result)
-    _emit_live_event(
-        payload.session_id,
-        "live.action",
-        {"kind": "halt_tripped", "broker": payload.broker, "reason": payload.reason},
-    )
-    return result
-
-
-@app.post("/live/resume", dependencies=[Depends(require_auth)])
-async def resume_live_endpoint(payload: LiveHaltRequest):
-    """Clear the live kill switch (privileged surface action, Consent §4).
-
-    Deletes the HALT sentinel via :func:`src.live.halt.clear_halt` (an explicit
-    re-enable; never an agent tool). Emits a ``live.resumed`` event.
-    """
-    from src.live.halt import clear_halt
-
-    try:
-        cleared = clear_halt(broker=payload.broker)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    result = {"halted": False, "broker": payload.broker, "cleared": cleared}
-    _emit_live_event(payload.session_id, "live.resumed", result)
-    _emit_live_event(
-        payload.session_id,
-        "live.action",
-        {"kind": "halt_cleared", "broker": payload.broker, "cleared": cleared},
-    )
-    return result
-
-
-# ============================================================================
-# Live trading channel — status, authorize on-ramp, runner control (C2 + §7.5)
-# ============================================================================
-#
-# C2 surfaces the dormant-by-default channel state so a user can SEE what is and
-# is not authorized before trusting it: per-broker OAuth presence, the active
-# mandate with its expiry countdown, runner liveness, and the kill-switch state.
-# The runner-control endpoints start/stop the persistent §7.5 runner that trades
-# autonomously inside a committed mandate. None of these is an agent tool; they
-# are privileged surface actions like /mandate/commit and /live/halt.
-
-
-def _known_live_brokers() -> List[str]:
-    """Return the recognized live-broker keys (SPEC §7.2)."""
-    from src.config.schema import LIVE_BROKER_SERVER_KEYS
-
-    return sorted(LIVE_BROKER_SERVER_KEYS)
-
-
-def _oauth_token_present(broker: str) -> bool:
-    """Return whether an OAuth token cache exists for a broker (C2 auth state).
-
-    The token cache lives at ``<runtime_root>/live/<broker>/oauth/`` (0700) and
-    is created only when the user OAuth-authorizes the channel. A missing or
-    empty directory means the channel is dormant (read-only, no live path).
-    """
-    try:
-        from src.live.paths import broker_dir
-
-        oauth_dir = broker_dir(broker) / "oauth"
-        return oauth_dir.is_dir() and any(oauth_dir.iterdir())
-    except Exception:  # pragma: no cover - status must never raise
-        logger.debug("oauth presence check failed for %s", broker, exc_info=True)
-        return False
-
-
-def _active_mandate_state(broker: str) -> Optional[ActiveMandateState]:
-    """Build the active-mandate snapshot for a broker, or ``None`` when absent.
-
-    Reads the committed mandate via the frozen store contract and computes the
-    ``expires_at`` countdown (SPEC §9 dec. 2). A mandate whose ``expires_at`` has
-    passed is still surfaced, flagged ``expired`` so the UI can prompt re-consent.
-    """
-    from src.live.mandate.store import load_mandate
-
-    mandate = load_mandate(broker)
-    if mandate is None:
-        return None
-
-    consent = mandate.consent
-    caps = mandate.hard_caps
-    expires_in: Optional[int] = None
-    expired = False
-    try:
-        expires_dt = datetime.fromisoformat(consent.expires_at.replace("Z", "+00:00"))
-        from datetime import timezone
-
-        now = datetime.now(timezone.utc)
-        if expires_dt.tzinfo is None:
-            expires_dt = expires_dt.replace(tzinfo=timezone.utc)
-        delta = expires_dt - now
-        expires_in = int(delta.total_seconds())
-        expired = expires_in <= 0
-    except (ValueError, AttributeError):
-        logger.debug("could not parse expires_at for %s mandate", broker, exc_info=True)
-
-    return ActiveMandateState(
-        broker=broker,
-        account_ref=consent.account_ref,
-        created_at=consent.created_at,
-        expires_at=consent.expires_at,
-        expires_in_seconds=expires_in,
-        expired=expired,
-        limits=MandateLimits(
-            max_order_notional_usd=caps.max_order_notional_usd,
-            max_total_exposure_usd=caps.max_total_exposure_usd,
-            max_leverage=caps.max_leverage,
-            max_trades_per_day=caps.max_trades_per_day,
-            allowed_instruments=[str(getattr(i, "value", i)) for i in caps.allowed_instruments],
-            account_funding_usd=caps.account_funding_usd,
-        ),
-    )
-
-
-def _runner_liveness_state(broker: str) -> RunnerLivenessState:
-    """Build the runner-liveness snapshot for a broker (SPEC §7.5 contract).
-
-    Uses the §7.5 ``liveness`` module (``is_runner_alive`` / ``last_tick``),
-    keyed by broker as the runner id. The module is built concurrently (R1); a
-    missing module or any error is treated as "not alive" (fail-safe display).
-    """
-    alive = False
-    tick: Optional[float] = None
-    age: Optional[float] = None
-    try:
-        from src.live.runtime import liveness
-
-        alive = bool(liveness.is_runner_alive(broker))
-        raw_tick = liveness.last_tick(broker)
-        if raw_tick is not None:
-            tick = float(raw_tick)
-            age = max(0.0, time.time() - tick)
-    except Exception:  # pragma: no cover - liveness module is built concurrently
-        logger.debug("runner liveness lookup failed for %s", broker, exc_info=True)
-
-    return RunnerLivenessState(broker=broker, alive=alive, last_tick=tick, last_tick_age_seconds=age)
-
-
-@app.get("/live/status", response_model=LiveStatusResponse, dependencies=[Depends(require_auth)])
-async def live_status_endpoint(broker: Optional[str] = Query(None, max_length=64)):
-    """Return live-channel status: auth, active mandate, runner liveness, halt (C2).
-
-    Args:
-        broker: Optional single-broker filter. When omitted, every recognized
-            live broker is reported.
-
-    Returns:
-        A :class:`LiveStatusResponse` with the global kill-switch state and a
-        per-broker breakdown so the UI can show exactly what is authorized.
-    """
-    from src.live.halt import halt_flag_set
-
-    if broker is not None:
-        target = broker.strip().lower()
-        if not target:
-            raise HTTPException(status_code=400, detail="broker must not be blank")
-        brokers = [target]
-    else:
-        brokers = _known_live_brokers()
-
-    known = set(_known_live_brokers())
-    statuses: List[LiveBrokerStatus] = []
-    for key in brokers:
-        statuses.append(
-            LiveBrokerStatus(
-                auth=BrokerAuthState(
-                    broker=key,
-                    oauth_token_present=_oauth_token_present(key),
-                    is_live_broker=key in known,
-                ),
-                mandate=_active_mandate_state(key),
-                runner=_runner_liveness_state(key),
-                halted=halt_flag_set(broker=key),
-            )
-        )
-
-    return LiveStatusResponse(global_halted=halt_flag_set(broker=None), brokers=statuses)
-
-
-@app.post("/live/authorize", dependencies=[Depends(require_auth)])
-async def live_authorize_endpoint(payload: LiveAuthorizeRequest):
-    """Describe the OAuth bootstrap on-ramp for a live broker (C2 web on-ramp).
-
-    TideTrading holds no funds and runs no venue: the OAuth flow happens on the
-    broker's own user-authorized device channel (CLI / desktop MCP), never a
-    server-side redirect. A Web UI user reaches this endpoint to DISCOVER how to
-    start the flow. It performs no authorization itself and never returns a token.
-    """
-    broker = payload.broker.strip().lower()
-    if not broker:
-        raise HTTPException(status_code=400, detail="broker must not be blank")
-    if broker not in set(_known_live_brokers()):
-        raise HTTPException(status_code=400, detail=f"unknown live broker: {broker}")
-
-    from src.trading.service import connector_profile_id_for_broker
-
-    connector_profile = connector_profile_id_for_broker(broker)
-    return {
-        "broker": broker,
-        "connector_profile": connector_profile,
-        "oauth_token_present": _oauth_token_present(broker),
-        "instruction": (
-            f"Run `vibe-trading connector authorize {connector_profile}` "
-            "from the device that will hold the broker session. This opens the "
-            "broker's own OAuth consent flow; TideTrading never holds funds and "
-            "only relays intent once you authorize."
-        ),
-        "note": (
-            "The live channel stays read-only until the OAuth token is present AND a "
-            "mandate is committed AND order tools are explicitly enabled."
-        ),
-    }
-
-
-# ---- Runner control (SPEC §7.5): start / stop the persistent live runner ----
-#
-# A LiveRunner (R2 contract: ``LiveRunner(broker)`` with ``run_loop()`` /
-# ``run_once()``) is driven in a background task per broker. The factory is
-# injectable (``_runner_factory``) so tests stub it with no real agent/broker.
-# ``run_loop`` may be sync (long-blocking) or async; both are supported.
-
-_runner_tasks: Dict[str, "asyncio.Task[Any]"] = {}
-_runner_factory: Optional[Any] = None
-
-
-class LiveRunnerUnavailable(RuntimeError):
-    """Raised when a live runner cannot be wired (broker not configured/authorized).
-
-    Distinct from a programming error so the start endpoint can map it to a 503
-    rather than a 500: the runtime is fine, the broker channel just isn't ready.
-    """
-
-
-def _live_broker_adapter(broker: str) -> Any:
-    """Build an ``MCPServerAdapter`` for a live broker from the user-side config.
-
-    Resolves the broker's MCP server entry by config key OR by a live-broker URL
-    host (so an aliased key still resolves), mirroring the registry's detection.
-
-    Args:
-        broker: The live-broker key, e.g. ``"robinhood"``.
-
-    Returns:
-        A constructed :class:`MCPServerAdapter` for the broker's read/write tools.
-
-    Raises:
-        LiveRunnerUnavailable: When no MCP server is configured for the broker.
-    """
-    from src.config.loader import load_agent_config
-    from src.tools.mcp import MCPServerAdapter
-
-    try:
-        from src.config.schema import is_live_broker_entry
-    except Exception:  # pragma: no cover - older schema without URL detection
-        is_live_broker_entry = None  # type: ignore[assignment]
-
-    cfg = load_agent_config()
-    servers = getattr(cfg, "mcp_servers", {}) or {}
-    for name, server_cfg in servers.items():
-        is_match = name == broker
-        if not is_match and is_live_broker_entry is not None and broker == "robinhood":
-            try:
-                is_match = is_live_broker_entry(name, server_cfg)
-            except Exception:  # pragma: no cover
-                is_match = False
-        if is_match:
-            return MCPServerAdapter(name, server_cfg)
-    raise LiveRunnerUnavailable(f"no MCP server configured for live broker {broker!r}")
-
-
-def _build_live_runner(broker: str) -> Any:
-    """Construct a fully-wired ``LiveRunner`` for a broker (SPEC §7.5 R-INT).
-
-    Wires the runner to the real surfaces — the public ``SessionService`` agent
-    caller (never the protected loop internals), the broker's READ/WRITE MCP
-    tools, the R4 reconciler, the R1 scheduler, and R3 market-hours triggers —
-    and injects an audit ``event_callback`` so every autonomous live action is
-    broadcast as a ``live.action`` SSE event on the runner's session bus.
-
-    Args:
-        broker: The live-broker key.
-
-    Returns:
-        A runner object exposing ``run_loop`` / ``run_once`` (R2 contract).
-
-    Raises:
-        LiveRunnerUnavailable: When the broker channel is not configured.
-    """
-    if _runner_factory is not None:
-        return _runner_factory(broker)
-
-    from src.live.audit import write_live_action
-    from src.live.runtime.reconcile import reconcile
-    from src.live.runtime.runner import LiveRunner
-    from src.live.runtime.scheduler import Scheduler
-    from src.live.runtime.triggers import Trigger
-    from src.trading.service import runner_tool_name
-
-    def _tool(operation: str) -> str:
-        remote_tool = runner_tool_name(broker, operation)
-        if remote_tool is None:
-            raise LiveRunnerUnavailable(
-                f"live runner for {broker!r} does not define remote tool {operation!r}"
-            )
-        return remote_tool
-
-    positions_tool = _tool("positions")
-    balance_tool = _tool("account")
-    open_orders_tool = _tool("orders")
-    submit_order_tool = _tool("submit_order")
-    cancel_order_tool = _tool("cancel_order")
-    adapter = _live_broker_adapter(broker)  # raises LiveRunnerUnavailable if absent
-
-    def _read(remote_tool: str):
-        """A zero-arg broker READ callable bound to one remote tool."""
-        return lambda: adapter.call_tool(remote_tool, {})
-
-    def _submit(order: Dict[str, Any]) -> Dict[str, Any]:
-        # Route the flatten sweep's normalized order to the broker's write tools.
-        # Field mapping against the real Robinhood schema is finalized post-access
-        # (L6); the action discriminator is broker-agnostic.
-        if order.get("action") == "cancel":
-            return adapter.call_tool(cancel_order_tool, order)
-        return adapter.call_tool(submit_order_tool, order)
-
-    svc = _get_session_service()
-    session = svc.create_session(title=f"live-runner:{broker}")
-    session_id = session.session_id
-
-    async def _agent_caller(sid: str, prompt: str) -> Dict[str, Any]:
-        # Dispatch one autonomous turn through the PUBLIC SessionService entry.
-        # The agent then trades within the mandate via the gated order tools.
-        return await svc.send_message(sid, prompt)
-
-    def _audit_with_bus(event: Any) -> Dict[str, Any]:
-        # Broadcast each live action as a live.action SSE event on the runner's
-        # session bus (no protected-loop touch — the runner owns its session).
-        return write_live_action(
-            event,
-            event_callback=lambda etype, record: svc.event_bus.emit(session_id, etype, record),
-        )
-
-    # Wire the scheduler's fire callback to the runner's tick. The scheduler is
-    # constructed before the runner (it needs on_fire), and the runner needs the
-    # scheduler, so late-bind via a holder to break the cycle.
-    runner_holder: Dict[str, Any] = {}
-
-    async def _on_fire(_job: Any) -> None:
-        runner = runner_holder.get("runner")
-        if runner is not None:
-            await runner.run_once()
-
-    scheduler = Scheduler(_on_fire)
-
-    runner = LiveRunner(
-        broker,
-        agent_caller=_agent_caller,
-        reconcile_fn=reconcile,
-        read_positions=_read(positions_tool),
-        read_balance=_read(balance_tool),
-        read_open_orders=_read(open_orders_tool),
-        submit_fn=_submit,
-        write_audit_fn=_audit_with_bus,
-        scheduler=scheduler,
-        triggers=[Trigger.market("us_equity")],
-        session_id=session_id,
-    )
-    runner_holder["runner"] = runner
-    return runner
-
-
-async def _drive_runner(runner: Any) -> None:
-    """Run a runner's ``run_loop`` to completion, sync or async.
-
-    A synchronous ``run_loop`` is offloaded to a worker thread so it does not
-    block the event loop; an async ``run_loop`` is awaited directly.
-    """
-    result = runner.run_loop()
-    if asyncio.iscoroutine(result):
-        await result
-    else:
-        await asyncio.get_running_loop().run_in_executor(None, lambda: result)
-
-
-@app.post("/live/runner/start", dependencies=[Depends(require_auth)])
-async def start_runner_endpoint(payload: LiveRunnerControlRequest):
-    """Start the persistent live runner for a broker (SPEC §7.5).
-
-    Refuses to start unless a committed, unexpired mandate exists and the kill
-    switch is clear — the runner trades autonomously, so it must not start into a
-    dead/halted channel. Idempotent: a request for an already-running broker
-    returns ``already_running`` without spawning a second task.
-    """
-    from src.live.halt import halt_flag_set
-
-    broker = payload.broker.strip().lower()
-    if not broker:
-        raise HTTPException(status_code=400, detail="broker must not be blank")
-    from src.trading.service import broker_supports_live_runner
-
-    if not broker_supports_live_runner(broker):
-        raise HTTPException(
-            status_code=400,
-            detail=f"live runner is not supported for {broker}",
-        )
-
-    existing = _runner_tasks.get(broker)
-    if existing is not None and not existing.done():
-        return {"broker": broker, "started": False, "already_running": True}
-
-    mandate = _active_mandate_state(broker)
-    if mandate is None:
-        raise HTTPException(status_code=409, detail=f"no committed mandate for {broker}")
-    if mandate.expired:
-        raise HTTPException(status_code=409, detail=f"mandate for {broker} has expired; re-authorize first")
-    if halt_flag_set(broker=broker) or halt_flag_set(broker=None):
-        raise HTTPException(status_code=409, detail="kill switch is tripped; resume before starting the runner")
-
-    try:
-        runner = _build_live_runner(broker)
-    except LiveRunnerUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"could not construct runner: {exc}") from exc
-
-    task = asyncio.ensure_future(_drive_runner(runner))
-    _runner_tasks[broker] = task
-    task.add_done_callback(
-        lambda t, b=broker: _runner_tasks.pop(b, None) if _runner_tasks.get(b) is t else None
-    )
-
-    _emit_live_event(
-        payload.session_id,
-        "live.action",
-        {"kind": "runner_started", "broker": broker},
-    )
-    return {"broker": broker, "started": True, "already_running": False}
-
-
-@app.post("/live/runner/stop", dependencies=[Depends(require_auth)])
-async def stop_runner_endpoint(payload: LiveRunnerControlRequest):
-    """Stop the persistent live runner for a broker (SPEC §7.5).
-
-    Cancels the background task. This does NOT flatten positions — that is the
-    preemptive kill switch's job (``/live/halt`` -> flatten); stopping the runner
-    simply ceases new autonomous turns. Idempotent for an already-stopped broker.
-    """
-    broker = payload.broker.strip().lower()
-    if not broker:
-        raise HTTPException(status_code=400, detail="broker must not be blank")
-    from src.trading.service import broker_supports_live_runner
-
-    if not broker_supports_live_runner(broker):
-        raise HTTPException(
-            status_code=400,
-            detail=f"live runner is not supported for {broker}",
-        )
-
-    task = _runner_tasks.pop(broker, None)
-    if task is None or task.done():
-        return {"broker": broker, "stopped": False, "was_running": False}
-
-    task.cancel()
-    _emit_live_event(
-        payload.session_id,
-        "live.action",
-        {"kind": "runner_stopped", "broker": broker},
-    )
-    return {"broker": broker, "stopped": True, "was_running": True}
-
 
 # ============================================================================
 # Alpha Zoo routes (Web UI) — defined in src/api/alpha_routes.py
@@ -6596,175 +1399,31 @@ async def stop_runner_endpoint(payload: LiveRunnerControlRequest):
 from src.api.alpha_routes import register_alpha_routes  # noqa: E402
 register_alpha_routes(app)
 
+from src.research_card.api import register_research_card_routes  # noqa: E402
+register_research_card_routes(app)
+
 
 # ============================================================================
-# Scheduled Research Routes
+# Scheduled Research Routes - defined in src/api/scheduled_routes.py
 # ============================================================================
 #
 # Lightweight CRUD endpoints backed by ScheduledResearchJobStore. The endpoint
 # handlers only record and expose jobs; the optional executor lifecycle is
-# guarded separately by VIBE_TRADING_ENABLE_SCHEDULER (defaults ON).
+# guarded separately by VIBE_TRADING_ENABLE_SCHEDULER.
 
+from src.api.scheduled_routes import register_scheduled_routes  # noqa: E402
 
-_SCHEDULED_RESEARCH_SCHEDULER_ENV = "VIBE_TRADING_ENABLE_SCHEDULER"
-_SCHEDULED_RESEARCH_TRUE_VALUES = {"1", "true", "yes", "on"}
+register_scheduled_routes(app)
 
-_scheduled_research_store: Optional["ScheduledResearchJobStore"] = None
-_scheduled_research_executor: Optional["ScheduledResearchExecutor"] = None
-
-
-def _get_scheduled_research_store() -> "ScheduledResearchJobStore":
-    """Return the singleton ScheduledResearchJobStore, creating it on first call."""
-    global _scheduled_research_store
-    if _scheduled_research_store is None:
-        from src.scheduled_research.store import ScheduledResearchJobStore
-
-        _scheduled_research_store = ScheduledResearchJobStore()
-    return _scheduled_research_store
-
-
-def _scheduled_research_scheduler_enabled() -> bool:
-    """Return whether scheduled research execution is enabled.
-
-    Honours an explicit ``VIBE_TRADING_ENABLE_SCHEDULER`` env var.
-    When unset, defaults to *True* — the executor is a passive loop
-    that only fires when there are pending jobs, so the cost of
-    leaving it on is negligible and avoids the hidden-foot-gun.
-    """
-    explicit = os.getenv(_SCHEDULED_RESEARCH_SCHEDULER_ENV)
-    if explicit is not None:
-        return explicit.strip().lower() in _SCHEDULED_RESEARCH_TRUE_VALUES
-    # Default ON — no jobs means no work, no risk.
-    return True
-
-
-async def _dispatch_scheduled_research_job(job: "ScheduledResearchJob") -> None:
-    """Enqueue one scheduled research job through the session runtime.
-
-    ``send_message`` queues the agent attempt and returns once accepted; it
-    does not wait for that agent run to reach a terminal status. The executor's
-    ``COMPLETED`` state for this dispatch path means "successfully enqueued."
-    """
-    svc = _get_session_service()
-    if not svc:
-        raise RuntimeError("Session runtime not enabled")
-    # Pass a copy so the session runtime's internal config writes (e.g.
-    # include_shell_tools) do not mutate the persisted scheduled-run config.
-    session = svc.create_session(title=f"scheduled-research:{job.id}", config=dict(job.config))
-    logger.info("dispatching scheduled research job %s via session %s", job.id, session.session_id)
-    await svc.send_message(session.session_id, job.prompt)
-
-
-def _get_scheduled_research_executor() -> "ScheduledResearchExecutor":
-    """Return the singleton scheduled research executor."""
-    global _scheduled_research_executor
-    if _scheduled_research_executor is None:
-        from src.scheduled_research.executor import ScheduledResearchExecutor
-
-        _scheduled_research_executor = ScheduledResearchExecutor(
-            _get_scheduled_research_store(),
-            _dispatch_scheduled_research_job,
-            enabled=_scheduled_research_scheduler_enabled(),
-        )
-    return _scheduled_research_executor
-
-
-def _start_scheduled_research_executor() -> None:
-    """Start scheduled research execution when explicitly enabled."""
-    if not _scheduled_research_scheduler_enabled():
-        return
-    _get_scheduled_research_executor().start()
-
-
-async def _stop_scheduled_research_executor() -> None:
-    """Stop scheduled research execution if it was started."""
-    executor = _scheduled_research_executor
-    if executor is not None:
-        await executor.stop()
-
-
-class CreateScheduledRunRequest(BaseModel):
-    """Request body for POST /scheduled-runs."""
-
-    id: Optional[str] = Field(None, description="Job id; auto-generated UUID when omitted")
-    prompt: str = Field(..., min_length=1, description="Research prompt or backtest description")
-    schedule: str = Field(..., min_length=1, description="Interval-ms or 5-field cron expression")
-    next_run_at: Optional[int] = Field(None, description="Epoch-ms for next run; defaults to now")
-    config: Dict[str, Any] = Field(default_factory=dict, description="Optional backtest parameters")
-
-
-class ScheduledRunResponse(BaseModel):
-    """API response for a single scheduled job."""
-
-    id: str
-    prompt: str
-    schedule: str
-    next_run_at: int
-    status: str
-    created_at: int
-    config: Dict[str, Any] = Field(default_factory=dict)
-
-
-@app.post(
-    "/scheduled-runs",
-    response_model=ScheduledRunResponse,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_auth)],
+# Re-exported for backward-compatibility / external consumers
+from src.api.scheduled_routes import (  # noqa: E402, F401
+    CreateScheduledRunRequest,
+    ScheduledRunResponse,
+    _dispatch_scheduled_research_job,
+    _get_scheduled_research_executor,
+    _get_scheduled_research_store,
+    _scheduled_research_scheduler_enabled,
 )
-async def create_scheduled_run(request: CreateScheduledRunRequest) -> ScheduledRunResponse:
-    """Create (or replace) a scheduled research job.
-
-    The job is persisted immediately. No execution is triggered.
-    """
-    import time
-
-    from src.scheduled_research.models import JobStatus, ScheduledResearchJob
-    from src.scheduled_research.models import validate_schedule
-
-    try:
-        validate_schedule(request.schedule)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    now_ms = int(time.time() * 1000)
-    job = ScheduledResearchJob(
-        id=request.id or str(uuid.uuid4()),
-        prompt=request.prompt,
-        schedule=request.schedule,
-        next_run_at=request.next_run_at if request.next_run_at is not None else now_ms,
-        status=JobStatus.PENDING,
-        created_at=now_ms,
-        config=request.config,
-    )
-    _get_scheduled_research_store().upsert(job)
-    return ScheduledRunResponse(**job.to_dict())
-
-
-@app.get(
-    "/scheduled-runs",
-    response_model=List[ScheduledRunResponse],
-    dependencies=[Depends(require_auth)],
-)
-async def list_scheduled_runs(
-    status_filter: Optional[str] = Query(None, alias="status"),
-    limit: int = Query(50, ge=1, le=200),
-) -> List[ScheduledRunResponse]:
-    """List scheduled research jobs, optionally filtered by status."""
-    jobs = _get_scheduled_research_store().list_jobs(status=status_filter, limit=limit)
-    return [ScheduledRunResponse(**j.to_dict()) for j in jobs]
-
-
-@app.delete(
-    "/scheduled-runs/{job_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_auth)],
-)
-async def delete_scheduled_run(job_id: str) -> None:
-    """Cancel (delete) a scheduled research job by id."""
-    _validate_path_param(job_id, "job_id")
-    removed = _get_scheduled_research_store().delete(job_id)
-    if not removed:
-        raise HTTPException(status_code=404, detail=f"scheduled run {job_id} not found")
 
 
 # ============================================================================
@@ -6790,14 +1449,21 @@ def serve_main(argv: list[str] | None = None) -> int:
                     raise
                 return await super().get_response("index.html", scope)
 
-    parser = argparse.ArgumentParser(description="TideTrading Server")
+    parser = argparse.ArgumentParser(description="Vibe-Trading Server")
     parser.add_argument("--port", type=int, default=8000, help="Listen port (default 8000)")
-    parser.add_argument("--host", default="0.0.0.0", help="Bind address")
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address")
     parser.add_argument("--dev", action="store_true", help="Dev mode: spawn Vite on :5173")
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
         return int(exc.code) if isinstance(exc.code, int) else 2
+
+    if not _is_loopback_bind_host(args.host) and not _configured_api_key():
+        print(
+            f"[warn] Binding to {args.host} without API_AUTH_KEY set. "
+            f"Remote requests are rejected by the loopback peer-IP check, "
+            f"but consider using --host 127.0.0.1 for local-only access."
+        )
 
     frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     frontend_root = Path(__file__).resolve().parent.parent / "frontend"
@@ -6823,7 +1489,7 @@ def serve_main(argv: list[str] | None = None) -> int:
         print("[warn] Run: cd frontend && npm run build")
 
     print("=" * 50)
-    print("  TideTrading Server")
+    print("  Vibe-Trading Server")
     print(f"  http://127.0.0.1:{args.port}")
     print("=" * 50)
 

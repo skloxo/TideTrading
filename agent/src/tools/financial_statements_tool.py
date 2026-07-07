@@ -1,21 +1,21 @@
 """Read-only financial-statements tool: three statements + key indicators.
 
 Pulls a single stock's balance sheet, income statement, cash-flow statement, or
-key per-period indicators from Eastmoney's free, no-auth datacenter report API,
-picking the per-market report dataset from the symbol's market suffix:
+key per-period indicators from a market-appropriate public source:
 
 * **A-share** (``.SH`` / ``.SZ`` / ``.BJ``) — Eastmoney's A-share F10 report
   datasets (``RPT_F10_FINANCE_*``), filtered on the dotted ``SECUCODE`` (e.g.
   ``600519.SH``). The legacy Sina ``quotes.sina.cn`` company-finance openapi
   returned a graceful-empty masking an upstream failure, so the A-share path now
-  shares the Eastmoney transport with US/HK.
-* **US** (``.US``) and **Hong Kong** (``.HK``) — Eastmoney's per-market F10
-  financial-report datasets, filtered on the bare ``SECURITY_CODE``; ``indicators``
-  reads the main-indicator dataset.
+  shares the Eastmoney transport with HK.
+* **US** (``.US``) — SEC EDGAR companyfacts XBRL, resolved by ticker->CIK.
+* **Hong Kong** (``.HK``) — Eastmoney's HK F10 financial-report datasets,
+  filtered on the bare ``SECURITY_CODE``; ``indicators`` reads the
+  main-indicator dataset.
 
-All requests go through :func:`backtest.loaders.eastmoney_client.get_json`
-(Eastmoney bans bursting clients, so every call is throttled under
-``host_key="eastmoney"``).
+Eastmoney requests go through :func:`backtest.loaders.eastmoney_client.get_json`
+(``host_key="eastmoney"``); SEC requests go through the shared EDGAR client
+(``host_key="sec"``).
 
 The tool is read-only and self-contained: ``execute`` returns a JSON-string
 envelope and never raises for a recoverable per-request failure — a bad symbol
@@ -29,6 +29,7 @@ import logging
 from typing import Any
 
 from backtest.loaders.eastmoney_client import get_json, resolve_secid
+from backtest.loaders.sec_edgar_client import cik_for, get_company_facts
 from src.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -36,23 +37,17 @@ logger = logging.getLogger(__name__)
 # --- Eastmoney datacenter report API --------------------------------------
 
 # Eastmoney datacenter report API. The three statements and the main-indicator
-# dataset are addressed by report name, which differs by market (A / US / HK).
+# dataset are addressed by report name, which differs by market (A / HK).
 _EM_REPORT_URL = "https://datacenter.eastmoney.com/securities/api/data/v1/get"
 
 # (market_prefix_group, statement) -> Eastmoney report name. ``a`` covers the
-# mainland exchanges (markets 0/1); ``us`` covers 105/106/107; ``hk`` covers 116.
+# mainland exchanges (markets 0/1); ``hk`` covers 116.
 _EM_REPORT_NAME: dict[str, dict[str, str]] = {
     "a": {
         "balance": "RPT_F10_FINANCE_GBALANCE",
         "income": "RPT_F10_FINANCE_GINCOME",
         "cashflow": "RPT_F10_FINANCE_GCASHFLOW",
         "indicators": "RPT_F10_FINANCE_MAINFINADATA",
-    },
-    "us": {
-        "balance": "RPT_USF10_FN_BALANCE",
-        "income": "RPT_USF10_FN_INCOME",
-        "cashflow": "RPT_USF10_FN_CASHFLOW",
-        "indicators": "RPT_USF10_FN_GMAININDICATOR",
     },
     "hk": {
         "balance": "RPT_HKF10_FN_BALANCE",
@@ -62,11 +57,47 @@ _EM_REPORT_NAME: dict[str, dict[str, str]] = {
     },
 }
 
-# Eastmoney mainland A-share markets (SZ/BJ = 0, SH = 1), US markets
-# (NASDAQ / NYSE / AMEX), and the HK market.
+# Eastmoney mainland A-share markets (SZ/BJ = 0, SH = 1) and the HK market.
 _EM_A_MARKETS = ("0", "1")
-_EM_US_MARKETS = ("105", "106", "107")
 _EM_HK_MARKET = "116"
+
+_SEC_CONCEPTS: dict[str, tuple[str, ...]] = {
+    "balance": (
+        "Assets",
+        "AssetsCurrent",
+        "CashAndCashEquivalentsAtCarryingValue",
+        "Liabilities",
+        "LiabilitiesCurrent",
+        "LongTermDebtAndFinanceLeaseObligationsCurrentAndNoncurrent",
+        "StockholdersEquity",
+    ),
+    "income": (
+        "Revenues",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "GrossProfit",
+        "OperatingIncomeLoss",
+        "NetIncomeLoss",
+        "EarningsPerShareBasic",
+        "EarningsPerShareDiluted",
+    ),
+    "cashflow": (
+        "NetCashProvidedByUsedInOperatingActivities",
+        "NetCashProvidedByUsedInInvestingActivities",
+        "NetCashProvidedByUsedInFinancingActivities",
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect",
+    ),
+    "indicators": (
+        "Revenues",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "NetIncomeLoss",
+        "Assets",
+        "Liabilities",
+        "StockholdersEquity",
+        "EarningsPerShareDiluted",
+        "WeightedAverageNumberOfDilutedSharesOutstanding",
+    ),
+}
 
 # --- Shared limits / validation ------------------------------------------
 
@@ -120,21 +151,17 @@ def _cap_periods(periods: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _eastmoney_market_group(secid: str) -> str | None:
-    """Classify an Eastmoney secid into the ``a``, ``us``, or ``hk`` report group.
+    """Classify an Eastmoney secid into the ``a`` or ``hk`` report group.
 
     Args:
-        secid: Eastmoney secid (e.g. ``"1.600519"``, ``"105.AAPL"`` or
-            ``"116.00700"``).
+        secid: Eastmoney secid (e.g. ``"1.600519"`` or ``"116.00700"``).
 
     Returns:
-        ``"a"``, ``"us"``, ``"hk"``, or ``None`` when the market prefix is
-        unrecognized.
+        ``"a"``, ``"hk"``, or ``None`` when the market prefix is unrecognized.
     """
     market = secid.split(".", 1)[0]
     if market in _EM_A_MARKETS:
         return "a"
-    if market in _EM_US_MARKETS:
-        return "us"
     if market == _EM_HK_MARKET:
         return "hk"
     return None
@@ -165,8 +192,8 @@ def _eastmoney_filter(group: str, code: str, secid: str) -> str:
     """Build the datacenter ``filter`` clause for one market group.
 
     The A-share F10 datasets key on the dotted ``SECUCODE`` (e.g.
-    ``600519.SH``), whereas the US/HK datasets key on the bare ``SECURITY_CODE``
-    carried in the secid (e.g. ``AAPL`` / ``00700``). No ``REPORT_TYPE`` clause
+    ``600519.SH``), whereas the HK datasets key on the bare ``SECURITY_CODE``
+    carried in the secid (e.g. ``00700``). No ``REPORT_TYPE`` clause
     is emitted: Eastmoney stores ``REPORT_TYPE`` as locale text (年报 / 一季报)
     or a ``2026/Q1`` string that differs by market and report, so a numeric
     filter matched zero rows. Period selection is done client-side instead
@@ -193,7 +220,7 @@ def _filter_by_period(
 
     Eastmoney returns a mixed newest-first series (annual + interim reports).
     For ``annual`` we keep only fiscal-year-end rows (``REPORT_DATE`` ending
-    ``-12-31``); if none match — e.g. a US issuer whose fiscal year does not end
+    ``-12-31``); if none match — e.g. an issuer whose fiscal year does not end
     in December — we fall back to the full series rather than drop all data.
     ``quarter`` returns the full newest-first series unchanged.
 
@@ -217,10 +244,10 @@ def _filter_by_period(
 def _fetch_eastmoney_statement(
     code: str, *, statement: str, period: str
 ) -> dict[str, Any]:
-    """Fetch one A-share/US/HK statement from Eastmoney, shaped into a result dict.
+    """Fetch one A-share/HK statement from Eastmoney, shaped into a result dict.
 
     Args:
-        code: Symbol (e.g. ``"600519.SH"``, ``"AAPL.US"`` or ``"00700.HK"``).
+        code: Symbol (e.g. ``"600519.SH"`` or ``"00700.HK"``).
         statement: One of :data:`_VALID_STATEMENTS`.
         period: ``"annual"`` or ``"quarter"``.
 
@@ -234,7 +261,7 @@ def _fetch_eastmoney_statement(
 
     group = _eastmoney_market_group(secid)
     if group is None:
-        return {"error": "symbol is not an A-share, US, or Hong Kong instrument"}
+        return {"error": "symbol is not an A-share or Hong Kong instrument"}
 
     params = {
         "reportName": _EM_REPORT_NAME[group][statement],
@@ -254,6 +281,102 @@ def _fetch_eastmoney_statement(
         return {"error": str(exc)}
 
     periods = _filter_by_period(_parse_eastmoney_periods(payload), period)
+    return {"periods": _cap_periods(periods)}
+
+
+def _to_number(value: Any) -> float | None:
+    """Coerce a numeric provider cell to float, preserving missing values."""
+    if value in (None, "", "-"):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _pick_sec_unit(units: dict[str, Any]) -> tuple[str, list[Any]]:
+    """Pick the SEC XBRL unit bucket with the most reported rows."""
+    best_key = ""
+    best_rows: list[Any] = []
+    for key, rows in units.items():
+        if isinstance(rows, list) and len(rows) >= len(best_rows):
+            best_key, best_rows = str(key), rows
+    return best_key, best_rows
+
+
+def _sec_period_matches(row: dict[str, Any], period: str) -> bool:
+    """Return whether a SEC fact row belongs in the requested cadence."""
+    if period != "annual":
+        return True
+    fp = str(row.get("fp") or "").upper()
+    form = str(row.get("form") or "").upper()
+    return fp == "FY" or form == "10-K"
+
+
+def _fetch_sec_statement(code: str, *, statement: str, period: str) -> dict[str, Any]:
+    """Fetch one US statement from SEC companyfacts, shaped as flat periods.
+
+    Args:
+        code: US symbol with ``.US`` suffix, e.g. ``"AAPL.US"``.
+        statement: One of :data:`_VALID_STATEMENTS`.
+        period: ``"annual"`` or ``"quarter"``.
+
+    Returns:
+        ``{"periods": [...]}`` on success or ``{"error": ...}`` on failure.
+    """
+    ticker = code.rsplit(".", 1)[0].strip().upper()
+    try:
+        cik = cik_for(ticker)
+    except Exception as exc:  # noqa: BLE001 - surface provider failures as envelope
+        logger.warning("SEC ticker lookup failed for %s: %s", code, exc)
+        return {"error": f"SEC ticker lookup failed: {exc}"}
+    if not cik:
+        return {"error": "ticker not found in SEC company table"}
+
+    try:
+        facts = get_company_facts(cik)
+    except Exception as exc:  # noqa: BLE001 - one bad fetch must not kill the call
+        logger.warning("SEC companyfacts fetch failed for %s: %s", code, exc)
+        return {"error": f"SEC companyfacts request failed: {exc}"}
+
+    gaap = (facts.get("facts") or {}).get("us-gaap") if isinstance(facts, dict) else None
+    if not isinstance(gaap, dict):
+        return {"periods": []}
+
+    periods_by_key: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for concept_name in _SEC_CONCEPTS[statement]:
+        concept = gaap.get(concept_name)
+        units = concept.get("units") if isinstance(concept, dict) else None
+        if not isinstance(units, dict):
+            continue
+        unit_key, rows = _pick_sec_unit(units)
+        for row in rows:
+            if not isinstance(row, dict) or not _sec_period_matches(row, period):
+                continue
+            end = row.get("end")
+            value = _to_number(row.get("val"))
+            if not end or value is None:
+                continue
+            key = (end, row.get("fy"), row.get("fp"), row.get("form"), row.get("accn"))
+            period_row = periods_by_key.setdefault(
+                key,
+                {
+                    "REPORT_DATE": end,
+                    "FISCAL_YEAR": row.get("fy"),
+                    "FISCAL_PERIOD": row.get("fp"),
+                    "FORM": row.get("form"),
+                    "ACCESSION": row.get("accn"),
+                    "_units": {},
+                },
+            )
+            period_row[concept_name] = value
+            period_row["_units"][concept_name] = unit_key
+
+    periods = sorted(
+        periods_by_key.values(),
+        key=lambda row: str(row.get("REPORT_DATE") or ""),
+        reverse=True,
+    )
     return {"periods": _cap_periods(periods)}
 
 
@@ -284,10 +407,10 @@ class FinancialStatementsTool(BaseTool):
         "Fetch a single stock's financial statements: balance sheet, income "
         "statement, cash-flow statement, or key per-period indicators (margins, "
         "ROE, EPS, etc.). Markets: A-share (.SH/.SZ/.BJ), US (.US) and "
-        "Hong Kong (.HK), all via Eastmoney. Reports come back newest-first as flat "
-        "per-period rows. Use this to read fundamentals before building a "
-        'valuation or screen. Example: {"code": "600519.SH", "statement": '
-        '"income", "period": "annual"}.'
+        "Hong Kong (.HK). US uses SEC EDGAR companyfacts; A-share and HK use "
+        "Eastmoney. Reports come back newest-first as flat per-period rows. Use "
+        'this to read fundamentals before building a valuation or screen. Example: '
+        '{"code": "600519.SH", "statement": "income", "period": "annual"}.'
     )
     parameters = {
         "type": "object",
@@ -357,9 +480,14 @@ class FinancialStatementsTool(BaseTool):
                 "code must carry a supported suffix: .SH/.SZ/.BJ, .US, or .HK"
             )
 
-        result = _fetch_eastmoney_statement(
-            code, statement=statement, period=period
-        )
+        if market == "us":
+            result = _fetch_sec_statement(code, statement=statement, period=period)
+            source = "sec_edgar"
+        else:
+            result = _fetch_eastmoney_statement(
+                code, statement=statement, period=period
+            )
+            source = "eastmoney"
 
         # The fetch failed for every requested code (here, the single ``code``)
         # iff its result carries an ``error``. Surface that as a top-level
@@ -368,7 +496,7 @@ class FinancialStatementsTool(BaseTool):
         envelope: dict[str, Any] = {
             "ok": not all_failed,
             "market": market,
-            "source": "eastmoney",
+            "source": source,
             "statement": statement,
             "period": period,
             "data": {code: result},

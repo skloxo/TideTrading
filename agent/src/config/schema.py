@@ -204,14 +204,16 @@ ROBINHOOD_MCP_SERVER_SEED: dict[str, object] = {
     # READ tool names (``src.trading.connectors.robinhood.classification.ROBINHOOD_TOOL_CLASS``).
     # These MUST match the curated map's READ entries: a name here that the map
     # does not classify READ would resolve UNKNOWN -> gated -> refused, silently
-    # hiding the real read tool. Canonical READ catalog: get_account,
-    # get_positions, get_quotes, list_orders. WRITE (place_order, cancel_order)
-    # is never seeded — the user adds those by hand once a mandate exists.
+    # hiding the real read tool. Canonical READ catalog: get_accounts,
+    # get_portfolio, get_equity_positions, get_equity_quotes, get_equity_orders.
+    # WRITE (place_equity_order, cancel_equity_order) is never seeded — the user
+    # adds those by hand once a mandate exists.
     "enabled_tools": [
-        "get_account",
-        "get_positions",
-        "get_quotes",
-        "list_orders",
+        "get_accounts",
+        "get_portfolio",
+        "get_equity_positions",
+        "get_equity_quotes",
+        "get_equity_orders",
     ],
 }
 
@@ -424,10 +426,27 @@ class MCPServerConfigOverride(ConfigBase):
     enabled_tools: list[str] | None = None
 
 
+class ChannelsConfig(ConfigBase):
+    """Top-level IM channel config.
+
+    Built-in adapters parse their own per-channel sections. This model keeps
+    the operator file strict for global fields while allowing platform-specific
+    channel keys such as ``telegram`` or ``feishu``.
+    """
+
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True, extra="allow")
+
+    send_progress: bool = True
+    send_tool_hints: bool = False
+    send_max_retries: int = Field(default=2, ge=1, le=10)
+    reply_timeout_s: float = Field(default=600.0, ge=1.0, le=86400.0)
+
+
 class AgentConfig(ConfigBase):
     """Top-level structured agent config."""
 
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
+    channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
 
     @model_validator(mode="after")
     def validate_live_broker_servers(self) -> "AgentConfig":
@@ -483,3 +502,4 @@ class AgentConfigOverride(ConfigBase):
     )
 
     mcp_servers: dict[str, MCPServerConfigOverride] = Field(default_factory=dict)
+    channels: ChannelsConfig | None = None

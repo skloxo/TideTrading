@@ -1,18 +1,19 @@
 """Robinhood order-intent extractor (SPEC.md Mandate Enforcement §4).
 
-Maps Robinhood's ``place_order`` tool kwargs to the normalized
+Maps Robinhood's ``place_equity_order`` tool kwargs to the normalized
 :class:`~src.live.enforcement.OrderIntent`. Pinned against the frozen Robinhood
-catalog: the only order-placing WRITE tool is ``place_order`` (``cancel_order``
-is a WRITE but not an *order placement* — it carries no notional/quantity to
-enforce, so it is not an order-intent tool here).
+catalog: the only order-placing WRITE tool is ``place_equity_order``
+(``cancel_equity_order`` is a WRITE but not an *order placement* — it carries no
+notional/quantity to enforce, so it is not an order-intent tool here).
 
-``place_order`` is sized by ``symbol`` + ``side`` plus exactly one (or, defended
-against, both) of ``notional_usd`` / ``quantity`` (``dollar_amount`` accepted as
-a notional alias). The extractor maps these concrete fields and returns ``None``
-(→ DENY) on anything missing or ambiguous — it never guesses, so the gate
-defaults to the safe state. Unknown extra keys are ignored. When both a notional
-and a quantity are present the extractor surfaces BOTH; the gate reconciles them
-to the larger enforced notional (closing the notional+quantity bypass).
+``place_equity_order`` is sized by ``symbol`` + ``side`` plus exactly one (or,
+defended against, both) of ``notional_usd`` / ``quantity`` (``dollar_amount``
+accepted as a notional alias). The extractor maps these concrete fields and
+returns ``None`` (→ DENY) on anything missing or ambiguous — it never guesses,
+so the gate defaults to the safe state. Unknown extra keys are ignored. When
+both a notional and a quantity are present the extractor surfaces BOTH; the gate
+reconciles them to the larger enforced notional (closing the notional+quantity
+bypass).
 """
 
 from __future__ import annotations
@@ -21,9 +22,9 @@ from src.live.enforcement import OrderIntent
 from src.live.mandate.model import InstrumentType
 
 #: Remote tool names this extractor recognizes as order placements. Frozen to
-#: the canonical catalog: ``place_order`` is the sole order-placing WRITE tool
-#: (``cancel_order`` carries no order intent to size).
-_ORDER_TOOLS = frozenset({"place_order"})
+#: the canonical catalog: ``place_equity_order`` is the sole order-placing WRITE
+#: tool (``cancel_equity_order`` carries no order intent to size).
+_ORDER_TOOLS = frozenset({"place_equity_order"})
 
 #: Accepted side spellings → normalized ``"buy"`` / ``"sell"``.
 _SIDE_ALIASES = {
@@ -56,7 +57,7 @@ _QUANTITY_KEYS = ("quantity", "qty", "shares", "units")
 
 
 def extract_order_intent(remote_name: str, kwargs: dict) -> OrderIntent | None:
-    """Parse Robinhood ``place_order`` kwargs into a normalized :class:`OrderIntent`.
+    """Parse Robinhood ``place_equity_order`` kwargs into a normalized :class:`OrderIntent`.
 
     Returns ``None`` (→ DENY) whenever the tool is not a recognized order tool,
     a required field is absent, or a field is ambiguous/invalid. Never guesses;
@@ -64,7 +65,7 @@ def extract_order_intent(remote_name: str, kwargs: dict) -> OrderIntent | None:
 
     Args:
         remote_name: The broker's un-prefixed remote tool name (e.g.
-            ``"place_order"``).
+            ``"place_equity_order"``).
         kwargs: Raw tool-call arguments the agent passed to the order tool.
 
     Returns:

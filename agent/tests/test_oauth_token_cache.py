@@ -26,6 +26,16 @@ from src.tools.mcp import _build_token_store
 pytestmark = pytest.mark.unit
 
 
+def _assert_owner_only_mode(path: Path) -> None:
+    if os.name == "nt":
+        # Windows exposes ACLs through a different API and reports directories
+        # as 0777 via stat.S_IMODE even after os.chmod(0o700).
+        assert path.is_dir()
+        return
+    mode = stat.S_IMODE(os.stat(path).st_mode)
+    assert mode == 0o700, f"expected owner-only 0700, got {oct(mode)}"
+
+
 def test_build_token_store_creates_dir_0700(tmp_path: Path) -> None:
     cache = tmp_path / "oauth"
     assert not cache.exists()
@@ -33,14 +43,14 @@ def test_build_token_store_creates_dir_0700(tmp_path: Path) -> None:
     _build_token_store(str(cache))
 
     assert cache.is_dir()
-    mode = stat.S_IMODE(os.stat(cache).st_mode)
-    assert mode == 0o700, f"expected owner-only 0700, got {oct(mode)}"
+    _assert_owner_only_mode(cache)
 
 
 def test_build_token_store_expands_user(monkeypatch, tmp_path: Path) -> None:
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setenv("USERPROFILE", str(fake_home))
 
     _build_token_store("~/.vibe-trading-cnx/live/robinhood/oauth")
 
@@ -53,7 +63,7 @@ def test_build_token_store_idempotent_on_existing_dir(tmp_path: Path) -> None:
     _build_token_store(str(cache))
     # Second call must not raise on an already-existing directory.
     _build_token_store(str(cache))
-    assert stat.S_IMODE(os.stat(cache).st_mode) == 0o700
+    _assert_owner_only_mode(cache)
 
 
 def test_token_persists_across_store_instances(tmp_path: Path) -> None:
@@ -179,7 +189,7 @@ def test_token_never_in_audit_payload() -> None:
         session_id="s1",
         outcome="accepted",
         server="robinhood",
-        remote_tool="place_order",
+        remote_tool="place_equity_order",
         broker_request={"symbol": "AAPL", "access_token": _OAUTH_SECRET},
         broker_response={"order_id": "rh_x", "authorization": _OAUTH_SECRET},
     )
@@ -209,8 +219,8 @@ def test_token_not_accepted_from_tool_args_or_variables() -> None:
 
     spec = MCPRemoteToolSpec(
         server_name="robinhood",
-        remote_name="place_order",
-        local_name="mcp_robinhood_place_order",
+        remote_name="place_equity_order",
+        local_name="mcp_robinhood_place_equity_order",
         description="place an order",
         parameters={
             "type": "object",
@@ -282,12 +292,12 @@ def test_cache_expiry_surfaces_reauth_no_silent_stale_call() -> None:
             "type": "streamableHttp",
             "url": "https://agent.robinhood.com/mcp/trading",
             "auth": {"type": "oauth", "scopes": ["trading.read"]},
-            "enabled_tools": ["place_order"],
+            "enabled_tools": ["place_equity_order"],
         }
     )
     adapter = MCPServerAdapter("robinhood", cfg, client_factory=_ExpiredAuthClient)
 
-    result = adapter.call_tool("place_order", {"symbol": "AAPL", "side": "buy"})
+    result = adapter.call_tool("place_equity_order", {"symbol": "AAPL", "side": "buy"})
 
     # Surfaced as an error envelope — never a silent success off a stale token.
     assert result["status"] == "error"

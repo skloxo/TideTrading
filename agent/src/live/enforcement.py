@@ -707,3 +707,12 @@ def market_cap_usd(symbol: str, asset_class: AssetClass) -> float | None:
     cap = info.get("marketCap")
     parsed = _as_float(cap)
     return parsed if parsed and parsed > 0 else None
+
+
+# -- Public aliases for cross-module use (advisory layer) --------------------
+# These expose internal helpers to the advisory module without requiring
+# callers to import underscore-prefixed private names.
+
+account_balance_market_value = _account_balance_market_value
+coerce_position_rows = _coerce_position_rows
+positions_market_value = _positions_market_value

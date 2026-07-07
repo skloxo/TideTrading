@@ -397,3 +397,14 @@ def get_uploads_dir() -> Path:
     if tenant == "default":
         return Path(__file__).resolve().parents[2] / "uploads"
     return get_runtime_root() / "uploads"
+
+
+def get_workspace_path() -> Path:
+    """Return the workspace path for channel state data.
+
+    For channel adapters that need to persist state (e.g. conversation
+    references, auth tokens), this returns ``~/.vibe-trading/workspace``.
+    """
+    p = get_runtime_root() / "workspace"
+    p.mkdir(parents=True, exist_ok=True)
+    return p

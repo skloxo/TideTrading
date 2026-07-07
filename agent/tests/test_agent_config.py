@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from src.channels.config import load_channels_config
 from src.config import (
     AgentConfig,
     MCPServerConfig,
@@ -92,6 +93,38 @@ def test_load_agent_config_accepts_camel_case_json(tmp_path: Path) -> None:
     assert config.mcp_servers["demo"].args == ["demo-server"]
     assert config.mcp_servers["demo"].tool_timeout == 15
     assert config.mcp_servers["demo"].enabled_tools == ["alpha"]
+
+
+def test_load_agent_config_accepts_channel_reply_timeout_aliases(tmp_path: Path) -> None:
+    config_path = tmp_path / "agent.json"
+    config_path.write_text(
+        """
+        {
+          "channels": {
+            "replyTimeoutS": 1800,
+            "sendMaxRetries": 3
+          }
+        }
+        """.strip(),
+        encoding="utf-8",
+    )
+
+    config = load_agent_config(config_path)
+
+    assert config.channels.reply_timeout_s == 1800
+    assert config.channels.send_max_retries == 3
+    assert load_channels_config(config_path)["reply_timeout_s"] == 1800
+
+
+def test_channels_config_accepts_snake_case_reply_timeout() -> None:
+    config = AgentConfig.model_validate({"channels": {"reply_timeout_s": 300}})
+
+    assert config.channels.reply_timeout_s == 300
+
+
+def test_channels_config_rejects_non_positive_reply_timeout() -> None:
+    with pytest.raises(ValidationError):
+        AgentConfig.model_validate({"channels": {"replyTimeoutS": 0}})
 
 
 def test_load_agent_config_supports_yaml(tmp_path: Path) -> None:
@@ -368,7 +401,7 @@ def test_robinhood_wildcard_validation_names_safe_seed_and_config_path() -> None
     assert ROBINHOOD_AGENT_CONFIG_PATH in message
     assert '"mcpServers"' in message
     assert '"enabledTools"' in message
-    assert '"get_account"' in message
+    assert '"get_portfolio"' in message
     assert "No live channel configured" not in message
 
 
@@ -424,7 +457,7 @@ def test_live_authorize_wildcard_robinhood_config_prints_safe_seed(
     assert 'Robinhood MCP config uses enabledTools: ["*"]' in out
     assert "safe read-only Robinhood seed" in out
     assert ROBINHOOD_AGENT_CONFIG_PATH in out
-    assert '"get_account"' in out
+    assert '"get_portfolio"' in out
     assert "No live channel configured" not in out
 
 
@@ -451,7 +484,7 @@ def test_mcp_robinhood_wildcard_zero_tools_warning_names_safe_allowlist(
     assert tools == []
     assert "wildcard enabledTools" in caplog.text
     assert "safe read-only allowlist" in caplog.text
-    assert "get_account" in caplog.text
+    assert "get_portfolio" in caplog.text
     assert ROBINHOOD_AGENT_CONFIG_PATH in caplog.text
 
 

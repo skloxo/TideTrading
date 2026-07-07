@@ -5,19 +5,19 @@ from __future__ import annotations
 from typing import Any
 
 _REMOTE_TOOL_NAMES = {
-    "account": "get_account",
-    "positions": "get_positions",
-    "orders": "list_orders",
-    "quote": "get_quotes",
+    "account": "get_portfolio",
+    "positions": "get_equity_positions",
+    "orders": "get_equity_orders",
+    "quote": "get_equity_quotes",
 }
 
 _RUNNER_TOOL_NAMES = {
-    "account": "get_account",
-    "positions": "get_positions",
-    "orders": "list_orders",
-    "quote": "get_quotes",
-    "submit_order": "place_order",
-    "cancel_order": "cancel_order",
+    "account": "get_portfolio",
+    "positions": "get_equity_positions",
+    "orders": "get_equity_orders",
+    "quote": "get_equity_quotes",
+    "submit_order": "place_equity_order",
+    "cancel_order": "cancel_equity_order",
 }
 
 

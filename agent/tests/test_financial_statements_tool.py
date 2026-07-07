@@ -1,8 +1,8 @@
 """Tests for financial_statements_tool: envelope shape, dispatch, isolation.
 
-All HTTP is mocked at the functions the tool imports — every market routes
-through the Eastmoney client's ``get_json`` / ``resolve_secid`` — so no test
-touches a live endpoint.
+All HTTP is mocked at the functions the tool imports. A-share/HK route through
+Eastmoney ``get_json`` / ``resolve_secid``; US routes through SEC EDGAR
+``cik_for`` / ``get_company_facts``. No test touches a live endpoint.
 """
 
 from __future__ import annotations
@@ -28,6 +28,74 @@ _EM_A_PAYLOAD = {
             {"REPORT_DATE": "2024-12-31", "TOTAL_ASSETS": 100.0, "NETPROFIT": 12.0},
             {"REPORT_DATE": "2023-12-31", "TOTAL_ASSETS": 90.0, "NETPROFIT": 10.0},
         ]
+    }
+}
+
+_SEC_FACTS = {
+    "facts": {
+        "us-gaap": {
+            "Revenues": {
+                "label": "Revenues",
+                "units": {
+                    "USD": [
+                        {
+                            "end": "2023-09-30",
+                            "val": 383285000000,
+                            "fy": 2023,
+                            "fp": "FY",
+                            "form": "10-K",
+                            "accn": "a1",
+                        },
+                        {
+                            "end": "2024-09-28",
+                            "val": 391035000000,
+                            "fy": 2024,
+                            "fp": "FY",
+                            "form": "10-K",
+                            "accn": "a2",
+                        },
+                    ]
+                },
+            },
+            "NetIncomeLoss": {
+                "label": "Net Income",
+                "units": {
+                    "USD": [
+                        {
+                            "end": "2024-06-29",
+                            "val": 21448000000,
+                            "fy": 2024,
+                            "fp": "Q3",
+                            "form": "10-Q",
+                            "accn": "q3",
+                        },
+                        {
+                            "end": "2024-09-28",
+                            "val": 93736000000,
+                            "fy": 2024,
+                            "fp": "FY",
+                            "form": "10-K",
+                            "accn": "a2",
+                        },
+                    ]
+                },
+            },
+            "Assets": {
+                "label": "Assets",
+                "units": {
+                    "USD": [
+                        {
+                            "end": "2024-09-28",
+                            "val": 364980000000,
+                            "fy": 2024,
+                            "fp": "FY",
+                            "form": "10-K",
+                            "accn": "a2",
+                        },
+                    ]
+                },
+            },
+        }
     }
 }
 
@@ -60,36 +128,67 @@ class TestSuccessEnvelope:
         assert periods[0]["REPORT_DATE"] == "2024-12-31"
 
         # A-share balance sheet hits the A-share F10 report, filtered on the
-        # dotted SECUCODE (not the bare SECURITY_CODE used for US/HK).
+        # dotted SECUCODE (not the bare SECURITY_CODE used for HK).
         sent_params = mock_get.call_args.kwargs["params"]
         assert sent_params["reportName"] == "RPT_F10_FINANCE_GBALANCE"
         assert 'SECUCODE="600519.SH"' in sent_params["filter"]
         assert "SECURITY_CODE" not in sent_params["filter"]
 
-    def test_us_uses_eastmoney_report_api(self):
+    def test_us_uses_sec_companyfacts(self):
         with patch(
             "src.tools.financial_statements_tool.resolve_secid",
-            return_value="105.AAPL",
-        ), patch(
+        ) as mock_resolve, patch(
             "src.tools.financial_statements_tool.get_json",
-            return_value=_EM_PAYLOAD,
-        ) as mock_get:
+        ) as mock_get, patch(
+            "src.tools.financial_statements_tool.cik_for",
+            return_value="0000320193",
+        ) as mock_cik, patch(
+            "src.tools.financial_statements_tool.get_company_facts",
+            return_value=_SEC_FACTS,
+        ) as mock_facts:
+            text = FinancialStatementsTool().execute(
+                code="AAPL.US", statement="income", period="annual"
+            )
+
+        mock_cik.assert_called_once_with("AAPL")
+        mock_facts.assert_called_once_with("0000320193")
+        mock_resolve.assert_not_called()
+        mock_get.assert_not_called()
+
+        payload = json.loads(text)
+        assert payload["ok"] is True
+        assert payload["market"] == "us"
+        assert payload["source"] == "sec_edgar"
+
+        periods = payload["data"]["AAPL.US"]["periods"]
+        assert periods[0]["REPORT_DATE"] == "2024-09-28"
+        assert periods[0]["FORM"] == "10-K"
+        assert periods[0]["Revenues"] == 391035000000.0
+        assert periods[0]["NetIncomeLoss"] == 93736000000.0
+        assert periods[0]["_units"] == {
+            "Revenues": "USD",
+            "NetIncomeLoss": "USD",
+        }
+
+    def test_us_quarter_keeps_10q_points(self):
+        with patch(
+            "src.tools.financial_statements_tool.cik_for",
+            return_value="0000320193",
+        ), patch(
+            "src.tools.financial_statements_tool.get_company_facts",
+            return_value=_SEC_FACTS,
+        ):
             text = FinancialStatementsTool().execute(
                 code="AAPL.US", statement="income", period="quarter"
             )
 
         payload = json.loads(text)
-        assert payload["ok"] is True
-        assert payload["market"] == "us"
-        assert payload["source"] == "eastmoney"
-
         periods = payload["data"]["AAPL.US"]["periods"]
-        assert periods[0]["REPORT_DATE"] == "2024-12-31"
-
-        # US income report name + bare code filter were passed through.
-        sent_params = mock_get.call_args.kwargs["params"]
-        assert sent_params["reportName"] == "RPT_USF10_FN_INCOME"
-        assert 'SECURITY_CODE="AAPL"' in sent_params["filter"]
+        dates = [row["REPORT_DATE"] for row in periods]
+        assert "2024-06-29" in dates
+        q3 = next(row for row in periods if row["REPORT_DATE"] == "2024-06-29")
+        assert q3["FORM"] == "10-Q"
+        assert q3["NetIncomeLoss"] == 21448000000.0
 
     def test_hk_indicators_use_hk_report_name(self):
         with patch(
@@ -136,15 +235,15 @@ class TestAllFailedSurfacesError:
 
     def test_unresolvable_us_symbol_yields_ok_false(self):
         with patch(
-            "src.tools.financial_statements_tool.resolve_secid",
+            "src.tools.financial_statements_tool.cik_for",
             return_value=None,
         ):
             text = FinancialStatementsTool().execute(code="ZZZZ.US")
 
         payload = json.loads(text)
         assert payload["ok"] is False
-        assert payload["error"] == "unresolvable symbol"
-        assert payload["data"]["ZZZZ.US"]["error"] == "unresolvable symbol"
+        assert payload["error"] == "ticker not found in SEC company table"
+        assert payload["data"]["ZZZZ.US"]["error"] == "ticker not found in SEC company table"
 
     def test_empty_a_share_payload_yields_no_periods_but_ok_true(self):
         # An empty-but-well-formed payload is data (zero periods), not a fetch
@@ -168,7 +267,7 @@ class TestPeriodSelection:
     """Period is chosen client-side. Eastmoney's REPORT_TYPE is locale text
     (年报 / 一季报) or a market-specific string (2026/Q1), so no REPORT_TYPE
     filter is sent; 'annual' keeps fiscal-year-end rows, falling back to the
-    full series when an issuer has no December year-end (e.g. a US fiscal year).
+    full series when an issuer has no December year-end.
     """
 
     _MIXED = {
@@ -217,10 +316,10 @@ class TestPeriodSelection:
 
     def test_annual_falls_back_when_no_december_year_end(self):
         payload, _ = self._run(
-            self._NO_YEAR_END, period="annual", code="AAPL.US", secid="105.AAPL"
+            self._NO_YEAR_END, period="annual", code="00700.HK", secid="116.00700"
         )
         # No -12-31 row -> return the full series rather than drop all data.
-        assert len(payload["data"]["AAPL.US"]["periods"]) == 2
+        assert len(payload["data"]["00700.HK"]["periods"]) == 2
 
     def test_a_share_indicators_use_mainfinadata_report(self):
         _, mock_get = self._run(self._MIXED, period="annual", statement="indicators")

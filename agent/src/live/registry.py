@@ -33,6 +33,7 @@ from src.trading.connectors.okx.classification import OKX_TOOL_CLASS
 from src.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
 from src.trading.connectors.shoonya.classification import SHOONYA_TOOL_CLASS
 from src.trading.connectors.tiger.classification import TIGER_TOOL_CLASS
+from src.trading.connectors.trading212.classification import TRADING212_TOOL_CLASS
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ _BROKER_CURATED_MAPS = {
     "futu": FUTU_TOOL_CLASS,
     "dhan": DHAN_TOOL_CLASS,
     "shoonya": SHOONYA_TOOL_CLASS,
+    "trading212": TRADING212_TOOL_CLASS,
 }
 
 
@@ -138,9 +140,7 @@ def has_cached_oauth_token(url: str, cache_dir: str) -> bool:
         return False
 
 
-def should_register_live_channel(
-    *, interactive: bool, url: str, cache_dir: str | None
-) -> bool:
+def should_register_live_channel(*, interactive: bool, url: str, cache_dir: str | None) -> bool:
     """Decide whether to register a live channel given session interactivity.
 
     SPEC Transport §4 (headless / no-token-yet): a non-interactive
@@ -203,22 +203,25 @@ def wrap_live_broker_tools(
     broker = _broker_for(server_name, url)
     curated = _BROKER_CURATED_MAPS.get(broker)
     halted = halt_flag_set(broker)
+
     result: list[MCPRemoteTool] = []
     for tool in wrappers:
         spec = tool._spec  # internal seam: the gate is constructed from the same spec/adapter
         tool_class = classify_tool(spec.remote_name, spec.annotations, curated)
         if tool_class is ToolClass.READ:
             tool.is_readonly = True
+            tool.live_classification = "READ"
             result.append(tool)
         elif halted:
             # WRITE/UNKNOWN + halt tripped -> do not even hand it to the model.
             logger.warning(
-                "live kill switch tripped for broker '%s' — omitting order tool "
-                "'%s' from the registry",
+                "live kill switch tripped for broker '%s' — omitting order tool '%s' from the registry",
                 broker,
                 spec.remote_name,
             )
         else:
             # WRITE or UNKNOWN -> mandate-gated (fail-closed for UNKNOWN).
-            result.append(LiveOrderGuardTool(tool._adapter, spec, broker=broker))
+            guarded = LiveOrderGuardTool(tool._adapter, spec, broker=broker)
+            guarded.live_classification = "UNKNOWN" if tool_class is ToolClass.UNKNOWN else "WRITE"
+            result.append(guarded)
     return result

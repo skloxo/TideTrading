@@ -55,12 +55,12 @@ def test_remote_streamable_http_tool_appears_in_registry(tmp_path: Path) -> None
         ready_url_builder=_http_url,
         extra_args_builder=lambda port: ["--port", str(port), "--path", HTTP_PATH],
         ready_statuses={200, 400, 405, 406},
-    ) as (_, port):
-        cfg_path = _make_agent_json(tmp_path, "fake_http", port=port)
+    ) as server:
+        cfg_path = _make_agent_json(tmp_path, "fake_http", port=server.port)
         agent_config = load_agent_config(config_path=cfg_path)
         registry = build_registry(agent_config=agent_config)
 
-        assert "mcp_fake_http_echo" in registry.tool_names
+        assert "mcp_fake_http_echo" in registry.tool_names, server.diagnostics()
 
 
 def test_remote_streamable_http_tool_is_callable_and_returns_expected_result(tmp_path: Path) -> None:
@@ -73,13 +73,13 @@ def test_remote_streamable_http_tool_is_callable_and_returns_expected_result(tmp
         ready_url_builder=_http_url,
         extra_args_builder=lambda port: ["--port", str(port), "--path", HTTP_PATH],
         ready_statuses={200, 400, 405, 406},
-    ) as (_, port):
-        cfg_path = _make_agent_json(tmp_path, "fake_http", port=port)
+    ) as server:
+        cfg_path = _make_agent_json(tmp_path, "fake_http", port=server.port)
         agent_config = load_agent_config(config_path=cfg_path)
         registry = build_registry(agent_config=agent_config)
 
         echo_tool = registry.get("mcp_fake_http_echo")
-        assert echo_tool is not None, "mcp_fake_http_echo not found in registry"
+        assert echo_tool is not None, f"mcp_fake_http_echo not found in registry\n{server.diagnostics()}"
 
         result = echo_tool.execute(message="hello")
         assert "echo: hello" in result
@@ -95,13 +95,13 @@ def test_enabled_tools_filter_limits_remote_streamable_http_tools(tmp_path: Path
         ready_url_builder=_http_url,
         extra_args_builder=lambda port: ["--port", str(port), "--path", HTTP_PATH],
         ready_statuses={200, 400, 405, 406},
-    ) as (_, port):
-        cfg_path = _make_agent_json(tmp_path, "fake_http", port=port, enabledTools=["echo"])
+    ) as server:
+        cfg_path = _make_agent_json(tmp_path, "fake_http", port=server.port, enabledTools=["echo"])
         agent_config = load_agent_config(config_path=cfg_path)
         registry = build_registry(agent_config=agent_config)
 
         mcp_names = [name for name in registry.tool_names if name.startswith("mcp_fake_http_")]
-        assert "mcp_fake_http_echo" in mcp_names
+        assert "mcp_fake_http_echo" in mcp_names, server.diagnostics()
         assert "mcp_fake_http_add" not in mcp_names, (
             "mcp_fake_http_add should be excluded by enabledTools filter"
         )
