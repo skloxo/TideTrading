@@ -8,7 +8,7 @@ if (typeof window !== "undefined" && !localStorage.getItem("i18nextLng")) {
   localStorage.setItem("i18nextLng", "zh-CN");
 }
 
-const isTest = typeof process !== "undefined" && process.env.VITEST;
+const isTest = typeof (globalThis as any).process !== "undefined" && (globalThis as any).process.env?.VITEST;
 
 i18n
   .use(LanguageDetector)
