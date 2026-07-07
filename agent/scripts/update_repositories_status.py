@@ -186,7 +186,7 @@ def main():
     
     # Local
     if local_info:
-        md.append(f"| **Vibe-Trading-CNX (本地主分支)** | `skloxo/Vibe-Trading-CNX` | `main` | `{local_info['hash']}` | {local_info['author']} | {local_info['relative_date']} |")
+        md.append(f"| **Vibe-Trading-CNX (本地主分支)** | `skloxo/TideTrading-CNX` | `main` | `{local_info['hash']}` | {local_info['author']} | {local_info['relative_date']} |")
     
     # Add all repos sorted by key
     for key in sorted(repos.keys()):
@@ -209,7 +209,7 @@ def main():
     if log_files:
         for f_name in log_files:
             date_part = f_name.replace('.md', '')
-            file_url = f"file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/Vibe-Trading/.agents/research_archive/repo_sync_logs/{f_name}"
+            file_url = f"file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/TideTrading/.agents/research_archive/repo_sync_logs/{f_name}"
             md.append(f"- [{date_part} 增量日志]({file_url})")
     else:
         md.append("- 暂无历史增量日志。")
