@@ -1,6 +1,6 @@
 [project]
 name = "tide-trading-ai"
-version = "1.7.5.4"
+version = "1.7.5.5"
 description = "A-Share & HK Equities Focus Quantitative Trading Workstation powered by Multi-Agent Swarms"
 requires-python = ">=3.11"
 license = "MIT"

@@ -26,6 +26,11 @@
 
 ## 📰 最新动态
 
+- **2026-07-07** 🚀 **v1.7.5.5 — Refactored service monitor and unified global card rounding & visual density**：
+  - **Service Monitor Expansion**: Added status cards for Swarm Agent Execution Engine (active instances count) and MCP Component Gateway (protocols, auth status) to the service monitor (`/monitor`), with live display of global Xueqiu cache sharing rates.
+  - **Global Theme & Radius Unification**: Tightened overall visual guidelines based on Robinhood cards, refactoring all card border-radiuses from bulky 16px to unified 6px (`rounded-md`); globally contracted padding and gaps for a much higher information density.
+  - **Glassmorphism Redesign**: Polished container widgets background opacity and neon accent shadows for smooth dark/light mode integration.
+
 - **2026-07-07** 🚀 **v1.7.5.4 — 多租户沙箱隔离、全局持仓收益共享缓存与 Token 契约自愈保护**：
   - **多租户沙箱安全隔离**：完成 Cards 1.1 - 1.5 存储隔离重构。在 `path_utils.py` 中为非 default 租户动态注入 uploads/runs 路径白名单；将 Swarm 运行时、图谱可视化、详情日志、投研目标与 Autopilot 会话及 Trace 追踪彻底隔离至各租户的专属沙箱，消除跨租户数据串扰与读写限权隐患。
   - **全局持仓与收益共享缓存**：在 `/settings/xueqiu/combos/details` 接口中实装跨租户共享缓存。只要有任一租户抓取了某组合的最新净值和持仓，全局共享池自动复用该数据，避免多用户订阅相同组合时的重复网络请求。
