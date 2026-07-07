@@ -11,6 +11,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+## [1.7.5.4] — 2026-07-07
+
+### Added
+- **多租户沙箱安全隔离**：彻底重构并隔离了非 default 租户的 Swarm 运行时、图谱可视化、详情日志、投研目标与 Autopilot 会话及 Trace 追踪工作区，并在 `path_utils.py` 中动态注入 uploads/runs 路径白名单解决权限报错。
+- **全局持仓与收益共享缓存**：在组合详情拉取 API 中实装跨租户共享缓存，防止多用户监控同一标的时的重复接口调用。
+- **Token 契约状态与推送联动**：过期或空订阅租户自动转入“监控停用状态”，剔除共享 token 并阻断通知推送。
+
+
 ## [0.1.10-s4] — 2026-07-02
 
 ### Added

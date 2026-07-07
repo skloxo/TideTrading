@@ -159,7 +159,8 @@ class RunResearchAutopilotTool(BaseTool):
             try:
                 from src.session.store import SessionStore
                 from src.session.search import get_shared_index
-                sessions_dir = Path(__file__).resolve().parents[2] / "sessions"
+                from src.config.paths import get_sessions_dir
+                sessions_dir = get_sessions_dir()
                 session_store = SessionStore(base_dir=sessions_dir)
                 session = session_store.get_session(session_id)
                 if session:

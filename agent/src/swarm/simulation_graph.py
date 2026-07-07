@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 from typing import Dict, Any, List
 
+from src.config.paths import get_runs_dir
+
 class SimulationGraphManager:
     """
     轻量级本地图谱管理器
@@ -10,8 +12,8 @@ class SimulationGraphManager:
     """
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
-        # Compute run directory inside agent folder
-        self.file_path = Path(__file__).resolve().parents[2] / "runs" / f"simulation_graph_{tenant_id}.json"
+        # Compute run directory based on active tenant context
+        self.file_path = get_runs_dir() / f"simulation_graph_{tenant_id}.json"
         self._ensure_file()
         
     def _ensure_file(self):

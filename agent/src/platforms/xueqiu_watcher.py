@@ -78,10 +78,28 @@ class DefaultTenantConfigProvider(ITenantConfigProvider):
             if config_path.exists():
                 config = json.loads(config_path.read_text(encoding="utf-8"))
                 if config.get("enabled", False):
+                    combos = config.get("combos", {}) or {}
+                    watch_uids = config.get("watch_uids", {}) or {}
+                    if not combos and not watch_uids:
+                        return None
+                    
+                    xq_tokens = [t.strip() for t in config.get("xq_tokens", []) if t.strip()]
+                    
+                    # If all configured tokens are expired, treat config as disabled (return None)
+                    alert_path = data_dir / "xueqiu_alert_status.json"
+                    if alert_path.exists():
+                        try:
+                            alert_status = json.loads(alert_path.read_text(encoding="utf-8")) or {}
+                            if xq_tokens and all(token in alert_status for token in xq_tokens):
+                                logger.info("[TenantConfigProvider] Tenant %s xq_tokens are expired. Disabling monitoring config.", tenant_id)
+                                return None
+                        except Exception:
+                            pass
+
                     return {
-                        "combos": config.get("combos", {}) or {},
-                        "watch_uids": config.get("watch_uids", {}) or {},
-                        "xq_tokens": [t.strip() for t in config.get("xq_tokens", []) if t.strip()],
+                        "combos": combos,
+                        "watch_uids": watch_uids,
+                        "xq_tokens": xq_tokens,
                         "feishu_webhook": config.get("feishu_webhook", "").strip(),
                         "data_dir": data_dir
                     }

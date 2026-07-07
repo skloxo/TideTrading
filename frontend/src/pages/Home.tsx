@@ -27,7 +27,9 @@ export function Home() {
   const [loadingChangelog, setLoadingChangelog] = useState(true);
 
   const STATIC_CHANGELOG: ChangelogItem[] = [
+    { v: "v1.7.5.4", date: "2026-07-07", title: isZh ? "多租户沙箱隔离、全局持仓收益共享缓存与 Token 契约自愈保护" : "Launched multi-tenant sandboxed workspace isolation and details cache", body: isZh ? "完成 Cards 1.1-1.5 重构，隔离了非 default 租户的 Swarm 运行时、图谱可视化、详情日志、投研目标与 Autopilot 会话及 Trace 追踪；实装跨租户详情共享缓存，合并重复网络请求；联动 Token 过期状态与监控停用契约自愈。" : "Completed Cards 1.1-1.5 storage isolation for Swarm runtime, simulation graphs, detail logs, research goals, autopilot sessions, and trace writers. Implemented cross-tenant shared cache for portfolio details to merge duplicate requests. Enforced token expiration contract to auto-exclude invalid credentials." },
     { v: "v1.7.5", date: "2026-07-07", title: isZh ? "雪球监控多租户联合查询与 Cookie 轮询 & 持久化共享缓存池 (性能与反爬专项)" : "Launched multi-tenant Xueqiu shared cache and cooperative cookie rotation", body: isZh ? "支持雪球监控的多租户共享缓存与 Cookie 轮询分摊查询，实现全自动反爬限流自愈，调仓日志与飞书通知完全租户级安全隔离；重构系统版本接口与四段式版本比对机制，修复低版本误报与开发环境一键升级拦截故障。" : "Launched multi-tenant Xueqiu shared cache and cooperative cookie rotation to balance query load and auto-heal anti-scraping blocks, with tenant-scoped private logging and webhooks. Refactored backend version endpoint and four-part versioning comparison rules to eliminate false version warnings and enable dev-container one-click upgrade monitoring." },
+
     { v: "v1.7.4", date: "2026-07-06", title: isZh ? "项目设置独立页面 · 租户敏感凭证物理隔离" : "Decoupled global project settings to a standalone page", body: isZh ? "将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为独立单页`/project-settings`；同时重构后端配置合并逻辑，在租户没有配置自定义 LLM 时进行物理级隐私隔离，不再向普通租户端泄露全局模型名（如 mimo）及密钥凭证。" : "Decoupled global project settings to a standalone page under the `/project-settings` route. Refactored backend configuration merging to strictly isolate tenant spaces; if a tenant has not configured custom LLM/data settings, global admin secrets and model names (e.g. mimo-v2.5-pro-ultraspeed) are fully hidden from the tenant settings form." },
     { v: "v1.7.3", date: "2026-07-03", title: isZh ? "管理员就地提权卡片 · 独立租户管理页面上线" : "Refactored admin privilege verification to inline elevation cards", body: isZh ? "重构管理员权限提权逻辑为各功能页面的就地提权卡片交互，并从服务看板中剥离出独立的租户与物理隔离工作区管理页面（新路由 `/tenants`），极大简化了管理员与普通用户的操作路径并防范了路由重定向断流。" : "Refactored admin privilege verification to inline elevation cards across restricted pages (Monitor, Settings, Logs, Tenants). Decoupled and launched a dedicated Tenant & Workspace Management page under the `/tenants` route to avoid full-page route redirects." },
     { v: "v1.7.1", date: "2026-07-02", title: isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影" : "Rebuilt layout cards to premium glassmorphic widgets", body: isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影，仿真控制台亮色/暗色主题完美适配；开发本地 SQLite 库个股占位名一键清洗脚本，打通腾讯行情分批 API 抓取解决超长 URL 失败故障。" : "Rebuilt layout cards to premium glassmorphic widgets. Added dark/light theme adaptation for emulator console. Implemented automatic SQLite stock name sanitization and batched Tencent quotes retrieval." },
@@ -130,7 +132,7 @@ export function Home() {
         {/* Version badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold backdrop-blur-sm shadow-sm shadow-primary/10">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v1.7.5.2 Stable</span>
+          <span>v1.7.5.4 Stable</span>
           <span className="w-px h-3 bg-primary/30" />
           <span className="text-emerald-400 font-normal">{isZh ? "运行中" : "Live"}</span>
         </div>

@@ -407,6 +407,7 @@ class XueqiuSettingsResponse(BaseModel):
     combos: Dict[str, str] = Field(default_factory=dict)
     xq_tokens: List[str] = Field(default_factory=list)
     watch_uids: Dict[str, str] = Field(default_factory=dict)
+    token_expired: bool = False
 
 
 class UpdateXueqiuSettingsRequest(BaseModel):
@@ -4308,11 +4309,28 @@ async def get_system_changelog(lang: Optional[str] = Query(None, description="La
 async def get_xueqiu_settings():
     """Return Xueqiu portfolio monitoring settings for the Web UI."""
     from src.config.paths import get_data_dir
-    path = get_data_dir() / "xueqiu_monitor.json"
+    data_dir = get_data_dir()
+    path = data_dir / "xueqiu_monitor.json"
     if not path.exists():
         return XueqiuSettingsResponse()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+        
+        # Check token expiration status in alert_status
+        token_expired = False
+        alert_path = data_dir / "xueqiu_alert_status.json"
+        if alert_path.exists():
+            try:
+                alert_status = json.loads(alert_path.read_text(encoding="utf-8")) or {}
+                # If any of the configured xq_tokens is in alert_status, mark as expired
+                for token in data.get("xq_tokens", []):
+                    if token in alert_status:
+                        token_expired = True
+                        break
+            except Exception:
+                pass
+                
+        data["token_expired"] = token_expired
         return XueqiuSettingsResponse(**data)
     except Exception as e:
         logger.error("Failed to load Xueqiu settings: %s", e)
@@ -4420,6 +4438,14 @@ async def update_xueqiu_settings(payload: UpdateXueqiuSettingsRequest, backgroun
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        
+        # Clear alert status for newly updated tokens
+        alert_path = data_dir / "xueqiu_alert_status.json"
+        if alert_path.exists():
+            try:
+                alert_path.unlink()
+            except Exception:
+                pass
     except Exception as e:
         logger.error("Failed to save Xueqiu settings: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to save settings: {e}")
@@ -4565,9 +4591,23 @@ async def get_xueqiu_combos_details():
     if not xq_tokens:
         xq_tokens = DEFAULT_XQ_TOKENS
         
+    global XUEQIU_GLOBAL_DETAILS_CACHE
+    if not hasattr(app.state, "xueqiu_global_details_cache"):
+        app.state.xueqiu_global_details_cache = {}
     details = []
-    
+
     def fetch_single(name: str, symbol: str):
+        current_time = time.time()
+        # 1. Try global shared cache first (valid for 5 minutes)
+        cached = app.state.xueqiu_global_details_cache.get(symbol)
+        if cached:
+            cached_time, cached_data = cached
+            if current_time - cached_time < 300:
+                logger.info("[XueqiuDetails] Shared Cache hit for symbol %s", symbol)
+                result = dict(cached_data)
+                result["name"] = name
+                return result
+
         url = f"https://xueqiu.com/cubes/show.json?symbol={symbol}"
         for retry in range(3):
             token = xq_tokens[retry % len(xq_tokens)]
@@ -4682,7 +4722,7 @@ async def get_xueqiu_combos_details():
                         except Exception as nav_e:
                             logger.error("Fallback error fetching nav_daily for %s: %s", symbol, nav_e)
                             
-                    return {
+                    res = {
                         "name": name,
                         "symbol": symbol,
                         "net_value": net_val,
@@ -4691,10 +4731,13 @@ async def get_xueqiu_combos_details():
                         "monthly_gain": monthly_g,
                         "holdings": holdings_list
                     }
+                    app.state.xueqiu_global_details_cache[symbol] = (current_time, res)
+                    return res
                 elif r.status_code == 429:
                     continue
             except Exception as e:
                 logger.error("Error fetching detail for %s: %s", symbol, e)
+
         return {
             "name": name,
             "symbol": symbol,
@@ -5560,24 +5603,30 @@ async def upload_file(file: UploadFile):
 # Swarm API
 # ============================================================================
 
-_swarm_runtime = None
+# Per-tenant SwarmRuntime cache: {tenant_id: SwarmRuntime}
+_swarm_runtime_cache: dict = {}
 
 
 def _get_swarm_runtime():
-    """Lazy-init SwarmRuntime singleton."""
-    global _swarm_runtime
-    if _swarm_runtime is not None:
-        return _swarm_runtime
+    """Lazy-init SwarmRuntime per active tenant to ensure isolation."""
+    from src.config.paths import active_tenant_var
     from src.config import load_swarm_agent_config
-    from src.swarm.store import SwarmStore
+    from src.swarm.store import SwarmStore, swarm_runs_root
     from src.swarm.runtime import SwarmRuntime
-    swarm_dir = Path(__file__).resolve().parent / ".swarm" / "runs"
+
+    tenant = active_tenant_var.get() or "default"
+    if tenant in _swarm_runtime_cache:
+        return _swarm_runtime_cache[tenant]
+
+    swarm_dir = swarm_runs_root()
+    swarm_dir.mkdir(parents=True, exist_ok=True)
     store = SwarmStore(base_dir=swarm_dir)
     # Boot-time / operator-trusted: REST API callers cannot influence the
     # config path. See docs/2026-05-25_swarm_mcp_tools_roadmap.md.
     agent_config = load_swarm_agent_config()
-    _swarm_runtime = SwarmRuntime(store=store, agent_config=agent_config)
-    return _swarm_runtime
+    runtime = SwarmRuntime(store=store, agent_config=agent_config)
+    _swarm_runtime_cache[tenant] = runtime
+    return runtime
 
 
 @app.get("/swarm/presets")

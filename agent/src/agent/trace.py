@@ -264,12 +264,28 @@ class TraceWriter:
         if runs_dir is None:
             runs_dir = Path(__file__).resolve().parents[2] / "runs"
 
-        session_dir = sessions_dir / run_id
-        if (session_dir / "trace.jsonl").exists():
-            return session_dir
+        # Build candidate search roots (default + per-tenant paths)
+        sessions_roots = [sessions_dir]
+        runs_roots = [runs_dir]
+        try:
+            from src.config.paths import get_sessions_dir, get_runs_dir
+            tenant_sessions = get_sessions_dir()
+            tenant_runs = get_runs_dir()
+            if tenant_sessions not in sessions_roots:
+                sessions_roots.append(tenant_sessions)
+            if tenant_runs not in runs_roots:
+                runs_roots.append(tenant_runs)
+        except Exception:
+            pass
 
-        run_dir = runs_dir / run_id
-        if (run_dir / "trace.jsonl").exists():
-            return run_dir
+        for s_dir in sessions_roots:
+            session_dir = s_dir / run_id
+            if (session_dir / "trace.jsonl").exists():
+                return session_dir
+
+        for r_dir in runs_roots:
+            run_dir = r_dir / run_id
+            if (run_dir / "trace.jsonl").exists():
+                return run_dir
 
         return None

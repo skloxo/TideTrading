@@ -5,6 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
+from src.config.paths import get_runs_dir
+
 class ReportLogger:
     """
     Report Agent 详细日志记录器
@@ -12,7 +14,7 @@ class ReportLogger:
     """
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
-        self.log_file_path = Path(__file__).resolve().parents[2] / "runs" / f"agent_log_{tenant_id}.jsonl"
+        self.log_file_path = get_runs_dir() / f"agent_log_{tenant_id}.jsonl"
         self.start_time = datetime.now()
         self._ensure_log_file()
         

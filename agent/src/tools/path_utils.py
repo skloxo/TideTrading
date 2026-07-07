@@ -84,7 +84,7 @@ def _default_file_roots() -> list[Path]:
     cwd = Path.cwd().resolve()
     home = Path.home().resolve()
     agent_root = _agent_root()
-    return [
+    roots = [
         agent_root / "uploads",
         agent_root / "runs",
         cwd / "uploads",
@@ -92,6 +92,15 @@ def _default_file_roots() -> list[Path]:
         home / ".vibe-trading-cnx" / "uploads",
         home / ".vibe-trading-cnx" / "imports",
     ]
+    # Inject active tenant's dedicated uploads/runs dirs so the security
+    # gateway does not block per-tenant file access in multi-tenant mode.
+    try:
+        from src.config.paths import get_uploads_dir, get_runs_dir
+        roots.append(get_uploads_dir())
+        roots.append(get_runs_dir())
+    except Exception:
+        pass
+    return roots
 
 
 def _default_run_roots() -> list[Path]:
@@ -101,13 +110,20 @@ def _default_run_roots() -> list[Path]:
     cwd = Path.cwd().resolve()
     home = Path.home().resolve()
     agent_root = _agent_root()
-    return [
+    roots = [
         agent_root / "runs",
         swarm_runs_root(),
         cwd / "runs",
         home / ".vibe-trading-cnx" / "shadow_runs",
         home / ".vibe-trading-cnx" / "runs",
     ]
+    # Inject tenant-specific runs dir for non-default tenants.
+    try:
+        from src.config.paths import get_runs_dir
+        roots.append(get_runs_dir())
+    except Exception:
+        pass
+    return roots
 
 
 def allowed_file_roots() -> list[Path]:
@@ -144,6 +160,13 @@ def allowed_write_roots() -> list[Path]:
         home / ".vibe-trading-cnx" / "uploads",
         home / ".vibe-trading-cnx" / "runs",
     ]
+    # Inject active tenant's write-allowed directories.
+    try:
+        from src.config.paths import get_uploads_dir, get_runs_dir
+        defaults.append(get_uploads_dir())
+        defaults.append(get_runs_dir())
+    except Exception:
+        pass
 
     roots: list[Path] = []
     for root in [*defaults, *configured]:
