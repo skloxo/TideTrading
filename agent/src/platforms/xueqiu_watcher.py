@@ -86,12 +86,33 @@ class XueqiuWatcher:
                 break
             await asyncio.sleep(self.check_interval_seconds)
 
+    def _load_shared_cache(self) -> Dict[str, Any]:
+        """Load persistent shared pool cache from disk."""
+        from src.config.paths import _get_active_runtime_dir
+        try:
+            cache_path = _get_active_runtime_dir() / "shared_xueqiu_cache.json"
+            if cache_path.exists():
+                return json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("[XueqiuWatcher] Failed to load shared cache: %s", e)
+        return {"combos": {}, "influencers": {}}
+
+    def _save_shared_cache(self, cache: Dict[str, Any]) -> None:
+        """Persist shared pool cache to disk."""
+        from src.config.paths import _get_active_runtime_dir
+        try:
+            cache_path = _get_active_runtime_dir() / "shared_xueqiu_cache.json"
+            cache_path.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            logger.error("[XueqiuWatcher] Failed to save shared cache: %s", e)
+
     async def tick(self) -> None:
         """Perform a single check across all active tenants.
         
         This check uses a Shared Cache Pool and de-duplicates queries across all active tenants,
         while performing cooperative Cookie rotation to distribute network request load.
         """
+        import time
         from src.config.paths import active_tenant_var, get_data_dir
         
         # 1. Load active tenants and configurations
@@ -153,17 +174,29 @@ class XueqiuWatcher:
                     uid_to_tenants[uid] = []
                 uid_to_tenants[uid].append((tenant, name))
 
-        # 3. Gather cooperative token lists and rotation indices
+        # 3. Load persistent shared cache from disk
+        shared_cache = self._load_shared_cache()
+        current_time = time.time()
+        cache_updated = False
+
+        # 4. Gather cooperative token lists and rotation indices
         if not hasattr(self, "_combo_rotation_indices"):
             self._combo_rotation_indices = {}
         if not hasattr(self, "_uid_rotation_indices"):
             self._uid_rotation_indices = {}
 
-        # 4. Perform single-queries with cooperative cookie rotation
+        # 5. Perform single-queries with cooperative cookie rotation & persistent shared pool caching
         shared_combo_results = {}
         for combo_id, monitoring_tenants in combo_to_tenants.items():
             if self._stopping:
                 break
+
+            # Check shared cache first (valid for 5 minutes / 300 seconds)
+            cached_item = shared_cache.get("combos", {}).get(combo_id)
+            if cached_item and isinstance(cached_item, dict) and (current_time - cached_item.get("timestamp", 0) < 300):
+                shared_combo_results[combo_id] = cached_item.get("data")
+                logger.info("[XueqiuWatcher] Shared Cache hit for combo %s", combo_id)
+                continue
 
             # Gather cookies
             cookies = []
@@ -224,10 +257,26 @@ class XueqiuWatcher:
             )
             shared_combo_results[combo_id] = rebalancings
 
+            # Update cache
+            if "combos" not in shared_cache:
+                shared_cache["combos"] = {}
+            shared_cache["combos"][combo_id] = {
+                "timestamp": current_time,
+                "data": rebalancings
+            }
+            cache_updated = True
+
         shared_uid_results = {}
         for uid, monitoring_tenants in uid_to_tenants.items():
             if self._stopping:
                 break
+
+            # Check shared cache first (valid for 5 minutes / 300 seconds)
+            cached_item = shared_cache.get("influencers", {}).get(uid)
+            if cached_item and isinstance(cached_item, dict) and (current_time - cached_item.get("timestamp", 0) < 300):
+                shared_uid_results[uid] = cached_item.get("data")
+                logger.info("[XueqiuWatcher] Shared Cache hit for influencer %s", uid)
+                continue
 
             # Gather cookies
             cookies = []
@@ -272,6 +321,19 @@ class XueqiuWatcher:
                 self._query_influencer_watchlist, uid, rotated_cookies
             )
             shared_uid_results[uid] = stocks
+
+            # Update cache
+            if "influencers" not in shared_cache:
+                shared_cache["influencers"] = {}
+            shared_cache["influencers"][uid] = {
+                "timestamp": current_time,
+                "data": stocks
+            }
+            cache_updated = True
+
+        # Save cache if updated
+        if cache_updated:
+            self._save_shared_cache(shared_cache)
 
         # 5. Distribute results privately to each tenant
         for tenant, cfg in tenant_configs.items():

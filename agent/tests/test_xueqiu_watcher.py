@@ -11,6 +11,7 @@ import api_server
 async def test_xueqiu_watcher_shared_pool_and_rotation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # 1. Setup paths
     monkeypatch.setattr("src.config.paths.get_data_dir", lambda *args, **kwargs: tmp_path)
+    monkeypatch.setattr("src.config.paths._get_active_runtime_dir", lambda *args, **kwargs: tmp_path)
     
     # Mock tenant keys to return tenant_1 and tenant_2
     mock_tenants = [
@@ -95,14 +96,33 @@ async def test_xueqiu_watcher_shared_pool_and_rotation(tmp_path: Path, monkeypat
     # Check that logs were written to both tenant directories
     assert (t1_dir / "xueqiu_rebalancing_logs.json").exists()
     assert (t2_dir / "xueqiu_rebalancing_logs.json").exists()
+
+    # Check that persistent shared cache was created and contains the data
+    cache_file = tmp_path / "shared_xueqiu_cache.json"
+    assert cache_file.exists()
+    cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
+    assert "combos" in cache_data
+    assert "ZH123456" in cache_data["combos"]
     
-    # 4. Second tick - check cookie rotation
+    # 4. Second tick - check that we hit the persistent cache without doing a new query
+    # (Since cached timestamp is current, query_combo should NOT be called again!)
     query_combo_mock.reset_mock()
     await watcher.tick()
-    assert query_combo_mock.call_count == 1
-    second_call_args = query_combo_mock.call_args[0]
+    # Call count must be 0 because of cache hit!
+    assert query_combo_mock.call_count == 0
+
+    # 5. Third tick - manually expire cache and check cookie rotation
+    cache_data = json.loads(cache_file.read_text(encoding="utf-8"))
+    cache_data["combos"]["ZH123456"]["timestamp"] = 0
+    cache_file.write_text(json.dumps(cache_data), encoding="utf-8")
     
-    # It should have rotated to the other token
-    second_token_used = second_call_args[1][0]
-    assert second_token_used in ["token_t1", "token_t2"]
-    assert second_token_used != first_token_used
+    query_combo_mock.reset_mock()
+    await watcher.tick()
+    # Call count must be 1 because cache expired
+    assert query_combo_mock.call_count == 1
+    third_call_args = query_combo_mock.call_args[0]
+    third_token_used = third_call_args[1][0]
+    
+    # It must be rotated to the other token
+    assert third_token_used in ["token_t1", "token_t2"]
+    assert third_token_used != first_token_used
