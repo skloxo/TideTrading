@@ -1126,7 +1126,13 @@ def _get_xueqiu_watcher():
     global _xueqiu_watcher
     if _xueqiu_watcher is None:
         from src.platforms.xueqiu_watcher import XueqiuWatcher
+        from src.platforms.event_dispatcher import MultiTenantEventDispatcher
         _xueqiu_watcher = XueqiuWatcher()
+        dispatcher = MultiTenantEventDispatcher(
+            config_provider=_xueqiu_watcher.config_provider,
+            watcher=_xueqiu_watcher
+        )
+        _xueqiu_watcher.add_event_listener(dispatcher.handle_event)
     return _xueqiu_watcher
 
 

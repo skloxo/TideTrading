@@ -57,7 +57,12 @@ async def test_xueqiu_watcher_shared_pool_and_rotation(tmp_path: Path, monkeypat
     
     watcher = XueqiuWatcher(check_interval_seconds=300)
     
-    # Mock network request to return sample
+    # Wire up MultiTenantEventDispatcher as in production
+    from src.platforms.event_dispatcher import MultiTenantEventDispatcher
+    dispatcher = MultiTenantEventDispatcher(config_provider=watcher.config_provider, watcher=watcher)
+    watcher.add_event_listener(dispatcher.handle_event)
+    
+    # Mock data to return from queries
     mock_rebal = [
         {
             "updated_at": 1698234720000,
@@ -76,13 +81,25 @@ async def test_xueqiu_watcher_shared_pool_and_rotation(tmp_path: Path, monkeypat
     query_combo_mock = MagicMock(return_value=mock_rebal)
     monkeypatch.setattr(watcher, "_query_combo", query_combo_mock)
     
-    # Mock Feishu notification
+    # Mock initialize_combo_history and initialize_influencer_watchlist to avoid actual network calls
+    monkeypatch.setattr(watcher, "initialize_combo_history", MagicMock())
+    monkeypatch.setattr(watcher, "initialize_influencer_watchlist", MagicMock())
+    
+    # Mock Feishu notification in dispatcher
     from unittest.mock import AsyncMock
     notify_mock = AsyncMock()
-    monkeypatch.setattr(watcher, "_notify_feishu", notify_mock)
+    monkeypatch.setattr(dispatcher, "_notify_feishu", notify_mock)
+    
+    # Mock asyncio.sleep only in event_dispatcher to speed up its alert loop
+    monkeypatch.setattr("src.platforms.event_dispatcher.asyncio.sleep", AsyncMock())
     
     # 3. First tick
     await watcher.tick()
+    
+    # Await all background tasks to ensure they finish executing before assertions
+    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
     
     # Assert _query_combo was called exactly ONCE (because of de-duplication/Shared Cache Pool)
     assert query_combo_mock.call_count == 1
@@ -108,6 +125,9 @@ async def test_xueqiu_watcher_shared_pool_and_rotation(tmp_path: Path, monkeypat
     # (Since cached timestamp is current, query_combo should NOT be called again!)
     query_combo_mock.reset_mock()
     await watcher.tick()
+    pending2 = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if pending2:
+        await asyncio.gather(*pending2, return_exceptions=True)
     # Call count must be 0 because of cache hit!
     assert query_combo_mock.call_count == 0
 
@@ -118,6 +138,9 @@ async def test_xueqiu_watcher_shared_pool_and_rotation(tmp_path: Path, monkeypat
     
     query_combo_mock.reset_mock()
     await watcher.tick()
+    pending3 = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if pending3:
+        await asyncio.gather(*pending3, return_exceptions=True)
     # Call count must be 1 because cache expired
     assert query_combo_mock.call_count == 1
     third_call_args = query_combo_mock.call_args[0]
