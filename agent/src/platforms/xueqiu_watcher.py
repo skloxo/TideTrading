@@ -87,14 +87,16 @@ class XueqiuWatcher:
             await asyncio.sleep(self.check_interval_seconds)
 
     async def tick(self) -> None:
-        """Perform a single check across all active tenants."""
-        from src.config.paths import active_tenant_var
-        original_tenant = active_tenant_var.get()
+        """Perform a single check across all active tenants.
         
-        # Load all active tenants
+        This check uses a Shared Cache Pool and de-duplicates queries across all active tenants,
+        while performing cooperative Cookie rotation to distribute network request load.
+        """
+        from src.config.paths import active_tenant_var, get_data_dir
+        
+        # 1. Load active tenants and configurations
         tenants = ["default"]
         try:
-            # We import this locally to avoid circular dependencies
             from api_server import _load_tenant_keys
             for k in _load_tenant_keys():
                 if k.get("is_active", True):
@@ -102,238 +104,329 @@ class XueqiuWatcher:
         except Exception as e:
             logger.error("[XueqiuWatcher] Failed to load tenants: %s", e)
 
+        tenant_configs = {}
         for tenant in tenants:
-            if self._stopping:
-                break
-            
-            # Switch context to the active tenant
             token = active_tenant_var.set(tenant)
             try:
-                await self._process_tenant(tenant)
+                data_dir = get_data_dir()
+                config_path = data_dir / "xueqiu_monitor.json"
+                if config_path.exists():
+                    try:
+                        config = json.loads(config_path.read_text(encoding="utf-8"))
+                        if config.get("enabled", False):
+                            tenant_configs[tenant] = {
+                                "combos": config.get("combos", {}) or {},
+                                "watch_uids": config.get("watch_uids", {}) or {},
+                                "xq_tokens": [t.strip() for t in config.get("xq_tokens", []) if t.strip()],
+                                "feishu_webhook": config.get("feishu_webhook", "").strip(),
+                                "data_dir": data_dir
+                            }
+                    except Exception as ce:
+                        logger.error("[XueqiuWatcher] Failed to parse config for tenant %s: %s", tenant, ce)
             except Exception as e:
-                logger.error("[XueqiuWatcher] Error processing tenant %s: %s", tenant, e)
+                logger.error("[XueqiuWatcher] Error loading config context for tenant %s: %s", tenant, e)
             finally:
                 active_tenant_var.reset(token)
 
-    async def _process_tenant(self, tenant: str) -> None:
-        """Process Xueqiu monitoring for a single tenant."""
-        from src.config.paths import get_data_dir
-        data_dir = get_data_dir()
-        config_path = data_dir / "xueqiu_monitor.json"
-        
-        if not config_path.exists():
-            return
-            
-        try:
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.error("[XueqiuWatcher] Failed to read config for tenant %s: %s", tenant, e)
+        if not tenant_configs:
+            logger.info("[XueqiuWatcher] No active tenants have Xueqiu monitoring enabled.")
             return
 
-        if not config.get("enabled", False):
-            return
+        # 2. Build unique mappings (combo/uid -> tenants)
+        combo_to_tenants = {}
+        uid_to_tenants = {}
 
-        feishu_webhook = config.get("feishu_webhook", "").strip()
-        combos = config.get("combos", {})
-        watch_uids = config.get("watch_uids", {})
-        if not combos and not watch_uids:
-            return
+        for tenant, cfg in tenant_configs.items():
+            for name, combo_id in cfg["combos"].items():
+                combo_id = combo_id.strip()
+                if not combo_id:
+                    continue
+                if combo_id not in combo_to_tenants:
+                    combo_to_tenants[combo_id] = []
+                combo_to_tenants[combo_id].append((tenant, name))
 
-        xq_tokens = [t.strip() for t in config.get("xq_tokens", []) if t.strip()]
-        if not xq_tokens:
-            xq_tokens = DEFAULT_XQ_TOKENS
+            for name, uid in cfg["watch_uids"].items():
+                uid = uid.strip()
+                if not uid:
+                    continue
+                if uid not in uid_to_tenants:
+                    uid_to_tenants[uid] = []
+                uid_to_tenants[uid].append((tenant, name))
 
-        # Load pushed records for this tenant
-        pushed_path = data_dir / "xueqiu_pushed_records.json"
-        pushed_records = {}
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        if pushed_path.exists():
-            try:
-                pushed_data = json.loads(pushed_path.read_text(encoding="utf-8"))
-                if today in pushed_data:
-                    pushed_records = pushed_data[today]
-            except Exception:
-                pass
+        # 3. Gather cooperative token lists and rotation indices
+        if not hasattr(self, "_combo_rotation_indices"):
+            self._combo_rotation_indices = {}
+        if not hasattr(self, "_uid_rotation_indices"):
+            self._uid_rotation_indices = {}
 
-        logger.info("[XueqiuWatcher] Tenant %s: Monitoring %d combos...", tenant, len(combos))
-
-        # Query combos
-        for name, combo_id in combos.items():
+        # 4. Perform single-queries with cooperative cookie rotation
+        shared_combo_results = {}
+        for combo_id, monitoring_tenants in combo_to_tenants.items():
             if self._stopping:
                 break
-                
-            # Auto-prepopulate history if logs are empty on disk
-            logs_path = data_dir / "xueqiu_rebalancing_logs.json"
-            has_logs = False
-            if logs_path.exists():
-                try:
-                    existing_logs = json.loads(logs_path.read_text(encoding="utf-8")) or []
-                    has_logs = any(r.get("combo_id") == combo_id for r in existing_logs if isinstance(r, dict))
-                except Exception:
-                    pass
-            if not has_logs:
-                logger.info("[XueqiuWatcher] Auto-prepopulating history for combo %s (%s)", name, combo_id)
-                try:
-                    await asyncio.to_thread(
-                        self.initialize_combo_history, combo_id, name, xq_tokens, data_dir
-                    )
-                except Exception as e:
-                    logger.error("[XueqiuWatcher] Failed to auto-prepopulate history for %s: %s", combo_id, e)
-            
-            rebalancings = await asyncio.to_thread(
-                self._query_combo, combo_id, xq_tokens, feishu_webhook, data_dir
-            )
-            
-            if not rebalancings:
-                continue
 
-            for item in rebalancings:
-                updated_at = item.get("updated_at")
-                stock_code = item.get("stock_symbol")
-                push_key = f"{name}_{stock_code}_{updated_at}"
-                
-                if push_key not in pushed_records:
-                    pushed_records[push_key] = True
-                    # Format and send Feishu notification
-                    await self._notify_feishu(feishu_webhook, name, combo_id, item)
-                    
-                    # Save to persistent logs for UI table
-                    try:
-                        logs_path = data_dir / "xueqiu_rebalancing_logs.json"
-                        logs = []
-                        if logs_path.exists():
-                            try:
-                                logs = json.loads(logs_path.read_text(encoding="utf-8"))
-                            except Exception:
-                                pass
-                        log_item = {
-                            "combo_name": name,
-                            "combo_id": combo_id,
-                            **item
-                        }
-                        logs.insert(0, log_item)
-                        logs = logs[:500]  # limit to 500 records
-                        logs_path.write_text(json.dumps(logs, indent=2, ensure_ascii=False), encoding="utf-8")
-                    except Exception as le:
-                        logger.error("[XueqiuWatcher] Failed to save rebalancing logs: %s", le)
-                        
-                    # Add small sleep between notifications
-                    await asyncio.sleep(1)
+            # Gather cookies
+            cookies = []
+            for tenant, _ in monitoring_tenants:
+                cookies.extend(tenant_configs[tenant]["xq_tokens"])
+            seen = set()
+            unique_cookies = [x for x in cookies if not (x in seen or seen.add(x))]
+            if not unique_cookies:
+                unique_cookies = DEFAULT_XQ_TOKENS
 
-        # Save pushed records back
-        try:
-            pushed_path.write_text(json.dumps({today: pushed_records}, indent=2, ensure_ascii=False), encoding="utf-8")
-        except Exception as e:
-            logger.error("[XueqiuWatcher] Failed to save pushed records for tenant %s: %s", tenant, e)
+            # Rotate cookie choice
+            idx = self._combo_rotation_indices.get(combo_id, 0)
+            selected_token = unique_cookies[idx % len(unique_cookies)]
+            self._combo_rotation_indices[combo_id] = (idx + 1) % len(unique_cookies)
 
-        # Query watched influencers
-        if watch_uids:
-            logger.info("[XueqiuWatcher] Tenant %s: Monitoring %d influencers...", tenant, len(watch_uids))
-            
-            # Load current snapshots
-            snapshots_path = data_dir / "xueqiu_watchlist_snapshots.json"
-            snapshots = {}
-            if snapshots_path.exists():
+            # Move selected token to front
+            rotated_cookies = [selected_token] + [t for t in unique_cookies if t != selected_token]
+
+            # Auto-prepopulate logs for any tenant that doesn't have logs yet for this combo
+            for tenant, name in monitoring_tenants:
+                t_token = active_tenant_var.set(tenant)
                 try:
-                    snapshots = json.loads(snapshots_path.read_text(encoding="utf-8")) or {}
-                except Exception:
-                    pass
-                    
-            for name, uid in watch_uids.items():
-                if self._stopping:
-                    break
-                    
-                stocks = await asyncio.to_thread(
-                    self._query_influencer_watchlist, uid, xq_tokens
-                )
-                
-                if not stocks and not isinstance(stocks, list):
-                    continue
-                    
-                # Format current stocks list as a dict
-                current_snapshot = {s["symbol"]: s["name"] for s in stocks if isinstance(s, dict) and s.get("symbol")}
-                
-                # Check if uid is not in snapshots
-                if uid not in snapshots:
-                    # Initialize snapshot without alert
-                    snapshots[uid] = current_snapshot
-                    logger.info("[XueqiuWatcher] Initialized watchlist snapshot for influencer %s (%s)", name, uid)
-                    continue
-                    
-                old_snapshot = snapshots[uid] or {}
-                
-                # Detect changes
-                added = [s for s in stocks if isinstance(s, dict) and s.get("symbol") and s["symbol"] not in old_snapshot]
-                removed = [{"symbol": sym, "name": name_val} for sym, name_val in old_snapshot.items() if sym not in current_snapshot]
-                
-                has_changes = False
-                if added or removed:
-                    # Load current logs to append changes
-                    logs_path = data_dir / "xueqiu_rebalancing_logs.json"
-                    logs = []
+                    t_data_dir = tenant_configs[tenant]["data_dir"]
+                    logs_path = t_data_dir / "xueqiu_rebalancing_logs.json"
+                    has_logs = False
                     if logs_path.exists():
                         try:
-                            logs = json.loads(logs_path.read_text(encoding="utf-8")) or []
+                            existing_logs = json.loads(logs_path.read_text(encoding="utf-8")) or []
+                            has_logs = any(r.get("combo_id") == combo_id for r in existing_logs if isinstance(r, dict))
                         except Exception:
                             pass
-                            
-                    current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    for s in added:
-                        operation = "新增自选"
-                        # Notify
-                        await self._notify_influencer_change(feishu_webhook, name, uid, operation, s["name"], s["symbol"])
-                        # Log
-                        log_item = {
-                            "combo_name": f"{name}的自选股",
-                            "combo_id": uid,
-                            "stock_symbol": s["symbol"],
-                            "stock_name": s["name"],
-                            "operation": operation,
-                            "trade_time": current_time_str,
-                            "price": "--",
-                            "current_weight": 0.0,
-                            "prev_weight": 0.0,
-                            "position_change": 0.0
-                        }
-                        logs.insert(0, log_item)
-                        has_changes = True
-                        
-                    for s in removed:
-                        operation = "移出自选"
-                        # Notify
-                        await self._notify_influencer_change(feishu_webhook, name, uid, operation, s["name"], s["symbol"])
-                        # Log
-                        log_item = {
-                            "combo_name": f"{name}的自选股",
-                            "combo_id": uid,
-                            "stock_symbol": s["symbol"],
-                            "stock_name": s["name"],
-                            "operation": operation,
-                            "trade_time": current_time_str,
-                            "price": "--",
-                            "current_weight": 0.0,
-                            "prev_weight": 0.0,
-                            "position_change": 0.0
-                        }
-                        logs.insert(0, log_item)
-                        has_changes = True
-                        
-                    if has_changes:
+                    if not has_logs:
+                        logger.info("[XueqiuWatcher] Auto-prepopulating history for tenant %s combo %s (%s)", tenant, name, combo_id)
+                        await asyncio.to_thread(
+                            self.initialize_combo_history, combo_id, name, rotated_cookies, t_data_dir
+                        )
+                except Exception as e:
+                    logger.error("[XueqiuWatcher] Failed to auto-prepopulate history for %s under tenant %s: %s", combo_id, tenant, e)
+                finally:
+                    active_tenant_var.reset(t_token)
+
+            # Determine alert route (which tenant context and webhook to use for expired token notifications)
+            alert_webhook = None
+            alert_data_dir = None
+            for tenant, _ in monitoring_tenants:
+                if selected_token in tenant_configs[tenant]["xq_tokens"]:
+                    alert_webhook = tenant_configs[tenant]["feishu_webhook"]
+                    alert_data_dir = tenant_configs[tenant]["data_dir"]
+                    break
+            if not alert_webhook:
+                first_tenant = monitoring_tenants[0][0]
+                alert_webhook = tenant_configs[first_tenant]["feishu_webhook"]
+                alert_data_dir = tenant_configs[first_tenant]["data_dir"]
+
+            # Query online
+            rebalancings = await asyncio.to_thread(
+                self._query_combo, combo_id, rotated_cookies, alert_webhook, alert_data_dir
+            )
+            shared_combo_results[combo_id] = rebalancings
+
+        shared_uid_results = {}
+        for uid, monitoring_tenants in uid_to_tenants.items():
+            if self._stopping:
+                break
+
+            # Gather cookies
+            cookies = []
+            for tenant, _ in monitoring_tenants:
+                cookies.extend(tenant_configs[tenant]["xq_tokens"])
+            seen = set()
+            unique_cookies = [x for x in cookies if not (x in seen or seen.add(x))]
+            if not unique_cookies:
+                unique_cookies = DEFAULT_XQ_TOKENS
+
+            idx = self._uid_rotation_indices.get(uid, 0)
+            selected_token = unique_cookies[idx % len(unique_cookies)]
+            self._uid_rotation_indices[uid] = (idx + 1) % len(unique_cookies)
+
+            rotated_cookies = [selected_token] + [t for t in unique_cookies if t != selected_token]
+
+            # Auto-initialize watchlist snapshot for any tenant that doesn't have it yet
+            for tenant, name in monitoring_tenants:
+                t_token = active_tenant_var.set(tenant)
+                try:
+                    t_data_dir = tenant_configs[tenant]["data_dir"]
+                    snapshots_path = t_data_dir / "xueqiu_watchlist_snapshots.json"
+                    has_snapshot = False
+                    if snapshots_path.exists():
                         try:
-                            logs = logs[:500]
-                            logs_path.write_text(json.dumps(logs, indent=2, ensure_ascii=False), encoding="utf-8")
-                        except Exception as le:
-                            logger.error("[XueqiuWatcher] Failed to save watchlist rebalancing logs: %s", le)
-                            
-                # Update snapshot
-                snapshots[uid] = current_snapshot
-                
-            # Save snapshots back
+                            snapshots = json.loads(snapshots_path.read_text(encoding="utf-8")) or {}
+                            has_snapshot = uid in snapshots
+                        except Exception:
+                            pass
+                    if not has_snapshot:
+                        logger.info("[XueqiuWatcher] Initializing watchlist snapshot for tenant %s influencer %s (%s)", tenant, name, uid)
+                        await asyncio.to_thread(
+                            self.initialize_influencer_watchlist, uid, name, rotated_cookies, t_data_dir
+                        )
+                except Exception as e:
+                    logger.error("[XueqiuWatcher] Failed to initialize watchlist snapshot for %s under tenant %s: %s", uid, tenant, e)
+                finally:
+                    active_tenant_var.reset(t_token)
+
+            # Query online
+            stocks = await asyncio.to_thread(
+                self._query_influencer_watchlist, uid, rotated_cookies
+            )
+            shared_uid_results[uid] = stocks
+
+        # 5. Distribute results privately to each tenant
+        for tenant, cfg in tenant_configs.items():
+            if self._stopping:
+                break
+
+            token = active_tenant_var.set(tenant)
             try:
-                snapshots_path.write_text(json.dumps(snapshots, indent=2, ensure_ascii=False), encoding="utf-8")
-            except Exception as e:
-                logger.error("[XueqiuWatcher] Failed to save watchlist snapshots: %s", e)
+                data_dir = cfg["data_dir"]
+                feishu_webhook = cfg["feishu_webhook"]
+                pushed_path = data_dir / "xueqiu_pushed_records.json"
+                pushed_records = {}
+                today = datetime.datetime.now().strftime("%Y-%m-%d")
+                if pushed_path.exists():
+                    try:
+                        pushed_data = json.loads(pushed_path.read_text(encoding="utf-8"))
+                        if today in pushed_data:
+                            pushed_records = pushed_data[today]
+                    except Exception:
+                        pass
+
+                # Process combos
+                for name, combo_id in cfg["combos"].items():
+                    rebalancings = shared_combo_results.get(combo_id)
+                    if not rebalancings:
+                        continue
+
+                    for item in rebalancings:
+                        updated_at = item.get("updated_at")
+                        stock_code = item.get("stock_symbol")
+                        push_key = f"{name}_{stock_code}_{updated_at}"
+
+                        if push_key not in pushed_records:
+                            pushed_records[push_key] = True
+                            await self._notify_feishu(feishu_webhook, name, combo_id, item)
+
+                            # Save log item locally for Web UI
+                            try:
+                                logs_path = data_dir / "xueqiu_rebalancing_logs.json"
+                                logs = []
+                                if logs_path.exists():
+                                    try:
+                                        logs = json.loads(logs_path.read_text(encoding="utf-8"))
+                                    except Exception:
+                                        pass
+                                log_item = {
+                                    "combo_name": name,
+                                    "combo_id": combo_id,
+                                    **item
+                                }
+                                logs.insert(0, log_item)
+                                logs = logs[:500]
+                                logs_path.write_text(json.dumps(logs, indent=2, ensure_ascii=False), encoding="utf-8")
+                            except Exception as le:
+                                logger.error("[XueqiuWatcher] Failed to save rebalancing logs for tenant %s: %s", tenant, le)
+
+                            await asyncio.sleep(1)
+
+                try:
+                    pushed_path.write_text(json.dumps({today: pushed_records}, indent=2, ensure_ascii=False), encoding="utf-8")
+                except Exception as e:
+                    logger.error("[XueqiuWatcher] Failed to save pushed records for tenant %s: %s", tenant, e)
+
+                # Process influencers (watch_uids)
+                if cfg["watch_uids"]:
+                    snapshots_path = data_dir / "xueqiu_watchlist_snapshots.json"
+                    snapshots = {}
+                    if snapshots_path.exists():
+                        try:
+                            snapshots = json.loads(snapshots_path.read_text(encoding="utf-8")) or {}
+                        except Exception:
+                            pass
+
+                    for name, uid in cfg["watch_uids"].items():
+                        stocks = shared_uid_results.get(uid)
+                        if not stocks and not isinstance(stocks, list):
+                            continue
+
+                        current_snapshot = {s["symbol"]: s["name"] for s in stocks if isinstance(s, dict) and s.get("symbol")}
+
+                        if uid not in snapshots:
+                            snapshots[uid] = current_snapshot
+                            continue
+
+                        old_snapshot = snapshots[uid] or {}
+
+                        added = [s for s in stocks if isinstance(s, dict) and s.get("symbol") and s["symbol"] not in old_snapshot]
+                        removed = [{"symbol": sym, "name": name_val} for sym, name_val in old_snapshot.items() if sym not in current_snapshot]
+
+                        has_changes = False
+                        if added or removed:
+                            logs_path = data_dir / "xueqiu_rebalancing_logs.json"
+                            logs = []
+                            if logs_path.exists():
+                                try:
+                                    logs = json.loads(logs_path.read_text(encoding="utf-8")) or []
+                                except Exception:
+                                    pass
+
+                            current_time_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                            for s in added:
+                                operation = "新增自选"
+                                await self._notify_influencer_change(feishu_webhook, name, uid, operation, s["name"], s["symbol"])
+                                log_item = {
+                                    "combo_name": f"{name}的自选股",
+                                    "combo_id": uid,
+                                    "stock_symbol": s["symbol"],
+                                    "stock_name": s["name"],
+                                    "operation": operation,
+                                    "trade_time": current_time_str,
+                                    "price": "--",
+                                    "current_weight": 0.0,
+                                    "prev_weight": 0.0,
+                                    "position_change": 0.0
+                                }
+                                logs.insert(0, log_item)
+                                has_changes = True
+
+                            for s in removed:
+                                operation = "移出自选"
+                                await self._notify_influencer_change(feishu_webhook, name, uid, operation, s["name"], s["symbol"])
+                                log_item = {
+                                    "combo_name": f"{name}的自选股",
+                                    "combo_id": uid,
+                                    "stock_symbol": s["symbol"],
+                                    "stock_name": s["name"],
+                                    "operation": operation,
+                                    "trade_time": current_time_str,
+                                    "price": "--",
+                                    "current_weight": 0.0,
+                                    "prev_weight": 0.0,
+                                    "position_change": 0.0
+                                }
+                                logs.insert(0, log_item)
+                                has_changes = True
+
+                            if has_changes:
+                                try:
+                                    logs = logs[:500]
+                                    logs_path.write_text(json.dumps(logs, indent=2, ensure_ascii=False), encoding="utf-8")
+                                except Exception as le:
+                                    logger.error("[XueqiuWatcher] Failed to save watchlist rebalancing logs for tenant %s: %s", tenant, le)
+
+                        snapshots[uid] = current_snapshot
+
+                    try:
+                        snapshots_path.write_text(json.dumps(snapshots, indent=2, ensure_ascii=False), encoding="utf-8")
+                    except Exception as e:
+                        logger.error("[XueqiuWatcher] Failed to save watchlist snapshots for tenant %s: %s", tenant, e)
+
+            except Exception as te:
+                logger.error("[XueqiuWatcher] Error distributing results for tenant %s: %s", tenant, te)
+            finally:
+                active_tenant_var.reset(token)
 
     def _get_headers(self, token: str, combo_id: str = None) -> Dict[str, str]:
         """Generate random request headers with token cookie."""
