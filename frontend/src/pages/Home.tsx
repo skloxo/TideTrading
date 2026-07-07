@@ -359,7 +359,7 @@ export function Home() {
               <History className="h-4 w-4" />
               {isZh ? "迭代记录 (Milestones Completed)" : "Milestones Completed"}
             </h3>
-            <div className="space-y-5">
+            <div className="relative">
               {[
                 { v: "v1.7.5", active: true,  label: isZh ? "已上线" : "Stable", labelColor: "text-emerald-400 bg-emerald-500/10", body: isZh ? "支持雪球监控的多租户共享缓存与 Cookie 轮询分摊查询，实现全自动反爬限流自愈，调仓日志与飞书通知完全租户级安全隔离；重构系统版本接口与四段式版本比对机制，修复低版本误报与开发环境一键升级拦截故障。" : "Launched multi-tenant Xueqiu shared cache and cooperative cookie rotation to balance query load and auto-heal anti-scraping blocks, with tenant-scoped private logging and webhooks. Refactored backend version endpoint and four-part versioning comparison rules to eliminate false version warnings and enable dev-container one-click upgrade monitoring." },
                 { v: "v1.7.4", active: false,  label: null, labelColor: "", body: isZh ? "将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为独立单页`/project-settings`；同时重构后端配置合并逻辑，在租户没有配置自定义 LLM 时进行物理级隐私隔离，不再向普通租户端泄露全局模型名（如 mimo）及密钥凭证。" : "Decoupled global project settings to a standalone page under the `/project-settings` route. Refactored backend configuration merging to strictly isolate tenant spaces; if a tenant has not configured custom LLM/data settings, global admin secrets and model names (e.g. mimo-v2.5-pro-ultraspeed) are fully hidden from the tenant settings form." },
@@ -372,7 +372,7 @@ export function Home() {
                 { v: "v1.2.0", active: false, label: null, labelColor: "", body: isZh ? "正式先锋迭代，上线一键平滑热升级系统与重启服务功能，布局移动端基础框架。" : "Implemented smooth online upgrades, live restarts, and foundational mobile Layout." },
                 { v: "v1.1.0", active: false, label: null, labelColor: "", body: isZh ? "引入 pytdx 高频行情基建，支持低延迟心跳保活与 A 股秒级 5 档行情直连。" : "Introduced pytdx connection pools, automatic speed checks, and live L1 A-share feeds." },
               ].map((item) => (
-                <div key={item.v} className="relative pl-5 border-l-2 border-primary/20">
+                <div key={item.v} className="relative pl-5 pb-5 border-l-2 border-primary/20 last:pb-0">
                   <span className={`absolute -left-[7px] top-1.5 h-3 w-3 rounded-full border-2 border-background ${item.active ? "bg-primary animate-pulse" : "bg-primary/35"}`} />
                   <h4 className="text-xs font-semibold flex items-center gap-1.5">
                     {item.v}
@@ -390,7 +390,7 @@ export function Home() {
               <Zap className="h-4 w-4" />
               {isZh ? "规划蓝图 (Future Blueprints)" : "Future Blueprints"}
             </h3>
-            <div className="space-y-5">
+            <div className="relative">
               {[
                 { title: isZh ? "选股与复盘日报脚本可视化"          : "Selection Script Visualization",     status: isZh ? "进行中" : "In Progress", statusColor: "text-amber-500 bg-amber-500/10", dot: "bg-orange-400 animate-pulse", body: isZh ? "将租户已有的量化选股与复盘日报 Python 脚本整合至前端，提供一键执行与图文看板渲染。" : "Visualize historical screening and daily analysis scripts on Web UI with one-click run." },
                 { title: isZh ? "多智能体深度投研协同管线 (Swarm)"   : "Multi-Agent Deep Research Swarm",     status: isZh ? "进行中" : "In Progress", statusColor: "text-amber-500 bg-amber-500/10", dot: "bg-orange-400 animate-pulse", body: isZh ? "多智能体辩论式深度投研 Swarm，牛熊双方 Agent 协同推演，产出含结构化数据的深度研报。" : "Multi-agent bull/bear debate pipeline producing deep research reports with structured data." },
@@ -400,7 +400,7 @@ export function Home() {
                 { title: isZh ? "Monaco 在线代码编辑器与沙箱编译器"  : "Online Code Editor & Sandbox",        status: isZh ? "规划中" : "Proposed",    statusColor: "text-muted-foreground bg-muted", dot: "bg-muted", body: isZh ? "集成 Monaco 编辑器，支持专业交易员在 Web 界面直接编写、修改并编译运行策略。" : "Embed Monaco editor to write, tweak, compile, and backtest custom strategies on the fly." },
                 { title: isZh ? "VLM 视觉研报与 K线技术形态识别"     : "VLM Visual Pattern Recognition",     status: isZh ? "规划中" : "Proposed",    statusColor: "text-muted-foreground bg-muted", dot: "bg-muted", body: isZh ? "利用视觉大模型（VLM）读取 K线走势图并自动识别技术形态（如双底、头肩底等）。" : "Leverage Multi-modal Vision LLMs to read charts and identify classic tech patterns." },
               ].map((item) => (
-                <div key={item.title} className="relative pl-5 border-l-2 border-orange-500/20">
+                <div key={item.title} className="relative pl-5 pb-5 border-l-2 border-orange-500/20 last:pb-0">
                   <span className={`absolute -left-[7px] top-1.5 h-3 w-3 rounded-full border-2 border-background ${item.dot}`} />
                   <h4 className="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
                     {item.title}
