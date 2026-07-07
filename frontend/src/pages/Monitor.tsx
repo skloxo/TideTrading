@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { api, type MonitorStats, type QuoteGatewayStatus, type SystemVersionInfo, type LiveStatus, type UserProfile } from "@/lib/api";
 import { setAdminToken } from "@/lib/apiAuth";
-import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, Loader2, Save, ShieldAlert, Lock, LogOut, ArrowUpCircle } from "lucide-react";
+import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, Loader2, Save, ShieldAlert, Lock, LogOut, ArrowUpCircle, Cpu, Bot } from "lucide-react";
 
 export function Monitor() {
   const { i18n } = useTranslation();
@@ -227,7 +227,7 @@ export function Monitor() {
   }
 
   if (!profileLoading && profile?.role !== "admin") {
-    const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
+    const fieldClass = "w-full rounded-xl border border-border/70 bg-background/50 backdrop-blur-sm px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
       <div className="mx-auto max-w-7xl space-y-6 p-6">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
@@ -240,24 +240,32 @@ export function Monitor() {
             </p>
           </div>
         </div>
-        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
-          <div className="flex items-center gap-2 border-b pb-3">
-            <ShieldAlert className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold">管理员提权 (系统运维)</h2>
+        <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-6 hover:border-border/80 hover:shadow-lg transition-all duration-300 max-w-xl overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl pointer-events-none group-hover:bg-primary/10 transition-all duration-500" />
+          
+          <div className="flex items-center gap-2.5 border-b border-border/40 pb-4">
+            <ShieldAlert className="h-5 w-5 text-primary animate-pulse" />
+            <h2 className="text-sm font-bold text-foreground">管理员提权 (系统运维)</h2>
           </div>
-          <p className="text-xs text-muted-foreground">此页面属于系统运维管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
-          <form onSubmit={handleAdminElevate} className="space-y-4">
+          
+          <p className="text-xs text-muted-foreground leading-relaxed pt-3">此页面属于系统运维管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
+          
+          <form onSubmit={handleAdminElevate} className="space-y-4 pt-3">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
                 <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} className={fieldClass} required />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
                 <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder="请输入管理员密码" />
               </label>
             </div>
-            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+            <button
+              type="submit"
+              disabled={elevating}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-70 cursor-pointer shadow-md shadow-primary/20"
+            >
               {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
               进行管理员提权
             </button>
@@ -305,20 +313,23 @@ export function Monitor() {
       )}
 
       {/* Grid of Stats */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {/* Memory Usage */}
-        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+        <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/75 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex flex-col justify-between overflow-hidden">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-full blur-xl pointer-events-none group-hover:bg-primary/10 transition-all duration-500" />
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               {isZh ? "内存占用" : "Memory Usage"}
             </span>
-            <Server className="h-4 w-4 text-primary" />
+            <div className="p-2 bg-primary/8 border border-primary/25 rounded-xl text-primary">
+              <Server className="h-4.5 w-4.5" />
+            </div>
           </div>
-          <div>
-            <div className="text-2xl font-bold">
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
               {statsLoading ? "..." : `${stats?.memory_usage_mb.toFixed(1) || "0.0"} MB`}
             </div>
-            <div className="w-full bg-muted rounded-full h-1.5 mt-2 overflow-hidden">
+            <div className="w-full bg-muted/40 rounded-full h-1.5 mt-2.5 overflow-hidden">
               <div
                 className="bg-primary h-1.5 rounded-full transition-all duration-500"
                 style={{ width: stats ? `${Math.min((stats.memory_usage_mb / 1024) * 100, 100)}%` : "0%" }}
@@ -328,99 +339,110 @@ export function Monitor() {
         </div>
 
         {/* Active Tenants */}
-        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+        <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/75 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex flex-col justify-between overflow-hidden">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-500" />
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               {isZh ? "有效租户" : "Active Tenants"}
             </span>
-            <Activity className="h-4 w-4 text-green-500" />
+            <div className="p-2 bg-emerald-500/8 border border-emerald-500/25 rounded-xl text-emerald-500">
+              <Activity className="h-4.5 w-4.5" />
+            </div>
           </div>
-          <div>
-            <div className="text-2xl font-bold">
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
               {statsLoading ? "..." : stats?.active_tenants.length || 0}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
               {isZh ? "已注册并分配密钥的租户" : "Registered tenants with API keys"}
             </p>
           </div>
         </div>
 
         {/* Total Sessions */}
-        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+        <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/75 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex flex-col justify-between overflow-hidden">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-500" />
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               {isZh ? "总会话数" : "Total Sessions"}
             </span>
-            <FolderHeart className="h-4 w-4 text-purple-500" />
+            <div className="p-2 bg-purple-500/8 border border-purple-500/25 rounded-xl text-purple-500">
+              <FolderHeart className="h-4.5 w-4.5" />
+            </div>
           </div>
-          <div>
-            <div className="text-2xl font-bold">
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
               {statsLoading ? "..." : stats?.total_sessions || 0}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
               {isZh ? "沙箱对话持久化目录数" : "Number of sandbox session directories"}
             </p>
           </div>
         </div>
 
         {/* Total Runs */}
-        <div className="rounded-lg border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+        <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/75 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex flex-col justify-between overflow-hidden">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-orange-500/10 transition-all duration-500" />
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               {isZh ? "执行记录" : "Strategy Runs"}
             </span>
-            <Database className="h-4 w-4 text-orange-500" />
+            <div className="p-2 bg-orange-500/8 border border-orange-500/25 rounded-xl text-orange-500">
+              <Database className="h-4.5 w-4.5" />
+            </div>
           </div>
-          <div>
-            <div className="text-2xl font-bold">
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-foreground">
               {statsLoading ? "..." : stats?.total_runs || 0}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">
               {isZh ? "量化执行与回测历史记录" : "Quantitative strategy & backtest history"}
             </p>
           </div>
         </div>
       </div>
 
+
       {/* Background Services & Data Status Section */}
-      <div className="space-y-3">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">
-          {isZh ? "数据对账与后台服务监控" : "Data Reconciliation & Background Services"}
+      <div className="space-y-4">
+        <h2 className="text-base font-bold tracking-tight text-foreground flex items-center gap-2">
+          <Activity className="h-4.5 w-4.5 text-primary animate-pulse" />
+          {isZh ? "服务拓扑与后台任务运行状态" : "Service Topology & Background Tasks"}
         </h2>
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {/* Data Maintenance Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-3 flex flex-col justify-between relative overflow-hidden group">
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
             {/* Ambient decorative effect */}
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl pointer-events-none group-hover:bg-primary/10 transition-all duration-500" />
             
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-border/40 pb-3">
               <div className="flex items-center gap-2">
                 <Database className="h-4.5 w-4.5 text-primary" />
-                <span className="text-sm font-semibold text-foreground">
-                  {isZh ? "收盘数据维护与自愈" : "Data Sync & Self-Healing"}
+                <span className="text-sm font-bold text-foreground">
+                  {isZh ? "收盘行情维护与自愈" : "Data Sync & Self-Healing"}
                 </span>
               </div>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase transition ${
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition ${
                 stats?.services?.data_maintenance?.running 
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]" 
                   : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}>
                 {stats?.services?.data_maintenance?.running ? (isZh ? "运行中" : "RUNNING") : (isZh ? "已停止" : "STOPPED")}
               </span>
             </div>
             
-            <div className="space-y-1.5 text-xs text-muted-foreground pt-1">
+            <div className="space-y-2 text-xs text-muted-foreground pt-3">
               <div className="flex justify-between">
                 <span>{isZh ? "历史对账区间" : "Historical Range"}:</span>
-                <span className="font-mono text-foreground font-medium">{stats?.services?.data_maintenance?.historical_range || "N/A"}</span>
+                <span className="font-mono text-foreground font-semibold">{stats?.services?.data_maintenance?.historical_range || "N/A"}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>{isZh ? "今日同步状态" : "Today's Status"}:</span>
-                <span className={`font-semibold ${
+                <span className={`font-bold ${
                   stats?.services?.data_maintenance?.today_status === "已完成"
                     ? "text-emerald-500"
                     : stats?.services?.data_maintenance?.today_status === "同步延迟/失败"
-                    ? "text-destructive font-bold animate-pulse"
+                    ? "text-destructive font-extrabold animate-pulse"
                     : "text-amber-500"
                 }`}>
                   {stats?.services?.data_maintenance?.today_status || (isZh ? "等待中" : "Pending")}
@@ -428,131 +450,215 @@ export function Monitor() {
               </div>
               <div className="flex justify-between">
                 <span>{isZh ? "已监控股票数" : "Monitored Stocks"}:</span>
-                <span className="text-foreground font-medium">{stats?.services?.data_maintenance?.total_stocks || 0} {isZh ? "只" : "stocks"}</span>
+                <span className="text-foreground font-semibold">{stats?.services?.data_maintenance?.total_stocks || 0} {isZh ? "只" : "stocks"}</span>
               </div>
               <div className="flex justify-between">
                 <span>{isZh ? "公共数据库大小" : "Market DB Size"}:</span>
-                <span className="text-foreground font-medium">{stats?.services?.data_maintenance?.db_size_mb || 0} MB</span>
+                <span className="text-foreground font-semibold">{stats?.services?.data_maintenance?.db_size_mb || 0} MB</span>
               </div>
             </div>
           </div>
 
           {/* THS Watchlist Sync Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-3 flex flex-col justify-between relative overflow-hidden group">
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-green-500/10 transition-all duration-500" />
             
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-border/40 pb-3">
               <div className="flex items-center gap-2">
                 <Wifi className="h-4.5 w-4.5 text-green-500" />
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-sm font-bold text-foreground">
                   {isZh ? "同花顺自选双向同步" : "THS Watchlist Sync"}
                 </span>
               </div>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase transition ${
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition ${
                 stats?.services?.ths_sync?.running 
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]" 
                   : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}>
                 {stats?.services?.ths_sync?.running ? (isZh ? "运行中" : "RUNNING") : (isZh ? "已停止" : "STOPPED")}
               </span>
             </div>
             
-            <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-              {isZh 
-                ? "基于 Web Cookie 自动检测并多租户同步同花顺自选股，若未配置凭据将自动降级为本地隔离数据库自选模式。" 
-                : "Bi-directional background synchronization of portfolios with Tonghuashun over secure cookies."}
-            </p>
+            <div className="space-y-3 pt-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {isZh 
+                  ? "支持多租户 Cookie 隔离配置，进行同花顺云端自选股双向差分对账同步。未配置时将自动降级为本地自选模型。" 
+                  : "Bi-directional background synchronization of portfolios with Tonghuashun over secure cookies."}
+              </p>
+              <div className="text-[10px] text-muted-foreground bg-muted/20 border border-border/40 rounded px-2.5 py-1.5 font-mono">
+                {isZh ? "同步频次: 盘中 5m / 盘后 30m" : "Interval: 5m Market / 30m Off-hour"}
+              </div>
+            </div>
           </div>
 
           {/* Watchlist Real-time Alert Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-3 flex flex-col justify-between relative overflow-hidden group">
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-500" />
             
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-border/40 pb-3">
               <div className="flex items-center gap-2">
                 <Activity className="h-4.5 w-4.5 text-purple-500" />
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-sm font-bold text-foreground">
                   {isZh ? "自选股秒级高频预警" : "Watchlist High-Freq Alert"}
                 </span>
               </div>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase transition ${
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition ${
                 stats?.services?.watchlist_monitor?.running 
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]" 
                   : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}>
                 {stats?.services?.watchlist_monitor?.running ? (isZh ? "运行中" : "RUNNING") : (isZh ? "已停止" : "STOPPED")}
               </span>
             </div>
             
-            <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-              {isZh 
-                ? "在交易时间段内以秒级频率高频轮询自选股的价格、涨跌幅、及异动状态，并在触发冷却规则后向通道推送通知。" 
-                : "High-frequency real-time stock price and alerts dispatcher during official trading hours."}
-            </p>
+            <div className="space-y-3 pt-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {isZh 
+                  ? "在交易时段内以秒级高频扫描自选股的价格和异动，并根据多通道降噪冷却过滤分发策略信号。" 
+                  : "High-frequency real-time stock price and alerts dispatcher during official trading hours."}
+              </p>
+              <div className="text-[10px] text-muted-foreground bg-muted/20 border border-border/40 rounded px-2.5 py-1.5 font-mono">
+                {isZh ? "网关直连: 沪深/北交所腾讯分批行情" : "Feed source: Tencent Batched Quotes API"}
+              </div>
+            </div>
           </div>
 
           {/* Xueqiu Portfolio Watcher Card */}
-          <div className="rounded-lg border bg-card p-5 shadow-sm space-y-3 flex flex-col justify-between relative overflow-hidden group">
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-orange-500/10 transition-all duration-500" />
             
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-border/40 pb-3">
               <div className="flex items-center gap-2">
                 <Server className="h-4.5 w-4.5 text-orange-500" />
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-sm font-bold text-foreground">
                   {isZh ? "雪球大V组合盯哨" : "Xueqiu Portfolio Watcher"}
                 </span>
               </div>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase transition ${
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition ${
                 stats?.services?.xueqiu_watcher?.running 
-                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]" 
                   : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}>
                 {stats?.services?.xueqiu_watcher?.running ? (isZh ? "运行中" : "RUNNING") : (isZh ? "已停止" : "STOPPED")}
               </span>
             </div>
             
-            <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-              {isZh 
-                ? "长连接或短周期高频监控配置中指定的雪球投资组合与大 V 自选股列表，在其发生调仓或调入调出时即时收集。" 
-                : "Real-time crawler and notifier for combinations rebalancing and target portfolio actions."}
-            </p>
+            <div className="space-y-2 text-xs text-muted-foreground pt-3">
+              <p className="text-xs text-muted-foreground leading-relaxed pb-1">
+                {isZh 
+                  ? "多租户联合监控大 V 持仓，共享持久化去重缓存与协同 Cookie 负载轮询，支持多租户独立通知隔离。" 
+                  : "Multi-tenant monitoring with persistent shared cache pool and cooperative cookie rotation."}
+              </p>
+              <div className="flex justify-between border-t border-border/40 pt-2.5">
+                <span>{isZh ? "全局持仓收益缓存数" : "Global Details Cache"}:</span>
+                <span className="text-foreground font-semibold font-mono">{stats?.services?.xueqiu_watcher?.cached_count || 0} {isZh ? "个组合" : "combos"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Swarm Agent Engine Card */}
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-pink-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-pink-500/10 transition-all duration-500" />
+            
+            <div className="flex items-center justify-between border-b border-border/40 pb-3">
+              <div className="flex items-center gap-2">
+                <Cpu className="h-4.5 w-4.5 text-pink-500" />
+                <span className="text-sm font-bold text-foreground">
+                  {isZh ? "Swarm 智能体执行引擎" : "Swarm Agent Engine"}
+                </span>
+              </div>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition ${
+                stats?.services?.swarm_engine?.running 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]" 
+                  : "bg-destructive/10 text-destructive border border-destructive/20"
+              }`}>
+                {stats?.services?.swarm_engine?.running ? (isZh ? "运行中" : "RUNNING") : (isZh ? "已停止" : "STOPPED")}
+              </span>
+            </div>
+            
+            <div className="space-y-2 text-xs text-muted-foreground pt-3">
+              <p className="text-xs text-muted-foreground leading-relaxed pb-1">
+                {isZh 
+                  ? "多租户独立沙箱运行的 Swarm 执行容器，并发处理各投资委员会的推理、对账及报告生成任务。" 
+                  : "Multi-agent runtime executing tenant Committee debates, audits, and automated research."}
+              </p>
+              <div className="flex justify-between border-t border-border/40 pt-2.5">
+                <span>{isZh ? "已缓存租户运行时" : "Active Tenant Runtimes"}:</span>
+                <span className="text-foreground font-semibold font-mono">{stats?.services?.swarm_engine?.active_runtimes || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* MCP Tool Gateway Card */}
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-cyan-500/10 transition-all duration-500" />
+            
+            <div className="flex items-center justify-between border-b border-border/40 pb-3">
+              <div className="flex items-center gap-2">
+                <Bot className="h-4.5 w-4.5 text-cyan-500" />
+                <span className="text-sm font-bold text-foreground">
+                  {isZh ? "MCP 外部组件网关" : "MCP Tool Gateway"}
+                </span>
+              </div>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition ${
+                stats?.services?.mcp_gateway?.running 
+                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.1)]" 
+                  : "bg-destructive/10 text-destructive border border-destructive/20"
+              }`}>
+                {stats?.services?.mcp_gateway?.running ? (isZh ? "已就绪" : "READY") : (isZh ? "已关闭" : "CLOSED")}
+              </span>
+            </div>
+            
+            <div className="space-y-3 pt-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {isZh 
+                  ? "Model Context Protocol 标准工具接口网关，允许 Cursor, Claude Desktop 等第三方 IDE 直接调度投研工具。" 
+                  : "Model Context Protocol interface gateway exposing agent tools to Cursor and external IDEs."}
+              </p>
+              <div className="text-[10px] text-muted-foreground bg-muted/20 border border-border/40 rounded px-2.5 py-1.5 font-mono">
+                {isZh ? "通信通道: Standard I/O + SSE 协议" : "Transport: Stdin/Stdout + SSE Server"}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="space-y-6">
         {/* Realtime Quote Gateway, Live Engine & System Version Cards */}
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {/* Quote Gateway */}
           {quoteStatus && (
-            <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl pointer-events-none group-hover:bg-primary/10 transition-all duration-500" />
+              
+              <div className="flex items-center justify-between border-b border-border/40 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                    <Wifi className="h-5 w-5 text-primary" />
+                  <div className="p-2.5 bg-primary/8 border border-primary/25 rounded-xl text-primary">
+                    <Wifi className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold">{isZh ? "实时行情网关状态" : "Realtime Quote Gateway"}</h2>
+                    <h2 className="text-sm font-bold text-foreground">{isZh ? "实时行情网关状态" : "Realtime Quote Gateway"}</h2>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => fetchQuoteStatus(true, true)}
                   disabled={quoteLoading}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted active:scale-95 transition-all cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${quoteLoading ? "animate-spin" : ""}`} />
                   {isZh ? "刷新" : "Refresh"}
                 </button>
               </div>
-              <div className="grid gap-4 grid-cols-2">
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "网关状态" : "Status"}</span>
-                  <div className="text-xs font-semibold">{quoteStatus.status}</div>
+
+              <div className="grid gap-4 grid-cols-2 mt-4">
+                <div className="rounded-xl border border-border/55 bg-muted/10 p-3 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{isZh ? "网关状态" : "Status"}</span>
+                  <div className="text-xs font-bold text-foreground mt-1">{quoteStatus.status}</div>
                 </div>
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "平均测速延迟" : "Avg Latency"}</span>
-                  <div className="text-xs font-semibold font-mono">{quoteStatus.latency_ms} ms</div>
+                <div className="rounded-xl border border-border/55 bg-muted/10 p-3 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{isZh ? "平均测速延迟" : "Avg Latency"}</span>
+                  <div className="text-xs font-bold text-foreground font-mono mt-1">{quoteStatus.latency_ms} ms</div>
                 </div>
               </div>
             </div>
@@ -560,34 +666,39 @@ export function Monitor() {
 
           {/* Live Trading Engine */}
           {liveStatus && (
-            <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-500" />
+              
+              <div className="flex items-center justify-between border-b border-border/40 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                    <Activity className="h-5 w-5 text-primary" />
+                  <div className="p-2.5 bg-emerald-500/8 border border-emerald-500/25 rounded-xl text-emerald-500">
+                    <Activity className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold">{isZh ? "实盘引擎监控" : "Live Trading Monitor"}</h2>
+                    <h2 className="text-sm font-bold text-foreground">{isZh ? "实盘引擎监控" : "Live Trading Monitor"}</h2>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => fetchLiveStatus(true, true)}
                   disabled={liveLoading}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted active:scale-95 transition-all cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${liveLoading ? "animate-spin" : ""}`} />
                   {isZh ? "刷新" : "Refresh"}
                 </button>
               </div>
-              <div className="grid gap-4 grid-cols-2">
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "全局熔断状态" : "Global Halt"}</span>
-                  <div className="text-xs font-semibold">{liveStatus.global_halted ? "HALTED" : "NORMAL"}</div>
+
+              <div className="grid gap-4 grid-cols-2 mt-4">
+                <div className="rounded-xl border border-border/55 bg-muted/10 p-3 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{isZh ? "全局熔断状态" : "Global Halt"}</span>
+                  <div className={`text-xs font-bold mt-1 ${liveStatus.global_halted ? "text-destructive" : "text-emerald-500"}`}>
+                    {liveStatus.global_halted ? "HALTED" : "NORMAL"}
+                  </div>
                 </div>
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "活跃运行器" : "Active Runners"}</span>
-                  <div className="text-xs font-semibold font-mono">{liveStatus.brokers.filter(b => b.runner?.alive).length}</div>
+                <div className="rounded-xl border border-border/55 bg-muted/10 p-3 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{isZh ? "活跃运行器" : "Active Runners"}</span>
+                  <div className="text-xs font-bold text-foreground font-mono mt-1">{liveStatus.brokers.filter(b => b.runner?.alive).length}</div>
                 </div>
               </div>
             </div>
@@ -595,42 +706,46 @@ export function Monitor() {
 
           {/* System Version */}
           {versionInfo && (
-            <div className="rounded-lg border bg-card p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+            <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-5 hover:border-border/90 hover:bg-card/80 hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-500" />
+              
+              <div className="flex items-center justify-between border-b border-border/40 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                    <Server className="h-5 w-5 text-primary" />
+                  <div className="p-2.5 bg-purple-500/8 border border-purple-500/25 rounded-xl text-purple-500">
+                    <Server className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold">{isZh ? "系统版本管理" : "System Version"}</h2>
+                    <h2 className="text-sm font-bold text-foreground">{isZh ? "系统版本管理" : "System Version"}</h2>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => fetchVersionInfo(true)}
                   disabled={versionLoading}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition cursor-pointer disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted active:scale-95 transition-all cursor-pointer disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${versionLoading ? "animate-spin" : ""}`} />
                   {isZh ? "检查" : "Check"}
                 </button>
               </div>
-              <div className="grid gap-4 grid-cols-2">
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "当前版本" : "Current"}</span>
-                  <div className="text-xs font-bold font-mono">{versionInfo.current_version}</div>
+
+              <div className="grid gap-4 grid-cols-2 mt-4">
+                <div className="rounded-xl border border-border/55 bg-muted/10 p-3 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{isZh ? "当前版本" : "Current"}</span>
+                  <div className="text-xs font-bold font-mono text-foreground mt-1">{versionInfo.current_version}</div>
                 </div>
-                <div className="rounded-md border bg-muted/10 p-3 flex flex-col justify-between">
-                  <span className="text-[10px] text-muted-foreground">{isZh ? "最新版本" : "Latest"}</span>
-                  <div className="text-xs font-bold font-mono">{versionInfo.latest_version}</div>
+                <div className="rounded-xl border border-border/55 bg-muted/10 p-3 flex flex-col justify-between">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{isZh ? "最新版本" : "Latest"}</span>
+                  <div className="text-xs font-bold font-mono text-foreground mt-1">{versionInfo.latest_version}</div>
                 </div>
               </div>
+              
               {versionInfo.has_update && (
                 <button
                   type="button"
                   onClick={handleTriggerUpgrade}
                   disabled={upgrading}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 transition disabled:opacity-70 cursor-pointer mt-4"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 active:scale-95 transition-all cursor-pointer mt-4"
                 >
                   {upgrading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpCircle className="h-4 w-4" />}
                   {upgrading ? (isZh ? "正在触发升级…" : "Upgrading...") : (isZh ? `立即升级到 ${versionInfo.latest_version}` : `Upgrade to ${versionInfo.latest_version}`)}
@@ -643,36 +758,48 @@ export function Monitor() {
 
       {/* Admin Control Card */}
       {(() => {
-        const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
+        const fieldClass = "w-full rounded-xl border border-border/70 bg-background/50 backdrop-blur-sm px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
         return (
-          <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4 max-w-xl">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-primary" />
-                <h2 className="text-base font-semibold">管理员身份管理</h2>
+          <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-2xl p-6 hover:border-border/80 hover:shadow-lg transition-all duration-300 max-w-xl overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-red-500/10 transition-all duration-500" />
+            
+            <div className="flex items-center justify-between border-b border-border/40 pb-4">
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="h-5 w-5 text-primary" />
+                <h2 className="text-sm font-bold text-foreground">管理员身份管理</h2>
               </div>
-              <button type="button" onClick={handleAdminDeelevate} className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition cursor-pointer">
+              <button
+                type="button"
+                onClick={handleAdminDeelevate}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted active:scale-95 transition-all cursor-pointer"
+              >
                 <LogOut className="h-3.5 w-3.5" />
                 退出提权
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">您当前处于系统管理员身份，可以修改管理员账户密码。</p>
-            <form onSubmit={handleAdminChangePassword} className="space-y-4">
+            
+            <p className="text-xs text-muted-foreground leading-relaxed pt-2">您当前处于系统管理员身份，可以修改管理员账户密码以保护服务端口及敏感配置。</p>
+            
+            <form onSubmit={handleAdminChangePassword} className="space-y-4 pt-2">
               <div className="grid gap-4 sm:grid-cols-3">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">原管理员密码</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">原管理员密码</span>
                   <input type="password" value={adminOldPassword} onChange={(e) => setAdminOldPassword(e.target.value)} className={fieldClass} placeholder="旧密码" required />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">新管理员密码</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">新管理员密码</span>
                   <input type="password" value={adminNewPassword} onChange={(e) => setAdminNewPassword(e.target.value)} className={fieldClass} placeholder="新密码" required />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">确认新密码</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">确认新密码</span>
                   <input type="password" value={adminConfirmPassword} onChange={(e) => setAdminConfirmPassword(e.target.value)} className={fieldClass} placeholder="确认新密码" required />
                 </label>
               </div>
-              <button type="submit" disabled={changingPwd} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+              <button
+                type="submit"
+                disabled={changingPwd}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-70 cursor-pointer shadow-md shadow-primary/20"
+              >
                 {changingPwd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 保存管理员密码
               </button>
@@ -683,11 +810,9 @@ export function Monitor() {
 
       {/* --- MODALS --- */}
 
-      {/* Upgrade Countdown Modal */}
-
       {/* 2. Upgrade Countdown Modal */}
       {showUpgradeModal && createPortal(
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/70 backdrop-blur-lg">
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="relative flex flex-col items-center gap-6 rounded-2xl border border-white/10 bg-white/5 p-10 shadow-2xl backdrop-blur-xl text-center max-w-sm w-full mx-4">
             <div className="relative flex items-center justify-center" style={{ height: "128px", width: "128px" }}>
               <svg className="absolute h-28 w-28 -rotate-90 animate-spin-slow" viewBox="0 0 100 100">
@@ -729,3 +854,4 @@ export function Monitor() {
     </div>
   );
 }
+

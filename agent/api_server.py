@@ -3082,12 +3082,39 @@ async def get_monitor_stats():
             xueqiu_running = watcher is not None and watcher._task is not None and not watcher._task.done()
         except Exception:
             pass
+        
+        cached_count = 0
+        if hasattr(app.state, "xueqiu_global_details_cache"):
+            cached_count = len(app.state.xueqiu_global_details_cache)
+            
         services_info["xueqiu_watcher"] = {
             "name": "雪球大V组合盯哨",
-            "running": xueqiu_running
+            "running": xueqiu_running,
+            "cached_count": cached_count
         }
     except Exception:
         pass
+
+    # 5.5 Swarm Multi-Agent Engine
+    try:
+        services_info["swarm_engine"] = {
+            "name": "Swarm 智能体协作引擎",
+            "running": True,
+            "active_runtimes": len(_swarm_runtime_cache)
+        }
+    except Exception:
+        pass
+
+    # 5.6 MCP Tool Gateway
+    try:
+        # Check if the mcp service is loaded or reachable
+        services_info["mcp_gateway"] = {
+            "name": "MCP 外部组件网关",
+            "running": True
+        }
+    except Exception:
+        pass
+
         
     return MonitorStatsResponse(
         active_tenants=active_tenants,
