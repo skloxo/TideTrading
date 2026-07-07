@@ -208,103 +208,101 @@ export function Layout() {
           })}
 
           {/* Collapsible Project DevOps Menu for Admin */}
-          {profile?.role === "admin" && (
-            <div className="mt-2 space-y-0.5 border-t pt-2 border-border/40">
-              {/* DevOps Main Entry */}
-              <button
-                onClick={() => setDevopsExpanded(!devopsExpanded)}
-                className={cn(
-                  "w-full flex items-center rounded-md text-sm transition-colors text-left",
-                  isCollapsed ? "justify-center p-2" : "justify-between px-3 py-2",
-                  (pathname === "/monitor" || pathname === "/logs" || (pathname === "/settings" && searchParams.get("tab") === "project"))
-                    ? "bg-primary/5 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-                title={isCollapsed ? (i18nHook.language === "zh-CN" ? "项目运维" : "DevOps") : undefined}
-              >
-                <div className="flex items-center gap-3">
-                  <Cpu className="h-4 w-4 shrink-0 text-amber-500/80" aria-hidden="true" />
-                  {!isCollapsed && (
-                    <span>
-                      {i18nHook.language === "zh-CN" ? "项目运维" : "DevOps"}
-                    </span>
-                  )}
-                </div>
-                {!isCollapsed && (
-                  devopsExpanded ? (
-                    <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-                  )
-                )}
-              </button>
-
-              {/* DevOps Sub-Menus */}
-              {devopsExpanded && (
-                <div className={cn("space-y-0.5", !isCollapsed && "pl-4")}>
-                  <Link
-                    to="/monitor"
-                    className={cn(
-                      "flex items-center rounded-md text-xs transition-colors",
-                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
-                      pathname === "/monitor"
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
-                    )}
-                    title={isCollapsed ? (i18nHook.language === "zh-CN" ? "服务看板" : "Monitor") : undefined}
-                  >
-                    <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {!isCollapsed && (i18nHook.language === "zh-CN" ? "服务看板" : "Monitor")}
-                  </Link>
-
-                  <Link
-                    to="/project-settings"
-                    className={cn(
-                      "flex items-center rounded-md text-xs transition-colors",
-                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
-                      pathname === "/project-settings"
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
-                    )}
-                    title={isCollapsed ? (i18nHook.language === "zh-CN" ? "项目设置" : "Project Settings") : undefined}
-                  >
-                    <Settings className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {!isCollapsed && (i18nHook.language === "zh-CN" ? "项目设置" : "Project Settings")}
-                  </Link>
-
-                  <Link
-                    to="/logs"
-                    className={cn(
-                      "flex items-center rounded-md text-xs transition-colors",
-                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
-                      pathname === "/logs"
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
-                    )}
-                    title={isCollapsed ? (i18nHook.language === "zh-CN" ? "运行日志" : "Runtime Logs") : undefined}
-                  >
-                    <Terminal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {!isCollapsed && (i18nHook.language === "zh-CN" ? "运行日志" : "Runtime Logs")}
-                  </Link>
-
-                  <Link
-                    to="/tenants"
-                    className={cn(
-                      "flex items-center rounded-md text-xs transition-colors",
-                      isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
-                      pathname === "/tenants"
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
-                    )}
-                    title={isCollapsed ? (i18nHook.language === "zh-CN" ? "租户管理" : "Tenants") : undefined}
-                  >
-                    <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {!isCollapsed && (i18nHook.language === "zh-CN" ? "租户管理" : "Tenants")}
-                  </Link>
-                </div>
+          <div className="mt-2 space-y-0.5 border-t pt-2 border-border/40">
+            {/* DevOps Main Entry */}
+            <button
+              onClick={() => setDevopsExpanded(!devopsExpanded)}
+              className={cn(
+                "w-full flex items-center rounded-md text-sm transition-colors text-left",
+                isCollapsed ? "justify-center p-2" : "justify-between px-3 py-2",
+                (pathname === "/monitor" || pathname === "/logs" || (pathname === "/settings" && searchParams.get("tab") === "project"))
+                  ? "bg-primary/5 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
-            </div>
-          )}
+              title={isCollapsed ? (i18nHook.language === "zh-CN" ? "项目运维" : "DevOps") : undefined}
+            >
+              <div className="flex items-center gap-3">
+                <Cpu className="h-4 w-4 shrink-0 text-amber-500/80" aria-hidden="true" />
+                {!isCollapsed && (
+                  <span>
+                    {i18nHook.language === "zh-CN" ? "项目运维" : "DevOps"}
+                  </span>
+                )}
+              </div>
+              {!isCollapsed && (
+                devopsExpanded ? (
+                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 opacity-60" />
+                )
+              )}
+            </button>
+
+            {/* DevOps Sub-Menus */}
+            {devopsExpanded && (
+              <div className={cn("space-y-0.5", !isCollapsed && "pl-4")}>
+                <Link
+                  to="/monitor"
+                  className={cn(
+                    "flex items-center rounded-md text-xs transition-colors",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
+                    pathname === "/monitor"
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                  )}
+                  title={isCollapsed ? (i18nHook.language === "zh-CN" ? "服务看板" : "Monitor") : undefined}
+                >
+                  <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {!isCollapsed && (i18nHook.language === "zh-CN" ? "服务看板" : "Monitor")}
+                </Link>
+
+                <Link
+                  to="/project-settings"
+                  className={cn(
+                    "flex items-center rounded-md text-xs transition-colors",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
+                    pathname === "/project-settings"
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                  )}
+                  title={isCollapsed ? (i18nHook.language === "zh-CN" ? "项目设置" : "Project Settings") : undefined}
+                >
+                  <Settings className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {!isCollapsed && (i18nHook.language === "zh-CN" ? "项目设置" : "Project Settings")}
+                </Link>
+
+                <Link
+                  to="/logs"
+                  className={cn(
+                    "flex items-center rounded-md text-xs transition-colors",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
+                    pathname === "/logs"
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                  )}
+                  title={isCollapsed ? (i18nHook.language === "zh-CN" ? "运行日志" : "Runtime Logs") : undefined}
+                >
+                  <Terminal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {!isCollapsed && (i18nHook.language === "zh-CN" ? "运行日志" : "Runtime Logs")}
+                </Link>
+
+                <Link
+                  to="/tenants"
+                  className={cn(
+                    "flex items-center rounded-md text-xs transition-colors",
+                    isCollapsed ? "justify-center p-2" : "gap-2.5 px-3 py-1.5",
+                    pathname === "/tenants"
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                  )}
+                  title={isCollapsed ? (i18nHook.language === "zh-CN" ? "租户管理" : "Tenants") : undefined}
+                >
+                  <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {!isCollapsed && (i18nHook.language === "zh-CN" ? "租户管理" : "Tenants")}
+                </Link>
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Sessions — hidden when collapsed */}
@@ -445,7 +443,11 @@ export function Layout() {
                   <Languages className="h-3.5 w-3.5" />
                   {i18nHook.language === "zh-CN" ? "English" : "中文"}
                 </button>
-                <p className="text-xs text-muted-foreground/60">{APP_VERSION}</p>
+                <p className="text-[10px] text-muted-foreground/60">{APP_VERSION}</p>
+              </div>
+              <div className="text-[10px] text-muted-foreground/50 border-t pt-1.5 border-border/30 truncate flex justify-between gap-2">
+                <span className="truncate" title={profile?.name}>User: {profile?.name}</span>
+                <span className="shrink-0 uppercase">{profile?.role}</span>
               </div>
             </>
           )}
