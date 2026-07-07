@@ -15,10 +15,53 @@ import {
   Compass,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
+import { api, type ChangelogItem } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
 
 export function Home() {
   const { i18n } = useTranslation();
   const isZh = i18n.language?.startsWith("zh");
+
+  const [changelogList, setChangelogList] = useState<ChangelogItem[]>([]);
+  const [loadingChangelog, setLoadingChangelog] = useState(true);
+
+  const STATIC_CHANGELOG: ChangelogItem[] = [
+    { v: "v1.7.5", date: "2026-07-07", title: isZh ? "雪球监控多租户联合查询与 Cookie 轮询 & 持久化共享缓存池 (性能与反爬专项)" : "Launched multi-tenant Xueqiu shared cache and cooperative cookie rotation", body: isZh ? "支持雪球监控的多租户共享缓存与 Cookie 轮询分摊查询，实现全自动反爬限流自愈，调仓日志与飞书通知完全租户级安全隔离；重构系统版本接口与四段式版本比对机制，修复低版本误报与开发环境一键升级拦截故障。" : "Launched multi-tenant Xueqiu shared cache and cooperative cookie rotation to balance query load and auto-heal anti-scraping blocks, with tenant-scoped private logging and webhooks. Refactored backend version endpoint and four-part versioning comparison rules to eliminate false version warnings and enable dev-container one-click upgrade monitoring." },
+    { v: "v1.7.4", date: "2026-07-06", title: isZh ? "项目设置独立页面 · 租户敏感凭证物理隔离" : "Decoupled global project settings to a standalone page", body: isZh ? "将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为独立单页`/project-settings`；同时重构后端配置合并逻辑，在租户没有配置自定义 LLM 时进行物理级隐私隔离，不再向普通租户端泄露全局模型名（如 mimo）及密钥凭证。" : "Decoupled global project settings to a standalone page under the `/project-settings` route. Refactored backend configuration merging to strictly isolate tenant spaces; if a tenant has not configured custom LLM/data settings, global admin secrets and model names (e.g. mimo-v2.5-pro-ultraspeed) are fully hidden from the tenant settings form." },
+    { v: "v1.7.3", date: "2026-07-03", title: isZh ? "管理员就地提权卡片 · 独立租户管理页面上线" : "Refactored admin privilege verification to inline elevation cards", body: isZh ? "重构管理员权限提权逻辑为各功能页面的就地提权卡片交互，并从服务看板中剥离出独立的租户与物理隔离工作区管理页面（新路由 `/tenants`），极大简化了管理员与普通用户的操作路径并防范了路由重定向断流。" : "Refactored admin privilege verification to inline elevation cards across restricted pages (Monitor, Settings, Logs, Tenants). Decoupled and launched a dedicated Tenant & Workspace Management page under the `/tenants` route to avoid full-page route redirects." },
+    { v: "v1.7.1", date: "2026-07-02", title: isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影" : "Rebuilt layout cards to premium glassmorphic widgets", body: isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影，仿真控制台亮色/暗色主题完美适配；开发本地 SQLite 库个股占位名一键清洗脚本，打通腾讯行情分批 API 抓取解决超长 URL 失败故障。" : "Rebuilt layout cards to premium glassmorphic widgets. Added dark/light theme adaptation for emulator console. Implemented automatic SQLite stock name sanitization and batched Tencent quotes retrieval." },
+    { v: "v1.6.0", date: "2026-07-01", title: isZh ? "行情网关启动自愈预检、多参考仓库对账看板与 GitHub CLI SOP" : "Gateway self-healing preflight, dynamic reference repo board with daily logs", body: isZh ? "行情网关启动自愈预检（秒拔 mootdx BESTIP 损坏），Git 远程多参考仓库动态追踪大看板与每日增量对账日志，跨仓库 CLI 贡献 SOP 确立。" : "Gateway self-healing preflight, dynamic reference repo board with daily logs, and CLI contribution SOP." },
+    { v: "v1.5.0", date: "2026-07-01", title: isZh ? "同花顺多租户双向自动/手动同步、秒级自选盯盘与收盘对账自愈系统" : "Multi-tenant bi-directional Tonghuashun watchlist sync", body: isZh ? "同花顺多租户双向自动/手动同步（交易日5分钟/其余30分钟自适应），秒级自选股实时监控，收盘数据维护与 Gap Healing 对账自愈。" : "Multi-tenant bi-directional Tonghuashun watchlist sync, close maintenance with self-healing, and real-time alerts." },
+    { v: "v1.4.0", date: "2026-06-30", title: isZh ? "平台级公用数据共享缓存层 (SharedMemoryHub)" : "Platform-level shared data hub", body: isZh ? "平台级公用数据共享缓存层 (SharedMemoryHub)，开闭盘自适应调频，防御高频请求防封 IP。" : "Platform-level shared data hub, market hour adaptive polling, and A-share quote rate-limiting." },
+    { v: "v1.3.0", date: "2026-06-30", title: isZh ? "平台指引优化、大屏与移动端 H5 响应式适配、服务看板合并与运行报告" : "Platform guide & onboarding optimization", body: isZh ? "平台指引与向导优化、侧边栏自适应与输入框适配、服务看板合并、运行报告鉴权加固。" : "Platform guide & onboarding optimization, responsive drawer & composer layout, monitor merging." },
+    { v: "v1.2.0", date: "2026-06-29", title: isZh ? "正式先锋先驱迭代，上线一键平滑热升级系统与重启服务" : "Implemented smooth online upgrades, live restarts", body: isZh ? "正式先锋迭代，上线一键平滑热升级系统与重启服务功能，布局移动端基础框架。" : "Implemented smooth online upgrades, live restarts, and foundational mobile Layout." },
+    { v: "v1.1.0", date: "2026-06-29", title: isZh ? "引入 pytdx 高频行情基建，支持低延迟心跳保活与 A 股秒级 5 档行情" : "Introduced pytdx connection pools, automatic speed checks", body: isZh ? "引入 pytdx 高频行情基建，支持低延迟心跳保活与 A 股秒级 5 档行情直连。" : "Introduced pytdx connection pools, automatic speed checks, and live L1 A-share feeds." }
+  ];
+
+  useEffect(() => {
+    let active = true;
+    api.getSystemChangelog(isZh ? "zh" : "en")
+      .then((res) => {
+        if (active) {
+          if (res && res.changelog && res.changelog.length > 0) {
+            setChangelogList(res.changelog);
+          } else {
+            setChangelogList(STATIC_CHANGELOG);
+          }
+          setLoadingChangelog(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setChangelogList(STATIC_CHANGELOG);
+          setLoadingChangelog(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [isZh]);
 
   const FEATURES = [
     {
@@ -87,7 +130,7 @@ export function Home() {
         {/* Version badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary text-xs font-semibold backdrop-blur-sm shadow-sm shadow-primary/10">
           <Activity className="h-3 w-3 animate-pulse" />
-          <span>v1.7.5.1 Stable</span>
+          <span>v1.7.5.2 Stable</span>
           <span className="w-px h-3 bg-primary/30" />
           <span className="text-emerald-400 font-normal">{isZh ? "运行中" : "Live"}</span>
         </div>
@@ -360,27 +403,35 @@ export function Home() {
               {isZh ? "迭代记录 (Milestones Completed)" : "Milestones Completed"}
             </h3>
             <div className="relative">
-              {[
-                { v: "v1.7.5", active: true,  label: isZh ? "已上线" : "Stable", labelColor: "text-emerald-400 bg-emerald-500/10", body: isZh ? "支持雪球监控的多租户共享缓存与 Cookie 轮询分摊查询，实现全自动反爬限流自愈，调仓日志与飞书通知完全租户级安全隔离；重构系统版本接口与四段式版本比对机制，修复低版本误报与开发环境一键升级拦截故障。" : "Launched multi-tenant Xueqiu shared cache and cooperative cookie rotation to balance query load and auto-heal anti-scraping blocks, with tenant-scoped private logging and webhooks. Refactored backend version endpoint and four-part versioning comparison rules to eliminate false version warnings and enable dev-container one-click upgrade monitoring." },
-                { v: "v1.7.4", active: false,  label: null, labelColor: "", body: isZh ? "将项目全局 LLM 及数据源默认设置从普通设置中彻底剥离，提取为独立单页`/project-settings`；同时重构后端配置合并逻辑，在租户没有配置自定义 LLM 时进行物理级隐私隔离，不再向普通租户端泄露全局模型名（如 mimo）及密钥凭证。" : "Decoupled global project settings to a standalone page under the `/project-settings` route. Refactored backend configuration merging to strictly isolate tenant spaces; if a tenant has not configured custom LLM/data settings, global admin secrets and model names (e.g. mimo-v2.5-pro-ultraspeed) are fully hidden from the tenant settings form." },
-                { v: "v1.7.3", active: false, label: null, labelColor: "", body: isZh ? "重构管理员权限提权逻辑为各功能页面的就地提权卡片交互，并从服务看板中剥离出独立的租户与物理隔离工作区管理页面（新路由 `/tenants`），极大简化了管理员与普通用户的操作路径并防范了路由重定向断流。" : "Refactored admin privilege verification to inline elevation cards across restricted pages (Monitor, Settings, Logs, Tenants). Decoupled and launched a dedicated Tenant & Workspace Management page under the `/tenants` route to avoid full-page route redirects." },
-                { v: "v1.7.1", active: false, label: null, labelColor: "", body: isZh ? "重构大屏全网格卡片样式为统一的玻璃态容器并清除多余边框阴影，仿真控制台亮色/暗色主题完美适配；开发本地 SQLite 库个股占位名一键清洗脚本，打通腾讯行情分批 API 抓取解决超长 URL 失败故障。" : "Rebuilt layout cards to premium glassmorphic widgets. Added dark/light theme adaptation for emulator console. Implemented automatic SQLite stock name sanitization and batched Tencent quotes retrieval." },
-                { v: "v1.6.0", active: false, label: null, labelColor: "", body: isZh ? "行情网关启动自愈预检（秒拔 mootdx BESTIP 损坏），Git 远程多参考仓库动态追踪大看板与每日增量对账日志，跨仓库 CLI 贡献 SOP 确立。" : "Gateway self-healing preflight, dynamic reference repo board with daily logs, and CLI contribution SOP." },
-                { v: "v1.5.0", active: false, label: null, labelColor: "", body: isZh ? "同花顺多租户双向自动/手动同步（交易日5分钟/其余30分钟自适应），秒级自选股实时监控，收盘数据维护与 Gap Healing 对账自愈。" : "Multi-tenant bi-directional Tonghuashun watchlist sync, close maintenance with self-healing, and real-time alerts." },
-                { v: "v1.4.0", active: false, label: null, labelColor: "", body: isZh ? "平台级公用数据共享缓存层 (SharedMemoryHub)，开闭盘自适应调频，防御高频请求防封 IP。" : "Platform-level shared data hub, market hour adaptive polling, and A-share quote rate-limiting." },
-                { v: "v1.3.0", active: false, label: null, labelColor: "", body: isZh ? "平台指引与向导优化、侧边栏自适应与输入框适配、服务看板合并、运行报告鉴权加固。" : "Platform guide & onboarding optimization, responsive drawer & composer layout, monitor merging." },
-                { v: "v1.2.0", active: false, label: null, labelColor: "", body: isZh ? "正式先锋迭代，上线一键平滑热升级系统与重启服务功能，布局移动端基础框架。" : "Implemented smooth online upgrades, live restarts, and foundational mobile Layout." },
-                { v: "v1.1.0", active: false, label: null, labelColor: "", body: isZh ? "引入 pytdx 高频行情基建，支持低延迟心跳保活与 A 股秒级 5 档行情直连。" : "Introduced pytdx connection pools, automatic speed checks, and live L1 A-share feeds." },
-              ].map((item) => (
-                <div key={item.v} className="relative pl-5 pb-5 border-l-2 border-primary/20 last:pb-0">
-                  <span className={`absolute -left-[7px] top-1.5 h-3 w-3 rounded-full border-2 border-background ${item.active ? "bg-primary animate-pulse" : "bg-primary/35"}`} />
-                  <h4 className="text-xs font-semibold flex items-center gap-1.5">
-                    {item.v}
-                    {item.label && <span className={`text-[9px] px-1.5 py-0.5 rounded font-normal ${item.labelColor}`}>{item.label}</span>}
-                  </h4>
-                  <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{item.body}</p>
+              {loadingChangelog ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+                  <span className="animate-spin h-3.5 w-3.5 border-2 border-primary border-t-transparent rounded-full" />
+                  <span>{isZh ? "正在同步最新动态..." : "Syncing latest changelog..."}</span>
                 </div>
-              ))}
+              ) : (
+                changelogList.map((item, index) => (
+                  <div key={item.v} className="relative pl-5 pb-5 border-l-2 border-primary/20 last:pb-0">
+                    <span className={`absolute -left-[7px] top-1.5 h-3 w-3 rounded-full border-2 border-background ${index === 0 ? "bg-primary animate-pulse" : "bg-primary/35"}`} />
+                    <h4 className="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono text-primary font-bold">{item.v}</span>
+                      {item.date && <span className="text-[9px] text-muted-foreground font-normal">({item.date})</span>}
+                      <span className="text-foreground">— {item.title}</span>
+                    </h4>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ node, ...props }) => <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed" {...props} />,
+                        ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1.5 my-1.5" {...props} />,
+                        li: ({ node, ...props }) => <li className="text-[10px] text-muted-foreground leading-normal" {...props} />,
+                        strong: ({ node, ...props }) => <strong className="font-bold text-foreground" {...props} />,
+                        code: ({ node, ...props }) => <code className="bg-muted px-1.5 py-0.5 rounded text-[9px] font-mono text-cyan-400" {...props} />,
+                        a: ({ node, ...props }) => <a className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                      }}
+                    >
+                      {item.body}
+                    </ReactMarkdown>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

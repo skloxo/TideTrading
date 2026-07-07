@@ -355,6 +355,8 @@ export const api = {
     request<{ status: string; message: string }>("/admin/system/update", {
       method: "POST",
     }),
+  getSystemChangelog: (lang?: string) =>
+    request<{ changelog: ChangelogItem[] }>(`/api/system/changelog${lang ? `?lang=${encodeURIComponent(lang)}` : ""}`),
 
   // Realtime quotes gateway
   getQuoteGatewayStatus: () => request<QuoteGatewayStatus>("/api/quote/gateway/status"),
@@ -362,6 +364,12 @@ export const api = {
   getRealtimeQuote: (code: string) => request<QuoteDetail>(`/api/quote/realtime/${encodeURIComponent(code)}`),
 };
 
+export interface ChangelogItem {
+  v: string;
+  date: string;
+  title: string;
+  body: string;
+}
 
 // --- Swarm types ---
 

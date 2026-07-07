@@ -4202,6 +4202,98 @@ async def health_check():
     )
 
 
+_changelog_cache = {
+    "zh": {"mtime": 0.0, "data": []},
+    "en": {"mtime": 0.0, "data": []}
+}
+
+def _parse_readme_changelog(filepath: Path, max_entries: int = 10) -> list:
+    if not filepath.exists():
+        return []
+    try:
+        content = filepath.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        
+        in_changelog = False
+        entries = []
+        current_entry = None
+        
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("## 📰 最新动态") or stripped.startswith("## 最新动态"):
+                in_changelog = True
+                continue
+            elif in_changelog and stripped.startswith("## "):
+                break
+            elif in_changelog and stripped.startswith("---"):
+                if entries:
+                    break
+            
+            if in_changelog:
+                m = re.match(r'^\s*[-\*]\s+\*\*(\d{4}-\d{2}-\d{2})\*\*\s+🚀\s+\*\*(v[\d\.]+)\s*—\s*(.*?)\*\*：?', line)
+                if m:
+                    if len(entries) >= max_entries:
+                        break
+                    date_str, ver_str, title_str = m.groups()
+                    current_entry = {
+                        "v": ver_str,
+                        "date": date_str,
+                        "title": title_str.strip(),
+                        "body": []
+                    }
+                    entries.append(current_entry)
+                elif current_entry is not None:
+                    if line.strip():
+                        subbed = re.sub(r'^\s*[-\*]\s+', '', line).rstrip()
+                        cleaned_line = f"* {subbed}"
+                        current_entry["body"].append(cleaned_line)
+        
+        formatted_entries = []
+        for entry in entries:
+            body_text = "\n".join(entry["body"])
+            formatted_entries.append({
+                "v": entry["v"],
+                "date": entry["date"],
+                "title": entry["title"],
+                "body": body_text
+            })
+        return formatted_entries
+    except Exception as e:
+        logger.error("Failed to parse changelog from %s: %s", filepath, e)
+        return []
+
+@app.get("/api/system/changelog")
+async def get_system_changelog(lang: Optional[str] = Query(None, description="Language code: zh or en")):
+    """Get the latest parsed system changelog entries from README files."""
+    language = "zh"
+    if lang:
+        if "en" in lang.lower():
+            language = "en"
+    
+    filename = "README_zh.md" if language == "zh" else "README.md"
+    readme_path = AGENT_DIR.parent / filename
+    if not readme_path.exists() and language == "zh":
+        readme_path = AGENT_DIR.parent / "README.md"
+    
+    if not readme_path.exists():
+        return {"changelog": []}
+    
+    try:
+        mtime = os.path.getmtime(readme_path)
+        cache = _changelog_cache[language]
+        if cache["mtime"] != mtime or not cache["data"]:
+            parsed_data = _parse_readme_changelog(readme_path)
+            _changelog_cache[language] = {
+                "mtime": mtime,
+                "data": parsed_data
+            }
+        return {"changelog": _changelog_cache[language]["data"]}
+    except Exception as e:
+        logger.error("Failed to fetch changelog: %s", e)
+        return {"changelog": []}
+
+
+
 @app.get(
     "/settings/xueqiu",
     response_model=XueqiuSettingsResponse,
