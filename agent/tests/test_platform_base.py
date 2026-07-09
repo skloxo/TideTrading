@@ -46,7 +46,8 @@ def test_platform_manager_registration_and_lifecycle():
     assert adapter.closed is True
 
 
-def test_platform_manager_session_resolution():
+def test_platform_manager_session_resolution(monkeypatch):
+    monkeypatch.setattr(PlatformManager, "session_service_current", property(lambda self: self.session_service))
     session_service = MagicMock()
     session_service.create_session = MagicMock()
     session_service.create_session.return_value = MagicMock(session_id="new_session_123")
@@ -121,7 +122,8 @@ class DynamicMockAdapter(BasePlatformAdapter):
         self.closed = True
 
 
-def test_platform_manager_multiple_channels():
+def test_platform_manager_multiple_channels(monkeypatch):
+    monkeypatch.setattr(PlatformManager, "session_service_current", property(lambda self: self.session_service))
     session_service = MagicMock()
     manager = PlatformManager(session_service)
     

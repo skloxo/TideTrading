@@ -103,9 +103,8 @@ def test_update_llm_settings_persists_project_env(
     body = response.json()
     assert body["provider"] == "openrouter"
     assert body["api_key_configured"] is True
-    assert body["api_key_hint"] == "or-s...alue"
+    assert body["api_key_hint"] is None
     assert "or-secret-value" not in response.text
-    assert "or-s...alue" in response.text
 
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "LANGCHAIN_PROVIDER=openrouter" in env_text
@@ -153,13 +152,11 @@ def test_settings_response_never_exposes_configured_secret_hints(
     llm_body = llm_response.json()
     data_body = data_response.json()
     assert llm_body["api_key_configured"] is True
-    assert llm_body["api_key_hint"] == "or-s...alue"
+    assert llm_body["api_key_hint"] is None
     assert data_body["tushare_token_configured"] is True
-    assert data_body["tushare_token_hint"] == "ts-s...oken"
+    assert data_body["tushare_token_hint"] is None
     assert "or-secret-private-value" not in llm_response.text
-    assert "or-s...alue" in llm_response.text
     assert "ts-secret-private-token" not in data_response.text
-    assert "ts-s...oken" in data_response.text
 
 
 def test_settings_reads_reject_remote_dev_mode_clients(
@@ -223,9 +220,8 @@ def test_settings_reads_allow_loopback_without_bearer_even_when_api_auth_key_con
     assert unauthenticated_response.status_code == 401
     assert authenticated_response.status_code == 200
     assert authenticated_response.json()["api_key_configured"] is True
-    assert authenticated_response.json()["api_key_hint"] == "or-s...alue"
+    assert authenticated_response.json()["api_key_hint"] is None
     assert "or-secret-value" not in authenticated_response.text
-    assert "or-s...alue" in authenticated_response.text
 
 
 def test_update_data_source_settings_persists_tushare_token(
@@ -239,9 +235,8 @@ def test_update_data_source_settings_persists_tushare_token(
     assert response.status_code == 200
     body = response.json()
     assert body["tushare_token_configured"] is True
-    assert body["tushare_token_hint"] == "ts-s...oken"
+    assert body["tushare_token_hint"] is None
     assert "ts-secret-token" not in response.text
-    assert "ts-s...oken" in response.text
 
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "TUSHARE_TOKEN=ts-secret-token" in env_text

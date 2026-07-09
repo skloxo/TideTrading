@@ -46,6 +46,9 @@ const GlobalDashboard = lazy(() =>
 const ProjectSettings = lazy(() =>
   import("@/pages/ProjectSettings").then((m) => ({ default: m.ProjectSettings })),
 );
+const TenantLogin = lazy(() =>
+  import("@/pages/TenantLogin").then((m) => ({ default: m.TenantLogin })),
+);
 
 function PageLoader() {
   return (
@@ -91,4 +94,6 @@ export const router = createBrowserRouter([
     path: "/xueqiu/auth",
     element: wrap(XueqiuAuth),
   },
+  // Standalone pages — outside Layout, no auth required to render
+  { path: "/login", element: wrap(TenantLogin) },
 ]);

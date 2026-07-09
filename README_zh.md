@@ -35,8 +35,8 @@
 </p>
 
 <p align="center">
-  <a href="https://vibetrading.wiki/">官网</a> &nbsp;&middot;&nbsp;
-  <a href="https://vibetrading.wiki/docs/">文档</a> &nbsp;&middot;&nbsp;
+  <a href="https://tide.red/">官网</a> &nbsp;&middot;&nbsp;
+  <a href="https://tide.red/docs/">文档</a> &nbsp;&middot;&nbsp;
   <a href="#-news">News</a> &nbsp;&middot;&nbsp;
   <a href="#-key-features">Features</a> &nbsp;&middot;&nbsp;
   <a href="#-shadow-account">Shadow Account</a> &nbsp;&middot;&nbsp;
@@ -55,6 +55,11 @@
 ---
 
 ## 📰 最新动态
+
+- **2026-07-09** 🚀 **v1.7.5.6 — 品牌域名规范纠偏、多语言官网对齐与数字资产落盘整理**：
+  - **品牌官方域名纠偏**：将全平台（含 `pyproject.toml`、中英文 `README` 说明书）中所有历史遗留的 `vibetrading.wiki` 域名统一更正替换为全新生产域名 **`tide.red`**，并更新 Cloudflare Pages 自定义发布配置。
+  - **数字资产落盘整理**：编写并物理落盘了全新的 [wiki/DIGITAL_ASSETS.md](file://wsl.localhost/Ubuntu-24.04/home/skloxo/aho/openclaw/project/TideTrading/wiki/DIGITAL_ASSETS.md)，明确了潮汐投研（TideTrading）的品牌属性（默认中文、支持英文）与阿里云 DNS 解析规范，清除了无关的宿主机 GPU 显存预算和 n8n/SearXNG 外部依赖，保持项目的独立性与高内聚力。
+  - **官网数据源同步重构**：修改了 `wiki/docs/content.js`，移除了无关的 MCP 技能中心页面，新增 `reference/digital-assets` 栏目，实现与物理落盘文档的完全对齐与在线发布。
 
 - **2026-07-07** 🚀 **v1.7.5.5 — 服务看板重构与系统视觉圆角及信息密度全局统一规范**：
   - **服务看板扩展**：在服务看板（`/monitor`）新增 Swarm 智能体执行引擎（运行实例数）与 MCP 外部组件网关（通信协议、授权状态）状态监控卡片，并实时读取展示全局 Xueqiu 缓存共享率。

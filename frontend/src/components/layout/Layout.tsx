@@ -1,24 +1,24 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
-import { Activity, BarChart3, Bot, Check, ChevronDown, ChevronRight, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, Cpu, KeyRound } from "lucide-react";
+import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Activity, BarChart3, Bot, Check, ChevronDown, ChevronRight, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, Cpu, KeyRound, ShieldCheck, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, isAuthRequiredError, type SessionItem, type UserProfile } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent";
 import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
-import { AuthBarrier } from "@/components/layout/AuthBarrier";
-import { setApiAuthKey } from "@/lib/apiAuth";
+import { clearApiAuthKey, clearAdminToken, getApiAuthKey } from "@/lib/apiAuth";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 
 // Bump on each release; one place keeps the footer in sync with package.json.
 const APP_VERSION = "v1.7.5.5";
 
 export function Layout() {
-  const { t } = useTranslation();
-
+  const { t, i18n: i18nHook } = useTranslation();
+  const isZhLayout = i18nHook.language === "zh-CN";
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { dark, toggle } = useDarkMode();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -86,6 +86,18 @@ export function Layout() {
     return () => { alive = false; };
   }, []);
 
+  // Redirect to /login if auth fails (no tenant key stored)
+  useEffect(() => {
+    const key = getApiAuthKey();
+    if (!key) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    if (!profileLoading && authFailed) {
+      navigate("/login", { replace: true });
+    }
+  }, [profileLoading, authFailed, navigate]);
+
   useEffect(() => {
     localStorage.setItem("qa-sidebar", collapsed ? "collapsed" : "expanded");
   }, [collapsed]);
@@ -141,16 +153,10 @@ export function Layout() {
   }
 
   if (authFailed) {
+    // Redirect handled in useEffect above — show spinner while redirecting
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="mx-auto max-w-md w-full p-4 space-y-4">
-          <AuthBarrier
-            onLogin={(key) => {
-              setApiAuthKey(key);
-              window.location.reload();
-            }}
-          />
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -440,13 +446,48 @@ export function Layout() {
                 <LanguageSwitcher />
                 <p className="text-[10px] text-muted-foreground/60">{t('app.version') || APP_VERSION}</p>
               </div>
+              {/* Identity footer */}
               {profile && (
-                <div className="text-[10px] text-muted-foreground/50 border-t pt-1.5 border-border/30 truncate flex justify-between gap-2">
-                  <span className="truncate" title={profile.name}>User: {profile.name}</span>
-                  <span className="shrink-0 uppercase">{profile.role}</span>
+                <div className="text-[10px] text-muted-foreground/50 border-t pt-1.5 border-border/30 space-y-1">
+                  <div className="flex justify-between gap-2 truncate">
+                    <span className="truncate" title={profile.name}>User: {profile.name}</span>
+                    <span className="shrink-0 uppercase">{profile.role}</span>
+                  </div>
+                  {/* Admin status & logout */}
+                  {profile.is_admin && (
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-1 text-amber-400">
+                        <ShieldCheck className="h-3 w-3" />
+                        {isZhLayout ? "项目运维模式" : "Ops Mode"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          clearAdminToken();
+                          window.location.reload();
+                        }}
+                        className="flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                        title={isZhLayout ? "退出提权" : "Exit elevation"}
+                      >
+                        <LogOut className="h-3 w-3" />
+                        <span>{isZhLayout ? "锁定" : "Lock"}</span>
+                      </button>
+                    </div>
+                  )}
+                  {/* Tenant logout */}
+                  {profile.is_tenant && (
+                    <button
+                      onClick={() => {
+                        clearApiAuthKey();
+                        navigate("/login", { replace: true });
+                      }}
+                      className="flex items-center gap-1 text-muted-foreground/60 hover:text-destructive transition-colors animate-pulse"
+                    >
+                      <LogOut className="h-3 w-3" />
+                      {isZhLayout ? "退出租户" : "Log out"}
+                    </button>
+                  )}
                 </div>
               )}
-              </div>
             </>
           )}
         </div>
@@ -622,4 +663,3 @@ function LanguageSwitcher() {
     </div>
   );
 }
->>>>>>> ref-upstream/main

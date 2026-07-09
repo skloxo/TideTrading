@@ -137,11 +137,16 @@ export function Runtime() {
             </div>
             <h2 className="text-base font-semibold">租户身份卡片</h2>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {profile?.role === "admin" && profile?.is_local
-              ? "您当前处于本地管理员租户空间 (默认)。"
-              : `当前登录身份：${profile?.name || "未知租户"} (ID: ${profile?.tenant_id || "未知"})`}
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              当前登录身份：{profile?.name || "未知租户"} (ID: {profile?.tenant_id || "未知"})
+            </span>
+            {profile?.is_admin && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-500 border border-amber-500/20">
+                🛡️ 全局管理已开启
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
@@ -202,7 +207,7 @@ export function Runtime() {
               type="button"
               onClick={() => {
                 setApiAuthKey("");
-                toast.success("已清除密钥，恢复默认管理员租户。");
+                toast.success("已清除密钥并安全登出。");
                 window.location.reload();
               }}
               className="inline-flex items-center justify-center gap-1.5 rounded-md border border-input bg-background hover:bg-accent px-4 py-2 text-sm font-medium transition cursor-pointer"

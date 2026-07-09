@@ -94,7 +94,7 @@ def test_monitor_stats_logs_blocked_externally(monkeypatch: pytest.MonkeyPatch) 
     # Let's verify with a tenant key:
     import secrets
     import hashlib
-    raw_key = "vibe_t_tenantsecret123"
+    raw_key = "tide_t_tenantsecret123"
     tenant_id = "tenant_" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:12]
     
     tenant_keys = [{
@@ -114,7 +114,7 @@ def test_monitor_stats_logs_blocked_externally(monkeypatch: pytest.MonkeyPatch) 
 
 def test_public_tenant_settings_isolation_vs_local(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     import hashlib
-    raw_key = "vibe_t_tenantsecret123"
+    raw_key = "tide_t_tenantsecret123"
     tenant_id = "tenant_" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:12]
     tenant_keys = [{
         "key": raw_key,

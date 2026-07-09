@@ -17,6 +17,23 @@ class PlatformManager:
         self._adapters: Dict[str, BasePlatformAdapter] = {}
         self._running_trackers: Dict[str, asyncio.Task] = {}  # session_id -> tracking task
 
+    @property
+    def session_service_current(self) -> Any:
+        import sys
+        from src.config.paths import active_tenant_var
+        tenant_id = active_tenant_var.get() or "default"
+        host = sys.modules.get("api_server") or sys.modules.get("agent.api_server")
+        if host and hasattr(host, "_get_session_service"):
+            original = active_tenant_var.get()
+            try:
+                active_tenant_var.set(tenant_id)
+                svc = host._get_session_service()
+                if svc is not None:
+                    return svc
+            finally:
+                active_tenant_var.set(original)
+        return self.session_service
+
     def register_adapter(self, adapter: BasePlatformAdapter) -> None:
         """Register a platform adapter."""
         self._adapters[adapter.platform_name] = adapter
@@ -221,7 +238,7 @@ class PlatformManager:
 
             # 2. Trigger backend agent execution
             # Enable shell tools for authenticated API/Bot interactions
-            response = await self.session_service.send_message(
+            response = await self.session_service_current.send_message(
                 session_id=session_id,
                 content=incoming.content,
                 role="user",
@@ -261,7 +278,7 @@ class PlatformManager:
         # Load sessions from store
         sessions = await loop.run_in_executor(
             None,
-            lambda: self.session_service.store.list_sessions(limit=200)
+            lambda: self.session_service_current.store.list_sessions(limit=200)
         )
 
         for session in sessions:
@@ -300,7 +317,7 @@ class PlatformManager:
         # Create session in executor to avoid blockages
         new_session = await loop.run_in_executor(
             None,
-            lambda: self.session_service.create_session(title=title, config=config)
+            lambda: self.session_service_current.create_session(title=title, config=config)
         )
 
         logger.info(
@@ -318,6 +335,10 @@ class PlatformManager:
         user_prompt: str,
     ) -> None:
         """Subscribe to EventBus and update progress cards in real-time."""
+        from src.config.paths import active_tenant_var
+        tenant_id = getattr(adapter, "tenant_id", "default")
+        active_tenant_var.set(tenant_id)
+        
         progress_msg_id = None
         current_thinking = ""
         current_text = ""
@@ -351,7 +372,7 @@ class PlatformManager:
                 )
 
             # Subscribe to event stream
-            event_bus = self.session_service.event_bus
+            event_bus = self.session_service_current.event_bus
             async for event in event_bus.subscribe(session_id, replay_all=False):
                 event_type = event.event_type
                 data = event.data or {}
@@ -404,7 +425,7 @@ class PlatformManager:
                     
                     # If summary is empty, fetch the last assistant message
                     if not summary:
-                        messages = self.session_service.get_messages(session_id, limit=2)
+                        messages = self.session_service_current.get_messages(session_id, limit=2)
                         for msg in reversed(messages):
                             if msg.role == "assistant":
                                 summary = msg.content
@@ -449,7 +470,7 @@ class PlatformManager:
         # Load sessions from store
         sessions = await loop.run_in_executor(
             None,
-            lambda: self.session_service.store.list_sessions(limit=200)
+            lambda: self.session_service_current.store.list_sessions(limit=200)
         )
 
         for session in sessions:
@@ -469,5 +490,5 @@ class PlatformManager:
                 # Update session config in store
                 await loop.run_in_executor(
                     None,
-                    lambda s=session: self.session_service.store.update_session(s)
+                    lambda s=session: self.session_service_current.store.update_session(s)
                 )

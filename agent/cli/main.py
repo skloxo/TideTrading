@@ -34,7 +34,7 @@ from cli.theme import Theme, get_console
 
 
 def _register_live_slash_commands() -> None:
-    fuzzy matcher never listed them. We append them here, at this module's import
+    """fuzzy matcher never listed them. We append them here, at this module's import
     time, which runs on every interactive startup *before* the lazily-imported
     ``cli.commands.help`` / ``cli.completer`` first read the registry. Both of
     those read ``slash_router.SLASH_COMMANDS`` (help) / call ``match_commands``

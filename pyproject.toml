@@ -1,6 +1,6 @@
 [project]
 name = "tide-trading-ai"
-version = "1.7.5.5"
+version = "1.7.5.6"
 description = "A-Share & HK Equities Focus Quantitative Trading Workstation powered by Multi-Agent Swarms"
 requires-python = ">=3.11"
 license = "MIT"
@@ -63,8 +63,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://vibetrading.wiki/"
-Documentation = "https://vibetrading.wiki/docs/"
+Homepage = "https://tide.red/"
+Documentation = "https://tide.red/docs/"
 Repository = "https://github.com/skloxo/Vibe-Trading-CNX"
 Issues = "https://github.com/skloxo/Vibe-Trading-CNX/issues"
 

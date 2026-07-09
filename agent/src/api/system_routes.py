@@ -4,9 +4,9 @@ import signal
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Security, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,7 @@ _changelog_cache = {
     "en": {"mtime": 0, "data": []}
 }
 
-def _parse_readme_changelog(filepath: Path, max_entries: int = 10) -> list:
+def _parse_readme_changelog(filepath: Path, max_entries: int = 5) -> list:
     if not filepath.exists():
         return []
     try:
@@ -84,6 +84,23 @@ class HealthResponse(BaseModel):
     timestamp: str = Field(..., description="Server timestamp")
 
 
+class MonitorStatsResponse(BaseModel):
+    """Service monitoring statistics."""
+    active_tenants: List[Dict[str, Any]] = Field(default_factory=list)
+    total_sessions: int
+    total_runs: int
+    memory_usage_mb: float
+    services: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LogEntry(BaseModel):
+    """Single log entry details."""
+    timestamp: str
+    level: str
+    logger: str
+    message: str
+
+
 # ---------------------------------------------------------------------------
 # Process termination
 # ---------------------------------------------------------------------------
@@ -123,6 +140,7 @@ def register_system_routes(
     _security = host._security
     _require_shutdown_authorization = host._require_shutdown_authorization
     _app_version = app_version if app_version is not None else host.APP_VERSION
+    require_admin = getattr(host, "require_admin", host.require_auth)
 
     def _get_terminate_process():
         """Late-access _terminate_current_process for test monkeypatch compat."""
@@ -134,6 +152,228 @@ def register_system_routes(
         return _terminate_current_process
 
     # --- Routes ---
+
+    @app.get(
+        "/admin/monitor/stats",
+        response_model=MonitorStatsResponse,
+        dependencies=[Depends(require_admin)],
+    )
+    async def get_monitor_stats():
+        """Get service metrics, database runs, sessions, and active tenants."""
+        # 1. Active tenants
+        keys = host._load_tenant_keys()
+        active_tenants = [
+            {
+                "tenant_id": k.get("tenant_id"),
+                "name": k.get("name"),
+                "created_at": k.get("created_at"),
+                "is_active": k.get("is_active", True)
+            }
+            for k in keys
+        ]
+        
+        # 2. Total sessions
+        total_sessions = 0
+        sessions_dir = getattr(host, "SESSIONS_DIR", None)
+        if sessions_dir is None:
+            try:
+                sessions_dir = host._get_sessions_dir()
+            except AttributeError:
+                sessions_dir = None
+        if sessions_dir and sessions_dir.exists():
+            try:
+                total_sessions = sum(1 for d in sessions_dir.iterdir() if d.is_dir())
+            except Exception:
+                pass
+                
+        # 3. Total runs
+        total_runs = 0
+        runs_dir = getattr(host, "RUNS_DIR", None)
+        if runs_dir is None:
+            try:
+                runs_dir = host._get_runs_dir()
+            except AttributeError:
+                runs_dir = None
+        if runs_dir and runs_dir.exists():
+            try:
+                total_runs = sum(1 for d in runs_dir.iterdir() if d.is_dir())
+            except Exception:
+                pass
+                
+        # 4. Memory usage
+        memory_usage_mb = 0.0
+        try:
+            if os.path.exists("/proc/self/status"):
+                with open("/proc/self/status", "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("VmRSS:"):
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                memory_usage_mb = float(parts[1]) / 1024.0
+                                break
+        except Exception:
+            pass
+
+        # 5. Service status info
+        services_info = {}
+        
+        # 5.1 Data Maintenance
+        try:
+            from src.market.close_maintenance import CloseDataMaintenanceService
+            from src.config.paths import get_market_db_path
+            import sqlite3
+            
+            db_path = get_market_db_path()
+            db_size_mb = 0.0
+            if db_path.exists():
+                db_size_mb = db_path.stat().st_size / (1024.0 * 1024.0)
+                
+            historical_range = "未开始"
+            today_status = "待维护"
+            total_stocks = 0
+            
+            if db_path.exists():
+                try:
+                    conn = sqlite3.connect(db_path)
+                    cur = conn.cursor()
+                    cur.execute("SELECT COUNT(*) FROM stock_meta")
+                    total_stocks = cur.fetchone()[0]
+                    
+                    cur.execute("SELECT MIN(date), MAX(date) FROM kline_daily")
+                    min_d, max_d = cur.fetchone()
+                    if min_d and max_d:
+                        historical_range = f"{min_d} ~ {max_d}"
+                        
+                        today_str = str(datetime.now().date())
+                        cur.execute("SELECT MAX(date) FROM trade_calendar WHERE is_open = 1 AND date <= ?", (today_str,))
+                        latest_trading_day = cur.fetchone()[0]
+                        if latest_trading_day:
+                            if max_d >= latest_trading_day:
+                                today_status = "已完成"
+                            else:
+                                from datetime import time
+                                now = datetime.now()
+                                cur.execute("SELECT is_open FROM trade_calendar WHERE date = ?", (today_str,))
+                                row = cur.fetchone()
+                                is_today_open = row[0] if row else 0
+                                
+                                if is_today_open and now.time() >= time(15, 35):
+                                    today_status = "同步延迟/失败"
+                                else:
+                                    today_status = "等待下午收盘"
+                        else:
+                            today_status = "未同步历法"
+                    conn.close()
+                except Exception:
+                    pass
+                    
+            maintenance_running = False
+            try:
+                maintenance_running = CloseDataMaintenanceService()._running
+            except Exception:
+                pass
+                
+            services_info["data_maintenance"] = {
+                "name": "收盘行情同步与 Gap Healing",
+                "running": maintenance_running,
+                "historical_range": historical_range,
+                "today_status": today_status,
+                "total_stocks": total_stocks,
+                "db_size_mb": round(db_size_mb, 2)
+            }
+        except Exception:
+            pass
+
+        # 5.2 THS Watchlist Sync
+        try:
+            from src.market.ths_sync import ThsSyncService
+            ths_running = False
+            try:
+                ths_running = ThsSyncService()._running
+            except Exception:
+                pass
+            services_info["ths_sync"] = {
+                "name": "同花顺自选股双向同步",
+                "running": ths_running
+            }
+        except Exception:
+            pass
+
+        # 5.3 Watchlist Monitor
+        try:
+            from src.market.watchlist_monitor import WatchlistMonitorService
+            monitor_running = False
+            try:
+                monitor_running = WatchlistMonitorService()._running
+            except Exception:
+                pass
+            services_info["watchlist_monitor"] = {
+                "name": "自选股秒级高频预警",
+                "running": monitor_running
+            }
+        except Exception:
+            pass
+
+        # 5.4 Xueqiu Combination Watcher
+        try:
+            xueqiu_running = False
+            try:
+                watcher = host._get_xueqiu_watcher()
+                xueqiu_running = watcher is not None and watcher._task is not None and not watcher._task.done()
+            except Exception:
+                pass
+            
+            cached_count = 0
+            if hasattr(app.state, "xueqiu_global_details_cache"):
+                cached_count = len(app.state.xueqiu_global_details_cache)
+                
+            services_info["xueqiu_watcher"] = {
+                "name": "雪球大V组合盯哨",
+                "running": xueqiu_running,
+                "cached_count": cached_count
+            }
+        except Exception:
+            pass
+
+        # 5.5 Swarm Multi-Agent Engine
+        try:
+            services_info["swarm_engine"] = {
+                "name": "Swarm 智能体协作引擎",
+                "running": True,
+                "active_runtimes": len(host._swarm_runtime_cache)
+            }
+        except Exception:
+            pass
+
+        # 5.6 MCP Tool Gateway
+        try:
+            services_info["mcp_gateway"] = {
+                "name": "MCP 外部组件网关",
+                "running": True
+            }
+        except Exception:
+            pass
+
+        return MonitorStatsResponse(
+            active_tenants=active_tenants,
+            total_sessions=total_sessions,
+            total_runs=total_runs,
+            memory_usage_mb=memory_usage_mb,
+            services=services_info,
+        )
+
+    @app.get(
+        "/admin/monitor/logs",
+        response_model=List[LogEntry],
+        dependencies=[Depends(require_admin)],
+    )
+    async def get_monitor_logs(
+        limit: int = Query(100, ge=1, le=1000),
+        level: Optional[str] = Query(None),
+        keyword: Optional[str] = Query(None),
+    ):
+        """Retrieve uvicorn root logs from the MemoryLogHandler."""
+        return host.memory_log_handler.get_logs(limit=limit, level=level, keyword=keyword)
 
     @app.get("/health", response_model=HealthResponse)
     async def health_check():

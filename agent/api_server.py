@@ -228,6 +228,50 @@ SESSIONS_DIR = _DynamicSessionsDir()
 UPLOADS_DIR = _DynamicUploadsDir()
 ENV_PATH = _DynamicEnvPath()
 
+import threading
+from collections import deque
+
+class MemoryLogHandler(logging.Handler):
+    """Thread-safe logging handler that retains the last N logs in memory."""
+    def __init__(self, maxlen: int = 1000):
+        super().__init__()
+        self._logs = deque(maxlen=maxlen)
+        self._lock = threading.Lock()
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            msg = self.format(record)
+            log_entry = {
+                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": msg,
+            }
+            with self._lock:
+                self._logs.append(log_entry)
+        except Exception:
+            self.handleError(record)
+
+    def get_logs(self, limit: int = 100, level: Optional[str] = None, keyword: Optional[str] = None):
+        with self._lock:
+            results = list(self._logs)
+        if level:
+            level_upper = level.upper()
+            results = [log for log in results if log["level"] == level_upper]
+        if keyword:
+            keyword_lower = keyword.lower()
+            results = [
+                log for log in results
+                if keyword_lower in log["message"].lower() or keyword_lower in log["logger"].lower()
+            ]
+        return results[-limit:]
+
+
+memory_log_handler = MemoryLogHandler()
+memory_log_handler.setFormatter(logging.Formatter("%(message)s"))
+memory_log_handler.setLevel(logging.INFO)
+logging.getLogger().addHandler(memory_log_handler)
+
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 _UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MB
 
@@ -510,6 +554,7 @@ async def _spa_html_deep_link_fallback(request: Request, call_next):
 from src.api.channels_routes import (  # noqa: E402
     _start_channel_runtime,
     _stop_channel_runtime,
+    _reload_platform_manager,
 )
 from src.api.scheduled_routes import (  # noqa: E402
     _start_scheduled_research_executor,
@@ -524,8 +569,11 @@ async def _run_startup_preflight() -> None:
 
     run_preflight(console)
     _start_scheduled_research_executor()
-    if os.getenv("VIBE_TRADING_CHANNELS_AUTO_START", "").strip().lower() in {"1", "true", "yes"}:
+    try:
         await _start_channel_runtime()
+        await _reload_platform_manager()
+    except Exception as e:
+        logger.exception("Failed to auto-start channel runtime on startup: %s", e)
 
 
 @app.on_event("shutdown")
@@ -572,7 +620,18 @@ async def require_local_or_auth(
     cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
 ) -> None:
     """Protect settings access when dev-mode auth is disabled."""
+    # 1. If Bearer token is present, validate it and resolve tenant context first
+    token = _auth_credential_from_header_or_query(cred, None, allow_query=False)
+    if token:
+        matched = _validate_api_key(cred, None, allow_query=False)
+        _set_tenant_from_matched_key(matched)
+        return
+
+    # 2. Otherwise check admin session token
     if _is_request_admin(request):
+        tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
+        if tenant_keys:
+            raise HTTPException(status_code=401, detail="Authentication required (tenant context missing)")
         from src.config.paths import active_tenant_var
         active_tenant_var.set("default")
         return
@@ -600,8 +659,25 @@ async def require_admin(
     request: Request,
     cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
 ) -> None:
-    """Require that the client has administrative privileges (default tenant)."""
+    """Require that the client has administrative privileges."""
+    # 1. If Bearer token is present, validate it and resolve tenant context first
+    token = _auth_credential_from_header_or_query(cred, None, allow_query=False)
+    if token:
+        matched = _validate_api_key(cred, None, allow_query=False)
+        _set_tenant_from_matched_key(matched)
+        # If elevated as admin, they have admin permission
+        if _is_request_admin(request):
+            return
+        # If their token matches an admin key, they have admin permission
+        admin_keys = _configured_api_keys()
+        if any(hmac.compare_digest(matched, k) for k in admin_keys):
+            return
+
+    # 2. Otherwise check admin session token
     if _is_request_admin(request):
+        tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
+        if tenant_keys:
+            raise HTTPException(status_code=401, detail="Authentication required (tenant context missing)")
         from src.config.paths import active_tenant_var
         active_tenant_var.set("default")
         return
@@ -609,9 +685,12 @@ async def require_admin(
     admin_keys = _configured_api_keys()
     if admin_keys:
         await require_auth(request, cred)
-        from src.config.paths import active_tenant_var
-        if active_tenant_var.get() == "default":
-            return
+        if token:
+            matched = _validate_api_key(cred, None, allow_query=False)
+            if any(hmac.compare_digest(matched, k) for k in admin_keys):
+                from src.config.paths import active_tenant_var
+                active_tenant_var.set("default")
+                return
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -738,33 +817,7 @@ def _require_shutdown_authorization(
 _SAFE_BROWSER_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def _validate_api_auth(
-    *,
-    request: Request,
-    cred: Optional[HTTPAuthorizationCredentials],
-    query_api_key: Optional[str] = None,
-    allow_query: bool = False,
-) -> None:
-    """Validate configured auth, preserving loopback-only dev mode."""
-    # CORS protects response reads, not blind side effects. Reject unsafe
-    # browser-originated cross-site requests before honoring loopback dev-mode
-    # trust, otherwise a malicious page can drive local POST/PUT/DELETE routes.
-    if request.method.upper() not in _SAFE_BROWSER_METHODS:
-        _reject_cross_site_browser_request(request)
 
-    # Loopback clients are always trusted, even when API_AUTH_KEY is set.
-    # The key only gates non-local (LAN/remote) access.
-    if _is_local_client(request):
-        return
-
-    api_key = _configured_api_key()
-    if not api_key:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="API_AUTH_KEY is required for non-local API access",
-    token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
-    if not token or not hmac.compare_digest(token, api_key):
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 _ADMIN_SESSION_TOKENS: set[str] = set()
 
 def _is_request_admin(request: Request) -> bool:
@@ -877,8 +930,6 @@ def _is_local_or_lan_client(request: Request) -> bool:
     except ValueError:
         return False
 
-_SAFE_BROWSER_METHODS = {"GET", "HEAD", "OPTIONS"}
-
 def _validate_api_auth(
     *,
     request: Request,
@@ -890,8 +941,20 @@ def _validate_api_auth(
     if request.method.upper() not in _SAFE_BROWSER_METHODS:
         _reject_cross_site_browser_request(request)
 
-    # 1. Check for Admin Session Token elevation
+    # 1. If a Bearer token is present, validate it and resolve tenant context.
+    #    This takes priority over any admin elevation header, so an admin-elevated
+    #    request that ALSO sends a tenant Bearer token stays in that tenant's context.
+    token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
+    if token:
+        matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
+        _set_tenant_from_matched_key(matched)
+        return
+
+    # 2. Admin Session Token elevation (only when no Bearer token is present).
     if _is_request_admin(request):
+        tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
+        if tenant_keys:
+            raise HTTPException(status_code=401, detail="Authentication required (tenant context missing)")
         from src.config.paths import active_tenant_var
         active_tenant_var.set("default")
         return
@@ -900,17 +963,12 @@ def _validate_api_auth(
     tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
     has_keys = bool(admin_keys) or bool(tenant_keys)
 
-    # 2. Loopback/LAN client tenant-aware routing
+    # 3. Loopback/LAN client tenant-aware routing.
     if _is_local_or_lan_client(request):
-        token = _auth_credential_from_header_or_query(cred, query_api_key, allow_query=allow_query)
-        if token:
-            matched = _validate_api_key(cred, query_api_key, allow_query=allow_query)
-            _set_tenant_from_matched_key(matched)
-        else:
-            if has_keys:
-                raise HTTPException(status_code=401, detail="Authentication required")
-            from src.config.paths import active_tenant_var
-            active_tenant_var.set("default")
+        if has_keys:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        from src.config.paths import active_tenant_var
+        active_tenant_var.set("default")
         return
 
     if not has_keys:
@@ -983,6 +1041,9 @@ def _env_shell_tools_enabled() -> bool:
 
 def _shell_tools_enabled_for_request(request: Request) -> bool:
     """Return whether this API request may expose shell tools to the agent."""
+    from src.config.paths import active_tenant_var
+    if active_tenant_var.get() != "default":
+        return False
     # Shell-capable tools execute commands on the host as the API process user.
     # Do not infer that privilege from peer IP alone: browser DNS rebinding can
     # make attacker-controlled pages appear as loopback clients. Operators who
@@ -991,49 +1052,7 @@ def _shell_tools_enabled_for_request(request: Request) -> bool:
     return _env_shell_tools_enabled()
 
 
-async def require_local_or_auth(
-    request: Request,
-    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
-) -> None:
-    """Protect settings access when dev-mode auth is disabled.
 
-    If API_AUTH_KEY is configured, require the bearer token. If not, allow only
-    loopback clients so an API server bound to 0.0.0.0 cannot accept remote
-    credential reads or writes in dev mode.
-    """
-    if _configured_api_key():
-        await require_auth(request, cred)
-        return
-    if not _is_local_client(request):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Settings access requires API_AUTH_KEY or a local loopback client",
-        )
-
-
-async def require_settings_write_auth(
-    request: Request,
-    cred: Optional[HTTPAuthorizationCredentials] = Security(_security),
-) -> None:
-    """Require explicit authorization before changing credential-routing settings.
-
-    Settings writes can redirect stored provider credentials to a different
-    endpoint. When an API key is configured, loopback peer IP alone is not a
-    sufficient user-intent signal because a browser can reach local APIs after
-    DNS rebinding.
-    """
-    api_key = _configured_api_key()
-    if api_key:
-        token = _auth_credential_from_header_or_query(cred, None, allow_query=False)
-        if not token or not hmac.compare_digest(token, api_key):
-            raise HTTPException(status_code=401, detail="Invalid or missing API key")
-        return
-
-    if not _is_local_client(request):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Settings writes require API_AUTH_KEY or a local loopback client",
-        )
 
 
 # ============================================================================
@@ -1323,7 +1342,6 @@ register_uploads_routes(app)
 # Re-export upload constants for test access via ``api_server.*``.
 from src.api.uploads_routes import (  # noqa: E402
     MAX_UPLOAD_SIZE,
-    UPLOADS_DIR,
     _BLOCKED_UPLOAD_EXT,
     _BLOCKED_UPLOAD_NAMES,
     _SHADOW_ID_RE,
@@ -1423,6 +1441,86 @@ from src.api.scheduled_routes import (  # noqa: E402, F401
     _get_scheduled_research_executor,
     _get_scheduled_research_store,
     _scheduled_research_scheduler_enabled,
+)
+
+
+# ============================================================================
+# Realtime Quote Routes (TDX Bridge / SharedMemoryHub)
+# ============================================================================
+
+@app.get(
+    "/api/quote/realtime",
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_realtime_quotes(codes: str):
+    """Batch fetch realtime L1 quotes for symbols."""
+    from src.market.shared_data_hub import SharedMemoryHub
+    symbol_list = [c.strip() for c in codes.split(",") if c.strip()]
+    if not symbol_list:
+        return {}
+    try:
+        return SharedMemoryHub().get_quotes(symbol_list)
+    except Exception as e:
+        logger.error("Error fetching realtime quotes via SharedMemoryHub: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch quotes: {e}"
+        )
+
+@app.get(
+    "/api/quote/realtime/{code}",
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_realtime_quote(code: str):
+    """Fetch single realtime L1 quote."""
+    if not code.strip():
+        return {}
+    try:
+        from src.market.shared_data_hub import SharedMemoryHub
+        quotes = SharedMemoryHub().get_quotes([code])
+        return quotes.get(code, {})
+    except Exception as e:
+        logger.error("Error fetching single quote %s via SharedMemoryHub: %s", code, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch quote: {e}"
+        )
+
+@app.get(
+    "/api/quote/gateway/status",
+    dependencies=[Depends(require_local_or_auth)],
+)
+async def get_quote_gateway_status():
+    """Get status of the market quote TCP connection pool."""
+    try:
+        from src.market.tdx_bridge import TdxGateway
+        gateway = TdxGateway()
+        return gateway.get_status()
+    except Exception as e:
+        logger.error("Error reading TdxGateway status: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read gateway status: {e}"
+        )
+
+
+# ============================================================================
+# Xueqiu routes - defined in src/api/xueqiu_routes.py
+# ============================================================================
+
+from src.api.xueqiu_routes import register_xueqiu_routes  # noqa: E402
+register_xueqiu_routes(app)
+
+# Re-export for test monkeypatch compatibility
+from src.api.xueqiu_routes import (  # noqa: F401, E402
+    XueqiuSettingsResponse,
+    UpdateXueqiuSettingsRequest,
+    TestXueqiuWebhookRequest,
+    ConfirmQRCodeRequest,
+    XUEQIU_COMBOS_CACHE,
+    XUEQIU_QR_SESSIONS,
+    initialize_new_combos_task,
+    initialize_new_influencers_task,
 )
 
 

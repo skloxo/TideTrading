@@ -152,6 +152,20 @@ export const api = {
       ...options,
     }),
   getFeatureFlags: (options?: RequestInit) => request<FeatureFlagsResponse>("/settings/feature-flags", options),
+  getAgentConfig: (options?: RequestInit) => request<AgentConfigTextResponse>("/settings/agent-config", options),
+  updateAgentConfig: (body: UpdateAgentConfigRequest, options?: RequestInit) =>
+    request<AgentConfigTextResponse>("/settings/agent-config", {
+      method: "PUT",
+      body: JSON.stringify(body),
+      ...options,
+    }),
+  getAgentConfigJson: (options?: RequestInit) => request<any>("/settings/agent-config/json", options),
+  updateAgentConfigJson: (body: any, options?: RequestInit) =>
+    request<any>("/settings/agent-config/json", {
+      method: "PUT",
+      body: JSON.stringify(body),
+      ...options,
+    }),
   getDataSourceSettings: (options?: RequestInit) => request<DataSourceSettings>("/settings/data-sources", options),
   updateDataSourceSettings: (settings: UpdateDataSourceSettingsRequest, options?: RequestInit) =>
     request<DataSourceSettings>("/settings/data-sources", {
@@ -217,6 +231,86 @@ export const api = {
       ilink_bot_id?: string;
       ilink_user_id?: string;
     }>(`/settings/platforms/wechat/transient/status?temp_id=${tempId}`),
+
+  getDingtalkChannels: () => request<DingtalkChannel[]>("/settings/platforms/dingtalk/channels"),
+  createDingtalkChannel: (channel: CreateDingtalkChannelRequest) =>
+    request<DingtalkChannel>("/settings/platforms/dingtalk/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateDingtalkChannel: (id: string, channel: UpdateDingtalkChannelRequest) =>
+    request<DingtalkChannel>(`/settings/platforms/dingtalk/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteDingtalkChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/dingtalk/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getQqChannels: () => request<QqChannel[]>("/settings/platforms/qq/channels"),
+  createQqChannel: (channel: CreateQqChannelRequest) =>
+    request<QqChannel>("/settings/platforms/qq/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateQqChannel: (id: string, channel: UpdateQqChannelRequest) =>
+    request<QqChannel>(`/settings/platforms/qq/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteQqChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/qq/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getEmailChannels: () => request<EmailChannel[]>("/settings/platforms/email/channels"),
+  createEmailChannel: (channel: CreateEmailChannelRequest) =>
+    request<EmailChannel>("/settings/platforms/email/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateEmailChannel: (id: string, channel: UpdateEmailChannelRequest) =>
+    request<EmailChannel>(`/settings/platforms/email/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteEmailChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/email/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getMsteamsChannels: () => request<MsteamsChannel[]>("/settings/platforms/msteams/channels"),
+  createMsteamsChannel: (channel: CreateMsteamsChannelRequest) =>
+    request<MsteamsChannel>("/settings/platforms/msteams/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateMsteamsChannel: (id: string, channel: UpdateMsteamsChannelRequest) =>
+    request<MsteamsChannel>(`/settings/platforms/msteams/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteMsteamsChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/msteams/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getWebsocketChannels: () => request<WebsocketChannel[]>("/settings/platforms/websocket/channels"),
+  createWebsocketChannel: (channel: CreateWebsocketChannelRequest) =>
+    request<WebsocketChannel>("/settings/platforms/websocket/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateWebsocketChannel: (id: string, channel: UpdateWebsocketChannelRequest) =>
+    request<WebsocketChannel>(`/settings/platforms/websocket/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteWebsocketChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/websocket/channels/${id}`, {
+      method: "DELETE",
+    }),
 
   getChannelStatus: () => request<ChannelRuntimeStatus>("/channels/status"),
   startChannels: () => request<ChannelRuntimeActionResponse>("/channels/start", { method: "POST" }),
@@ -514,6 +608,131 @@ export interface UpdateWechatChannelRequest {
   ilink_user_id?: string;
 }
 
+export interface DingtalkChannel {
+  id: string;
+  name: string;
+  client_id: string;
+  client_secret_configured: boolean;
+  enabled: boolean;
+}
+
+export interface CreateDingtalkChannelRequest {
+  name: string;
+  client_id: string;
+  client_secret: string;
+  enabled: boolean;
+}
+
+export interface UpdateDingtalkChannelRequest {
+  name: string;
+  client_id: string;
+  client_secret?: string;
+  enabled: boolean;
+}
+
+export interface QqChannel {
+  id: string;
+  name: string;
+  app_id: string;
+  secret_configured: boolean;
+  enabled: boolean;
+}
+
+export interface CreateQqChannelRequest {
+  name: string;
+  app_id: string;
+  secret: string;
+  enabled: boolean;
+}
+
+export interface UpdateQqChannelRequest {
+  name: string;
+  app_id: string;
+  secret?: string;
+  enabled: boolean;
+}
+
+export interface EmailChannel {
+  id: string;
+  name: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password_configured: boolean;
+  from_address: string;
+  enabled: boolean;
+}
+
+export interface CreateEmailChannelRequest {
+  name: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password: string;
+  from_address: string;
+  enabled: boolean;
+}
+
+export interface UpdateEmailChannelRequest {
+  name: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password?: string;
+  from_address: string;
+  enabled: boolean;
+}
+
+export interface MsteamsChannel {
+  id: string;
+  name: string;
+  app_id: string;
+  app_password_configured: boolean;
+  enabled: boolean;
+}
+
+export interface CreateMsteamsChannelRequest {
+  name: string;
+  app_id: string;
+  app_password: string;
+  enabled: boolean;
+}
+
+export interface UpdateMsteamsChannelRequest {
+  name: string;
+  app_id: string;
+  app_password?: string;
+  enabled: boolean;
+}
+
+export interface WebsocketChannel {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  token_configured: boolean;
+  websocket_requires_token: boolean;
+  enabled: boolean;
+}
+
+export interface CreateWebsocketChannelRequest {
+  name: string;
+  host: string;
+  port: number;
+  token: string;
+  websocket_requires_token: boolean;
+  enabled: boolean;
+}
+
+export interface UpdateWebsocketChannelRequest {
+  name: string;
+  host: string;
+  port: number;
+  token?: string;
+  websocket_requires_token: boolean;
+  enabled: boolean;
+}
+
 export interface DataSourceSettings {
   tushare_token_configured: boolean;
   tushare_token_hint?: string | null;
@@ -547,6 +766,15 @@ export interface FeatureFlagsResponse {
   scheduler_enabled: boolean;
   session_runtime_enabled: boolean;
   env_path: string;
+}
+
+export interface AgentConfigTextResponse {
+  yaml_content: string;
+  config_path: string;
+}
+
+export interface UpdateAgentConfigRequest {
+  yaml_content: string;
 }
 
 export interface ChannelAdapterStatus {
@@ -1279,6 +1507,8 @@ export interface UserProfile {
   tenant_id: string;
   name?: string;
   is_local: boolean;
+  is_tenant?: boolean;  // Has a valid tenant Bearer Token
+  is_admin?: boolean;   // Has a valid admin session token
 }
 
 export interface TenantKey {

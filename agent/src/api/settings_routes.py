@@ -116,6 +116,7 @@ class LLMSettingsResponse(BaseModel):
     reasoning_effort: str
     sse_timeout_seconds: int
     env_path: str
+    is_custom: Optional[bool] = None
     providers: List[LLMProviderOption]
 
 
@@ -131,6 +132,7 @@ class UpdateLLMSettingsRequest(BaseModel):
     timeout_seconds: int = Field(120, ge=1, le=3600)
     max_retries: int = Field(2, ge=0, le=20)
     reasoning_effort: Optional[str] = None
+    use_default: bool = False
 
 
 class DataSourceSettingsResponse(BaseModel):
@@ -138,10 +140,47 @@ class DataSourceSettingsResponse(BaseModel):
 
     tushare_token_configured: bool
     tushare_token_hint: Optional[str] = None
+    iwencai_key_configured: bool = False
+    iwencai_key_hint: Optional[str] = None
+    fred_api_key_configured: bool = False
+    fred_api_key_hint: Optional[str] = None
     baostock_supported: bool
     baostock_installed: bool
     baostock_message: str
     env_path: str
+    ths_cookie_configured: bool
+    ths_cookie_hint: Optional[str] = None
+    is_custom: Optional[bool] = None
+
+
+class ProfileResponse(BaseModel):
+    """User Profile Response."""
+    role: str
+    tenant_id: str
+    name: Optional[str] = None
+    is_local: bool
+    is_tenant: bool = False   # Has a valid tenant Bearer Token
+    is_admin: bool = False    # Has a valid admin session token
+
+
+class FeatureFlagsResponse(BaseModel):
+    """Current feature flag state."""
+
+    shell_tools_enabled: bool
+    scheduler_enabled: bool
+    session_runtime_enabled: bool
+    env_path: str
+
+
+class AgentConfigTextResponse(BaseModel):
+    """Raw YAML agent configuration response."""
+    yaml_content: str
+    config_path: str
+
+
+class UpdateAgentConfigRequest(BaseModel):
+    """Payload to update raw agent configuration."""
+    yaml_content: str
 
 
 class UpdateDataSourceSettingsRequest(BaseModel):
@@ -149,6 +188,13 @@ class UpdateDataSourceSettingsRequest(BaseModel):
 
     tushare_token: Optional[str] = None
     clear_tushare_token: bool = False
+    iwencai_key: Optional[str] = None
+    clear_iwencai_key: bool = False
+    fred_api_key: Optional[str] = None
+    clear_fred_api_key: bool = False
+    ths_cookie: Optional[str] = None
+    clear_ths_cookie: bool = False
+    use_default: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +227,9 @@ LLM_PROVIDER_BY_NAME = {provider.name: provider for provider in LLM_PROVIDERS}
 LLM_REASONING_EFFORTS = {"", "low", "medium", "high", "max"}
 LLM_API_KEY_PLACEHOLDERS = {"", "sk-or-v1-your-key-here", "sk-xxx", "xxx", "gsk_xxx"}
 TUSHARE_TOKEN_PLACEHOLDERS = {"", "your-tushare-token"}
+IWENCAI_KEY_PLACEHOLDERS = {"", "your-iwencai-key"}
+FRED_API_KEY_PLACEHOLDERS = {"", "your-fred-api-key"}
+THS_COOKIE_PLACEHOLDERS = {"", "your-ths-cookie"}
 
 
 # ---------------------------------------------------------------------------
@@ -204,9 +253,30 @@ def _host():
 # ---------------------------------------------------------------------------
 
 
+def _delete_env_values(path: Path, keys_to_delete: List[str]) -> None:
+    """Delete keys from a dotenv file."""
+    if not path.exists():
+        return
+    lines = path.read_text(encoding="utf-8").splitlines()
+    new_lines = []
+    to_delete_set = set(keys_to_delete)
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped.startswith("#") or "=" not in stripped:
+            new_lines.append(line)
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key in to_delete_set:
+            continue
+        new_lines.append(line)
+    path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
 def _baostock_supported() -> bool:
     """Check whether the project has a BaoStock loader implementation."""
     host = _host()
+    if host is not None and getattr(host, "_baostock_supported", None) is not _baostock_supported:
+        return host._baostock_supported()
     agent_dir = host.AGENT_DIR if host is not None else _AGENT_DIR
     loader_dir = agent_dir / "backtest" / "loaders"
     return any((loader_dir / name).exists() for name in ("baostock.py", "baostock_loader.py"))
@@ -214,6 +284,9 @@ def _baostock_supported() -> bool:
 
 def _baostock_installed() -> bool:
     """Check whether the optional BaoStock package is importable."""
+    host = _host()
+    if host is not None and getattr(host, "_baostock_installed", None) is not _baostock_installed:
+        return host._baostock_installed()
     return importlib.util.find_spec("baostock") is not None
 
 
@@ -239,26 +312,52 @@ def _read_settings_env_values() -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+def mask_api_keys(key: str) -> str:
+    if not key:
+        return ""
+    key = key.strip()
+    return key[:4] + "***" + key[-4:] if len(key) > 8 else "***"
+
 def _build_llm_settings_response(
     values: Optional[Dict[str, str]] = None,
+    is_public: bool = False,
 ) -> LLMSettingsResponse:
     """Build the public settings payload from dotenv values."""
     host = _host()
-    env_values = values if values is not None else _read_settings_env_values()
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+
+    is_custom = True
+    if tenant != "default":
+        tenant_env = get_runtime_root() / ".env"
+        if not tenant_env.exists():
+            is_custom = False
+        else:
+            tenant_vals = host._read_env_values(tenant_env)
+            is_custom = "LANGCHAIN_PROVIDER" in tenant_vals
+
+    if tenant != "default":
+        if is_custom:
+            env_values = values if values is not None else tenant_vals
+        else:
+            env_values = {}
+    else:
+        env_values = values if values is not None else _read_settings_env_values()
+
     provider_name = env_values.get("LANGCHAIN_PROVIDER", "openai").strip().lower()
     provider = LLM_PROVIDER_BY_NAME.get(provider_name, LLM_PROVIDER_BY_NAME["openai"])
     api_key = env_values.get(provider.api_key_env or "", "") if provider.api_key_env else ""
     api_key_configured = host._is_configured_secret(api_key, LLM_API_KEY_PLACEHOLDERS)
+    
     api_key_hint = None
     if provider.auth_type == "oauth":
         try:
             from src.providers.openai_codex import get_openai_codex_login_status
-
             token = get_openai_codex_login_status()
         except Exception:
             token = None
         api_key_configured = bool(token)
-        api_key_hint = None
+
     return LLMSettingsResponse(
         provider=provider.name,
         model_name=env_values.get("LANGCHAIN_MODEL_NAME", provider.default_model),
@@ -273,36 +372,76 @@ def _build_llm_settings_response(
         reasoning_effort=env_values.get("LANGCHAIN_REASONING_EFFORT", "").strip().lower(),
         sse_timeout_seconds=host._coerce_int(env_values.get("VIBE_TRADING_SSE_TIMEOUT", "90"), 90),
         env_path=host._project_relative_path(host.ENV_PATH),
+        is_custom=is_custom,
         providers=LLM_PROVIDERS,
     )
 
 
 def _build_data_source_settings_response(
     values: Optional[Dict[str, str]] = None,
+    is_public: bool = False,
 ) -> DataSourceSettingsResponse:
     """Build the public data source settings payload."""
     host = _host()
-    env_values = values if values is not None else _read_settings_env_values()
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+
+    is_custom = True
+    tenant_vals = {}
+    if tenant != "default":
+        tenant_env = get_runtime_root() / ".env"
+        if not tenant_env.exists():
+            is_custom = False
+        else:
+            tenant_vals = host._read_env_values(tenant_env)
+            is_custom = any(k in tenant_vals for k in ["TUSHARE_TOKEN", "FRED_API_KEY", "VIBE_TRADING_IWENCAI_KEY", "THS_COOKIE"])
+
+    if tenant != "default":
+        if is_custom:
+            env_values = values if values is not None else tenant_vals
+        else:
+            env_values = {}
+    else:
+        env_values = values if values is not None else _read_settings_env_values()
+
     token = env_values.get("TUSHARE_TOKEN", "")
     token_configured = host._is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS)
-    # Late-access baostock helpers for monkeypatch compat.
-    baostock_sup = getattr(host, "_baostock_supported", _baostock_supported)
-    baostock_ins = getattr(host, "_baostock_installed", _baostock_installed)
-    supported = baostock_sup()
-    installed = baostock_ins()
+    iwencai_key = env_values.get("VIBE_TRADING_IWENCAI_KEY", "")
+    iwencai_key_configured = host._is_configured_secret(iwencai_key, IWENCAI_KEY_PLACEHOLDERS)
+    fred_key = env_values.get("FRED_API_KEY", "")
+    fred_api_key_configured = host._is_configured_secret(fred_key, FRED_API_KEY_PLACEHOLDERS)
+    ths_cookie = env_values.get("THS_COOKIE", "")
+    ths_cookie_configured = host._is_configured_secret(ths_cookie, THS_COOKIE_PLACEHOLDERS)
+    supported = _baostock_supported()
+    installed = _baostock_installed()
     if supported:
         baostock_message = "BaoStock loader is available."
     elif installed:
-        baostock_message = "BaoStock package is installed, but this project has no BaoStock loader."
+        baostock_message = (
+            "BaoStock package is installed, but this project has no BaoStock loader."
+        )
     else:
         baostock_message = "No BaoStock loader is registered in this project."
+
+    tushare_token_hint = None
+    iwencai_key_hint = None
+    fred_api_key_hint = None
+    ths_cookie_hint = None
+
     return DataSourceSettingsResponse(
         tushare_token_configured=token_configured,
-        tushare_token_hint=None,
+        tushare_token_hint=tushare_token_hint,
+        iwencai_key_configured=iwencai_key_configured,
+        iwencai_key_hint=iwencai_key_hint,
+        fred_api_key_configured=fred_api_key_configured,
+        fred_api_key_hint=fred_api_key_hint,
         baostock_supported=supported,
         baostock_installed=installed,
         baostock_message=baostock_message,
         env_path=host._project_relative_path(host.ENV_PATH),
+        ths_cookie_configured=ths_cookie_configured,
+        ths_cookie_hint=ths_cookie_hint,
+        is_custom=is_custom,
     )
 
 
@@ -356,12 +495,13 @@ def register_settings_routes(
             "ensure api_server is imported before calling this function"
         )
 
-    if require_auth is None:
-        require_auth = host.require_auth
-    require_local_or_auth = getattr(host, "require_local_or_auth", require_auth)
+    require_auth = host.require_auth
+    if require_local_or_auth is None:
+        require_local_or_auth = getattr(host, "require_local_or_auth", require_auth)
     if require_settings_write_auth is None:
         require_settings_write_auth = getattr(host, "require_settings_write_auth", require_auth)
     require_admin = getattr(host, "require_admin", require_auth)
+    require_event_stream_auth = getattr(host, "require_event_stream_auth", require_auth)
 
     # --- Routes ---
 
@@ -370,18 +510,54 @@ def register_settings_routes(
         response_model=LLMSettingsResponse,
         dependencies=[Depends(require_local_or_auth)],
     )
-    async def get_llm_settings():
+    async def get_llm_settings(request: Request):
         """Return project-local LLM settings for the Web UI."""
-        return _build_llm_settings_response()
+        host_ref = _host()
+        is_public = not (host_ref._is_request_admin(request) or host_ref._is_local_or_lan_client(request))
+        return _build_llm_settings_response(is_public=is_public)
 
     @app.put(
         "/settings/llm",
         response_model=LLMSettingsResponse,
         dependencies=[Depends(require_settings_write_auth)],
     )
-    async def update_llm_settings(payload: UpdateLLMSettingsRequest):
+    async def update_llm_settings(request: Request, payload: UpdateLLMSettingsRequest):
         """Persist project-local LLM settings and update the running process."""
         host_ref = _host()
+        is_public = not (host_ref._is_request_admin(request) or host_ref._is_local_or_lan_client(request))
+        
+        from src.config.paths import active_tenant_var
+        tenant = active_tenant_var.get()
+        if payload.use_default:
+            if tenant != "default":
+                LLM_KEYS_TO_CLEAN = [
+                    "LANGCHAIN_PROVIDER",
+                    "LANGCHAIN_MODEL_NAME",
+                    "LANGCHAIN_TEMPERATURE",
+                    "TIMEOUT_SECONDS",
+                    "MAX_RETRIES",
+                    "LANGCHAIN_REASONING_EFFORT",
+                    "OPENAI_API_KEY",
+                    "OPENAI_BASE_URL",
+                    "OPENROUTER_API_KEY",
+                    "OPENROUTER_BASE_URL",
+                    "GEMINI_API_KEY",
+                    "GEMINI_BASE_URL",
+                    "ANTHROPIC_API_KEY",
+                    "ANTHROPIC_BASE_URL",
+                    "DEEPSEEK_API_KEY",
+                    "DEEPSEEK_BASE_URL",
+                    "QWEN_API_KEY",
+                    "QWEN_BASE_URL",
+                    "OLLAMA_BASE_URL",
+                ]
+                _delete_env_values(host_ref.ENV_PATH, LLM_KEYS_TO_CLEAN)
+                for key in LLM_KEYS_TO_CLEAN:
+                    os.environ.pop(key, None)
+                return _build_llm_settings_response(is_public=is_public)
+            else:
+                raise HTTPException(status_code=400, detail="Admin cannot revert to global default")
+
         provider_name = payload.provider.strip().lower()
         provider = LLM_PROVIDER_BY_NAME.get(provider_name)
         if provider is None:
@@ -437,11 +613,15 @@ def register_settings_routes(
                 updates[provider.api_key_env] = ""
             elif payload.api_key is not None and payload.api_key.strip():
                 api_key = payload.api_key.strip()
-                updates[provider.api_key_env] = (
-                    api_key
-                    if host_ref._is_configured_secret(api_key, LLM_API_KEY_PLACEHOLDERS)
-                    else ""
-                )
+                if api_key == "********":
+                    if provider.api_key_env in current_values:
+                        updates[provider.api_key_env] = current_values[provider.api_key_env]
+                else:
+                    updates[provider.api_key_env] = (
+                        api_key
+                        if host_ref._is_configured_secret(api_key, LLM_API_KEY_PLACEHOLDERS)
+                        else ""
+                    )
             elif provider.api_key_env in current_values and host_ref._is_configured_secret(
                 current_values[provider.api_key_env],
                 LLM_API_KEY_PLACEHOLDERS,
@@ -452,45 +632,126 @@ def register_settings_routes(
 
         host_ref._write_env_values(host_ref.ENV_PATH, updates)
         _sync_runtime_env(provider, updates)
-        return _build_llm_settings_response(host_ref._read_env_values(host_ref.ENV_PATH))
+        return _build_llm_settings_response(host_ref._read_env_values(host_ref.ENV_PATH), is_public=is_public)
 
     @app.get(
         "/settings/data-sources",
         response_model=DataSourceSettingsResponse,
         dependencies=[Depends(require_local_or_auth)],
     )
-    async def get_data_source_settings():
+    async def get_data_source_settings(request: Request):
         """Return project-local data source credentials for the Web UI."""
-        return _build_data_source_settings_response()
+        host_ref = _host()
+        is_public = not (host_ref._is_request_admin(request) or host_ref._is_local_or_lan_client(request))
+        return _build_data_source_settings_response(is_public=is_public)
 
     @app.put(
         "/settings/data-sources",
         response_model=DataSourceSettingsResponse,
         dependencies=[Depends(require_settings_write_auth)],
     )
-    async def update_data_source_settings(payload: UpdateDataSourceSettingsRequest):
+    async def update_data_source_settings(request: Request, payload: UpdateDataSourceSettingsRequest):
         """Persist project-local data source credentials and update the running process."""
         host_ref = _host()
+        is_public = not (host_ref._is_request_admin(request) or host_ref._is_local_or_lan_client(request))
+        
+        from src.config.paths import active_tenant_var
+        tenant = active_tenant_var.get()
+        if payload.use_default:
+            if tenant != "default":
+                DS_KEYS_TO_CLEAN = ["TUSHARE_TOKEN", "FRED_API_KEY", "VIBE_TRADING_IWENCAI_KEY", "THS_COOKIE"]
+                _delete_env_values(host_ref.ENV_PATH, DS_KEYS_TO_CLEAN)
+                for key in DS_KEYS_TO_CLEAN:
+                    os.environ.pop(key, None)
+                return _build_data_source_settings_response(is_public=is_public)
+            else:
+                raise HTTPException(status_code=400, detail="Admin cannot revert to global default")
+
         current_values = _read_settings_env_values()
         updates: Dict[str, str] = {}
 
+        # Tushare Token
         if payload.clear_tushare_token:
             updates["TUSHARE_TOKEN"] = ""
         elif payload.tushare_token is not None and payload.tushare_token.strip():
-            updates["TUSHARE_TOKEN"] = payload.tushare_token.strip()
+            val = payload.tushare_token.strip()
+            if val == "********":
+                if "TUSHARE_TOKEN" in current_values:
+                    updates["TUSHARE_TOKEN"] = current_values["TUSHARE_TOKEN"]
+            else:
+                updates["TUSHARE_TOKEN"] = val
         elif "TUSHARE_TOKEN" in current_values:
             updates["TUSHARE_TOKEN"] = current_values["TUSHARE_TOKEN"]
 
+        # Iwencai Key
+        if payload.clear_iwencai_key:
+            updates["VIBE_TRADING_IWENCAI_KEY"] = ""
+        elif payload.iwencai_key is not None and payload.iwencai_key.strip():
+            val = payload.iwencai_key.strip()
+            if val == "********":
+                if "VIBE_TRADING_IWENCAI_KEY" in current_values:
+                    updates["VIBE_TRADING_IWENCAI_KEY"] = current_values["VIBE_TRADING_IWENCAI_KEY"]
+            else:
+                updates["VIBE_TRADING_IWENCAI_KEY"] = val
+        elif "VIBE_TRADING_IWENCAI_KEY" in current_values:
+            updates["VIBE_TRADING_IWENCAI_KEY"] = current_values["VIBE_TRADING_IWENCAI_KEY"]
+
+        # Fred API Key
+        if payload.clear_fred_api_key:
+            updates["FRED_API_KEY"] = ""
+        elif payload.fred_api_key is not None and payload.fred_api_key.strip():
+            val = payload.fred_api_key.strip()
+            if val == "********":
+                if "FRED_API_KEY" in current_values:
+                    updates["FRED_API_KEY"] = current_values["FRED_API_KEY"]
+            else:
+                updates["FRED_API_KEY"] = val
+        elif "FRED_API_KEY" in current_values:
+            updates["FRED_API_KEY"] = current_values["FRED_API_KEY"]
+
+        # THS Cookie
+        if payload.clear_ths_cookie:
+            updates["THS_COOKIE"] = ""
+        elif payload.ths_cookie is not None and payload.ths_cookie.strip():
+            val = payload.ths_cookie.strip()
+            if val == "********":
+                if "THS_COOKIE" in current_values:
+                    updates["THS_COOKIE"] = current_values["THS_COOKIE"]
+            else:
+                updates["THS_COOKIE"] = val
+        elif "THS_COOKIE" in current_values:
+            updates["THS_COOKIE"] = current_values["THS_COOKIE"]
+
         if updates:
             host_ref._write_env_values(host_ref.ENV_PATH, updates)
-            token = updates.get("TUSHARE_TOKEN", "").strip()
-            if host_ref._is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS):
-                os.environ["TUSHARE_TOKEN"] = token
-            else:
-                os.environ.pop("TUSHARE_TOKEN", None)
+            if "TUSHARE_TOKEN" in updates:
+                token = updates.get("TUSHARE_TOKEN", "").strip()
+                if host_ref._is_configured_secret(token, TUSHARE_TOKEN_PLACEHOLDERS):
+                    os.environ["TUSHARE_TOKEN"] = token
+                else:
+                    os.environ.pop("TUSHARE_TOKEN", None)
+            if "VIBE_TRADING_IWENCAI_KEY" in updates:
+                iwencai = updates.get("VIBE_TRADING_IWENCAI_KEY", "").strip()
+                if host_ref._is_configured_secret(iwencai, IWENCAI_KEY_PLACEHOLDERS):
+                    os.environ["VIBE_TRADING_IWENCAI_KEY"] = iwencai
+                else:
+                    os.environ.pop("VIBE_TRADING_IWENCAI_KEY", None)
+            if "FRED_API_KEY" in updates:
+                fred = updates.get("FRED_API_KEY", "").strip()
+                if host_ref._is_configured_secret(fred, FRED_API_KEY_PLACEHOLDERS):
+                    os.environ["FRED_API_KEY"] = fred
+                else:
+                    os.environ.pop("FRED_API_KEY", None)
+            if "THS_COOKIE" in updates:
+                cookie = updates.get("THS_COOKIE", "").strip()
+                if host_ref._is_configured_secret(cookie, THS_COOKIE_PLACEHOLDERS):
+                    os.environ["THS_COOKIE"] = cookie
+                else:
+                    os.environ.pop("THS_COOKIE", None)
 
         return _build_data_source_settings_response(
-            host_ref._read_env_values(host_ref.ENV_PATH)
+            host_ref._read_env_values(host_ref.ENV_PATH),
+            is_public=is_public
         )
 
     # --- Custom THS Cookie Test/Sync Endpoints ---
@@ -609,6 +870,57 @@ def register_settings_routes(
             host._ADMIN_SESSION_TOKENS.remove(token)
         return {"status": "success"}
 
+    @app.post(
+        "/settings/register",
+        response_model=TenantKeyItem,
+    )
+    async def register_tenant(payload: CreateTenantKeyRequest):
+        """Public tenant self-registration endpoint."""
+        import secrets
+        import datetime
+        import re
+        host = _host()
+        
+        name = payload.name.strip()
+        # 1. 验证格式与长度 (2-20字符，中英文、数字、下划线、减号、空格)
+        if not re.match(r"^[\u4e00-\u9fa5a-zA-Z0-9_\-\s]{2,20}$", name):
+            raise HTTPException(
+                status_code=400,
+                detail="Nickname must be 2-20 characters, containing only letters, numbers, Chinese, spaces, dashes or underscores."
+            )
+            
+        # 2. 查重
+        keys = host._load_tenant_keys()
+        normalized_name = name.lower()
+        for k in keys:
+            if k["name"].strip().lower() == normalized_name:
+                raise HTTPException(status_code=400, detail="Tenant name already exists")
+                
+        # 3. 生成密钥与 tenant_id
+        raw_key = "tide_t_" + secrets.token_hex(16)
+        tenant_id = "tenant_" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:12]
+        
+        new_key = {
+            "key": raw_key,
+            "tenant_id": tenant_id,
+            "name": name,
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "is_active": True,
+        }
+        keys.append(new_key)
+        host._save_tenant_keys(keys)
+        
+        # 4. 创建隔离目录
+        tenant_dir = host._get_active_runtime_dir() / "tenants" / tenant_id
+        tenant_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 初始化专属的配置说明文件
+        env_file = tenant_dir / ".env"
+        if not env_file.exists():
+            env_file.write_text(f"# Created for tenant: {name}\n", encoding="utf-8")
+            
+        return TenantKeyItem(**new_key)
+
     # --- Multi-tenant Keys CRUD Endpoints ---
 
     @app.get(
@@ -633,7 +945,7 @@ def register_settings_routes(
         import datetime
         host = _host()
         
-        raw_key = "vibe_t_" + secrets.token_hex(16)
+        raw_key = "tide_t_" + secrets.token_hex(16)
         tenant_id = "tenant_" + hashlib.sha256(raw_key.encode("utf-8")).hexdigest()[:12]
         
         keys = host._load_tenant_keys()
@@ -689,3 +1001,443 @@ def register_settings_routes(
             raise HTTPException(status_code=404, detail="Tenant key not found")
         host._save_tenant_keys(filtered_keys)
         return {"status": "success"}
+
+    # --- Extended settings & dashboard routes ---
+
+    @app.get(
+        "/settings/profile",
+        response_model=ProfileResponse,
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def get_settings_profile(request: Request):
+        """Return login identity and active workspace/tenant info."""
+        from src.config.paths import active_tenant_var
+        tenant = active_tenant_var.get() or "default"
+        host_ref = _host()
+
+        # --- Admin status: valid admin session token in header ---
+        admin_elevated = host_ref._is_request_admin(request)
+
+        # --- Tenant status: check if Bearer token resolves to a tenant key ---
+        is_tenant = False
+        tenant_name: Optional[str] = None
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            admin_keys = host_ref._configured_api_keys()
+            tenant_keys_list = host_ref._load_tenant_keys()
+            tenant_key_values = [k["key"] for k in tenant_keys_list if k.get("is_active", True)]
+            is_admin_key = any(__import__("hmac").compare_digest(token, k) for k in admin_keys)
+            is_tenant = bool(token) and not is_admin_key and token in tenant_key_values
+            if is_tenant and tenant != "default":
+                for item in tenant_keys_list:
+                    if item.get("tenant_id") == tenant:
+                        tenant_name = item.get("name")
+                        break
+
+        # --- Role derivation ---
+        if is_tenant:
+            role = "tenant"
+            name = tenant_name or tenant
+        elif admin_elevated:
+            role = "admin"
+            name = "Admin"
+        else:
+            role = "guest"
+            name = "Guest"
+
+        return ProfileResponse(
+            role=role,
+            tenant_id=tenant,
+            name=name,
+            is_local=host_ref._is_local_or_lan_client(request),
+            is_tenant=is_tenant,
+            is_admin=admin_elevated,
+        )
+
+    @app.get(
+        "/settings/dashboard-layout",
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def get_dashboard_layout():
+        """Load dashboard layout configuration for the active tenant."""
+        from src.config.paths import active_tenant_var
+        tenant = active_tenant_var.get()
+        host_ref = _host()
+        layout_path = host_ref.AGENT_DIR / "runs" / f"dashboard_layout_{tenant}.json"
+        if layout_path.exists():
+            try:
+                with open(layout_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.warning("Failed to read dashboard layout for tenant %s: %s", tenant, e)
+        return {}
+
+    @app.put(
+        "/settings/dashboard-layout",
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_dashboard_layout(payload: dict):
+        """Save dashboard layout configuration for the active tenant."""
+        from src.config.paths import active_tenant_var
+        tenant = active_tenant_var.get()
+        host_ref = _host()
+        layout_path = host_ref.AGENT_DIR / "runs" / f"dashboard_layout_{tenant}.json"
+        try:
+            os.makedirs(layout_path.parent, exist_ok=True)
+            with open(layout_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            return {"status": "success"}
+        except Exception as e:
+            logger.error("Failed to save dashboard layout for tenant %s: %s", tenant, e)
+            raise HTTPException(status_code=500, detail=f"Failed to save layout: {e}")
+
+    @app.get(
+        "/settings/dashboard/graph",
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def get_dashboard_graph():
+        """Load ECharts relation graph topology for the active tenant."""
+        from src.config.paths import active_tenant_var
+        from src.swarm.simulation_graph import SimulationGraphManager
+        tenant = active_tenant_var.get()
+        try:
+            manager = SimulationGraphManager(tenant)
+            return manager.load()
+        except Exception as e:
+            logger.error("Failed to load dashboard graph for tenant %s: %s", tenant, e)
+            return {"nodes": [], "links": []}
+
+    @app.get(
+        "/settings/dashboard/react-logs",
+        dependencies=[Depends(require_event_stream_auth)],
+    )
+    async def get_dashboard_react_logs(request: Request, stream: bool = True):
+        """Get ReACT logs for the active tenant. Supports optional SSE streaming."""
+        from src.config.paths import active_tenant_var
+        tenant = active_tenant_var.get()
+        host_ref = _host()
+        log_path = host_ref.AGENT_DIR / "runs" / f"agent_log_{tenant}.jsonl"
+
+        if not stream:
+            logs = []
+            if log_path.exists():
+                try:
+                    with open(log_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                logs.append(json.loads(line.strip()))
+                except Exception as e:
+                    logger.warning("Failed to read ReACT logs array for tenant %s: %s", tenant, e)
+            return logs
+
+        # SSE Streaming mode
+        from fastapi.responses import StreamingResponse
+        import asyncio
+
+        async def event_generator():
+            if log_path.exists():
+                try:
+                    with open(log_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                yield f"data: {line.strip()}\n\n"
+                except Exception:
+                    pass
+            
+            last_size = log_path.stat().st_size if log_path.exists() else 0
+            while True:
+                if await request.is_disconnected():
+                    break
+                if log_path.exists():
+                    curr_size = log_path.stat().st_size
+                    if curr_size > last_size:
+                        try:
+                            with open(log_path, "r", encoding="utf-8") as f:
+                                f.seek(last_size)
+                                for line in f:
+                                    if line.strip():
+                                        yield f"data: {line.strip()}\n\n"
+                            last_size = curr_size
+                        except Exception:
+                            pass
+                await asyncio.sleep(1)
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    @app.post(
+        "/settings/dashboard/agent-chat",
+        dependencies=[Depends(require_auth)],
+    )
+    async def dashboard_agent_chat(payload: dict):
+        """Direct NLP chat with specific Swarm Agent presets."""
+        agent_id = payload.get("agent_id", "")
+        message = payload.get("message", "")
+        if not agent_id or not message:
+            raise HTTPException(status_code=400, detail="agent_id and message are required")
+
+        AGENT_PERSONAS = {
+            "yuzi": "你是游资·游侠，热衷于超短线交易和炒作题材（如低空经济、AI算力）。你言辞犀利、行动迅速，极度关注涨停板 and 资金流入。请用大字报风格和黑客终端语气分析万丰奥威或其它股票，必须包含具体的阻力位、买入点 and 游资博弈心理。",
+            "beixiang": "你是北向资金（机构投资者代表），倾向于长线价值投资与宏观配置。你行事稳健，注重筹码分布、基本面估值以及ETF异动，用理性、专业、机构视角的语气来分析市场和个股的估值水平及资金安全垫。",
+            "SwarmConductor": "你是多智能体投研管线的指挥官（SwarmConductor），负责汇总技术面、基本面 and 风控面的辩论共识。用全面、不偏不倚的分析语气，客观权衡板块题材机会与回撤风险，给出综合结论。"
+        }
+
+        persona = AGENT_PERSONAS.get(agent_id, AGENT_PERSONAS["SwarmConductor"])
+        
+        from src.providers.chat import ChatLLM
+        try:
+            llm = ChatLLM()
+            messages = [
+                {"role": "system", "content": persona},
+                {"role": "user", "content": message}
+            ]
+            response = llm.chat(messages)
+            return {"response": response.content or "(无回复)"}
+        except Exception as e:
+            logger.error("Agent chat failed: %s", e)
+            raise HTTPException(status_code=500, detail=f"LLM chat call failed: {e}")
+
+    @app.get(
+        "/settings/dashboard/market-data",
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    def get_dashboard_market_data():
+        """Load real-time market data (watchlist, sectors, longhubang, limitup) for A-shares."""
+        from src.swarm.market_board import (
+            fetch_tencent_quotes,
+            fetch_eastmoney_sectors,
+            fetch_eastmoney_longhu,
+            fetch_eastmoney_limitup,
+            fetch_dynamic_yuzi,
+            fetch_dynamic_portfolio,
+            fetch_dynamic_kol_and_alerts,
+            fetch_dynamic_lattice
+        )
+        from src.config.paths import active_tenant_var, get_runtime_root
+        import sqlite3
+        
+        tenant = active_tenant_var.get() or "default"
+        db_path = get_runtime_root() / f"stocks_{tenant}.db"
+        
+        watchlist_symbols = []
+        if db_path.exists():
+            try:
+                conn = sqlite3.connect(str(db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Watchlist'")
+                if cursor.fetchone():
+                    cursor.execute("SELECT code FROM Watchlist")
+                    watchlist_symbols = [row["code"] for row in cursor.fetchall()]
+                conn.close()
+            except Exception as e:
+                logger.error("Failed to query Watchlist from DB: %s", e)
+                
+        if watchlist_symbols:
+            cleaned_symbols = [s.split(".")[0].strip() for s in watchlist_symbols]
+            cleaned_symbols = list(filter(None, dict.fromkeys(cleaned_symbols)))
+        else:
+            cleaned_symbols = ["300750", "600519", "002594", "301550", "601398"]
+
+        try:
+            watchlist = fetch_tencent_quotes(cleaned_symbols)
+            sectors = fetch_eastmoney_sectors()
+            longhu = fetch_eastmoney_longhu()
+            limitup = fetch_eastmoney_limitup()
+            
+            yuzi = fetch_dynamic_yuzi()
+            portfolio_data = fetch_dynamic_portfolio(tenant)
+            kol_and_alerts = fetch_dynamic_kol_and_alerts(cleaned_symbols)
+            lattice = fetch_dynamic_lattice()
+            
+            sentiment_score = 50
+            up_count = sum(1 for s in sectors if s["change"] > 0)
+            if sectors:
+                sentiment_score = int((up_count / len(sectors)) * 100)
+                
+            return {
+                "watchlist": watchlist,
+                "sectors": sectors,
+                "longhu": longhu,
+                "limitup": limitup,
+                "yuzi": yuzi,
+                "portfolio": portfolio_data.get("positions", []),
+                "netAsset": portfolio_data.get("netAsset", 0.0),
+                "kol": kol_and_alerts.get("opinions", []),
+                "alerts": kol_and_alerts.get("alerts", []),
+                "lattice": lattice,
+                "sentiment": {
+                    "score": sentiment_score,
+                    "description": "多头偏强" if sentiment_score > 60 else "空头偏强" if sentiment_score < 40 else "震荡平衡"
+                }
+            }
+        except Exception as e:
+            logger.error("Failed to load dashboard market data: %s", e)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get(
+        "/settings/feature-flags",
+        response_model=FeatureFlagsResponse,
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def get_feature_flags():
+        """Return current feature flag state."""
+        host_ref = _host()
+        try:
+            from src.api.scheduled_routes import _scheduled_research_scheduler_enabled
+            scheduler_enabled = _scheduled_research_scheduler_enabled()
+        except ImportError:
+            scheduler_enabled = True
+
+        shell_enabled = host_ref._env_shell_tools_enabled() if hasattr(host_ref, "_env_shell_tools_enabled") else False
+        
+        return FeatureFlagsResponse(
+            shell_tools_enabled=shell_enabled,
+            scheduler_enabled=scheduler_enabled,
+            session_runtime_enabled=os.getenv("ENABLE_SESSION_RUNTIME", "true").lower() == "true",
+            env_path=host_ref._project_relative_path(host_ref.ENV_PATH) if hasattr(host_ref, "_project_relative_path") else host_ref.ENV_PATH,
+        )
+
+    @app.get(
+        "/settings/agent-config",
+        response_model=AgentConfigTextResponse,
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def get_agent_config():
+        """Read the raw agent.yaml config content."""
+        from src.config.paths import get_config_path
+        path = get_config_path()
+        content = ""
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+        else:
+            content = """# TideTrading Agent Configuration File
+# Configure global settings, MCP servers, and IM channels here.
+
+# MCP Servers configurations:
+# mcp_servers:
+#   weather:
+#     type: stdio
+#     command: npx
+#     args: ["-y", "@modelcontextprotocol/server-weather"]
+
+# IM Channels configurations:
+# channels:
+#   send_progress: true
+#   reply_timeout_s: 600
+#   telegram:
+#     enabled: false
+#     token: "YOUR_TELEGRAM_BOT_TOKEN"
+#     allow_from: ["YOUR_CHAT_ID"]
+#   feishu:
+#     enabled: false
+#     app_id: "YOUR_FEISHU_APP_ID"
+#     app_secret: "YOUR_FEISHU_APP_SECRET"
+#   weixin:
+#     enabled: false
+#     token: "YOUR_WECHAT_ILINK_TOKEN"
+"""
+        return AgentConfigTextResponse(
+            yaml_content=content,
+            config_path=str(path),
+        )
+
+    @app.put(
+        "/settings/agent-config",
+        response_model=AgentConfigTextResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_agent_config(payload: UpdateAgentConfigRequest):
+        """Write the raw agent.yaml config content and reload runtime."""
+        import yaml
+        from src.config.paths import get_config_path
+        from src.config.schema import AgentConfig
+        
+        try:
+            parsed = yaml.safe_load(payload.yaml_content) or {}
+            if not isinstance(parsed, dict):
+                raise ValueError("YAML root must be an object")
+            AgentConfig.model_validate(parsed)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid configuration format: {e}")
+        
+        path = get_config_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(payload.yaml_content, encoding="utf-8")
+        
+        import sys
+        host_ref = _host()
+        if host_ref and getattr(host_ref, "_channel_runtime", None) is not None:
+            try:
+                logger.info("Config changed, reloading channel runtime...")
+                await host_ref._channel_runtime.stop()
+                host_ref._channel_runtime = None
+                host_ref._get_channel_runtime()
+                if os.getenv("VIBE_TRADING_CHANNELS_AUTO_START", "").strip().lower() in {"1", "true", "yes"}:
+                    await host_ref._start_channel_runtime()
+            except Exception as ex:
+                logger.exception("Failed to restart channel runtime after config update: %s", ex)
+                
+        return AgentConfigTextResponse(
+            yaml_content=payload.yaml_content,
+            config_path=str(path),
+        )
+
+    @app.get(
+        "/settings/agent-config/json",
+        response_model=dict,
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def get_agent_config_json():
+        """Read the agent.yaml config as a JSON object."""
+        import yaml
+        from src.config.paths import get_config_path
+        path = get_config_path()
+        if path.exists():
+            try:
+                content = path.read_text(encoding="utf-8")
+                parsed = yaml.safe_load(content) or {}
+                if not isinstance(parsed, dict):
+                    parsed = {}
+                return parsed
+            except Exception as e:
+                logger.error("Failed to parse agent.yaml: %s", e)
+                return {}
+        return {}
+
+    @app.put(
+        "/settings/agent-config/json",
+        response_model=dict,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_agent_config_json(payload: dict):
+        """Write the agent.yaml config from a JSON object and reload runtime."""
+        import yaml
+        from src.config.paths import get_config_path
+        from src.config.schema import AgentConfig
+        
+        try:
+            AgentConfig.model_validate(payload)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid configuration format: {e}")
+            
+        path = get_config_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        yaml_content = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
+        path.write_text(yaml_content, encoding="utf-8")
+        
+        import sys
+        host_ref = _host()
+        if host_ref and getattr(host_ref, "_channel_runtime", None) is not None:
+            try:
+                logger.info("Config changed via JSON API, reloading channel runtime...")
+                await host_ref._channel_runtime.stop()
+                host_ref._channel_runtime = None
+                host_ref._get_channel_runtime()
+                if os.getenv("VIBE_TRADING_CHANNELS_AUTO_START", "").strip().lower() in {"1", "true", "yes"}:
+                    await host_ref._start_channel_runtime()
+            except Exception as ex:
+                logger.exception("Failed to restart channel runtime after JSON config update: %s", ex)
+                
+        return payload

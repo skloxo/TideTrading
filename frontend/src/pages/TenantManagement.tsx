@@ -55,7 +55,7 @@ export function TenantManagement() {
   };
 
   useEffect(() => {
-    if (profile?.role === "admin") {
+    if (profile?.is_admin) {
       fetchTenantKeys();
     }
   }, [profile]);
@@ -117,6 +117,7 @@ export function TenantManagement() {
     }
   };
 
+
   if (profileLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center text-muted-foreground animate-pulse">
@@ -125,7 +126,7 @@ export function TenantManagement() {
     );
   }
 
-  if (profile?.role !== "admin") {
+  if (!profile?.is_admin) {
     const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
       <div className="mx-auto max-w-7xl space-y-4 p-4">
@@ -141,30 +142,36 @@ export function TenantManagement() {
         </div>
         <div className="rounded-lg border bg-card p-4 shadow-sm space-y-4 max-w-xl">
           <div className="flex items-center gap-2 border-b pb-3">
-            <ShieldAlert className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold">管理员提权 (租户管理)</h2>
+            <ShieldAlert className="h-4 w-4 text-amber-500" />
+            <h2 className="text-base font-semibold">{isZh ? "管理员提权 (租户管理)" : "Admin Elevation (Tenant Management)"}</h2>
           </div>
-          <p className="text-xs text-muted-foreground">此页面属于系统租户管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
+          <p className="text-xs text-muted-foreground">
+            {isZh 
+              ? "此页面属于系统租户管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。" 
+              : "This page is for tenant keys management and is restricted to admin. Please enter admin credentials to elevate."}
+          </p>
           <form onSubmit={handleAdminElevate} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">{isZh ? "管理员账号" : "Admin Username"}</span>
                 <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} className={fieldClass} required />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
-                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder="请输入管理员密码" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">{isZh ? "管理员密码" : "Admin Password"}</span>
+                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder={isZh ? "请输入管理员密码" : "Password"} required />
               </label>
             </div>
-            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
               {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-              进行管理员提权
+              {isZh ? "进行管理员提权" : "Elevate as Admin"}
             </button>
           </form>
         </div>
       </div>
     );
   }
+
+
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">

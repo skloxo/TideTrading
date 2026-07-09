@@ -97,11 +97,11 @@ FEISHU_CHANNELS_JSON = Path(__file__).resolve().parents[3] / "sessions" / "feish
 WECHAT_CHANNELS_JSON = _get_active_runtime_dir() / "wechat_channels.json"
 
 def _get_feishu_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var
+    from src.config.paths import active_tenant_var, get_runtime_root
     tenant = active_tenant_var.get()
     if tenant == "default":
         return Path(__file__).resolve().parents[3] / "sessions" / "feishu_channels.json"
-    return _get_active_runtime_dir() / "feishu_channels.json"
+    return get_runtime_root() / "feishu_channels.json"
 
 def _load_feishu_channels() -> list[dict[str, Any]]:
     """Load Feishu channels from the persistent JSON file. Handles legacy migration."""
@@ -122,11 +122,11 @@ def _save_feishu_channels(channels: list[dict[str, Any]]) -> None:
 
 def _get_wechat_channels_json_path() -> Path:
     """Get path to the WeChat channels persistent JSON file based on active tenant."""
-    from src.config.paths import active_tenant_var
+    from src.config.paths import active_tenant_var, get_runtime_root
     tenant = active_tenant_var.get()
     if tenant == "default":
         return WECHAT_CHANNELS_JSON
-    return _get_active_runtime_dir() / "wechat_channels.json"
+    return get_runtime_root() / "wechat_channels.json"
 
 def _load_wechat_channels() -> list[dict[str, Any]]:
     """Load WeChat channels from the persistent JSON file."""
@@ -142,6 +142,116 @@ def _load_wechat_channels() -> list[dict[str, Any]]:
 def _save_wechat_channels(channels: list[dict[str, Any]]) -> None:
     """Save WeChat channels to the persistent JSON file."""
     path = _get_wechat_channels_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def _get_dingtalk_channels_json_path() -> Path:
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+    if tenant == "default":
+        return Path(__file__).resolve().parents[3] / "sessions" / "dingtalk_channels.json"
+    return get_runtime_root() / "dingtalk_channels.json"
+
+def _load_dingtalk_channels() -> list[dict[str, Any]]:
+    channels = []
+    path = _get_dingtalk_channels_json_path()
+    if path.exists():
+        try:
+            channels = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("Failed to read %s: %s", path, e)
+    return channels
+
+def _save_dingtalk_channels(channels: list[dict[str, Any]]) -> None:
+    path = _get_dingtalk_channels_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def _get_qq_channels_json_path() -> Path:
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+    if tenant == "default":
+        return Path(__file__).resolve().parents[3] / "sessions" / "qq_channels.json"
+    return get_runtime_root() / "qq_channels.json"
+
+def _load_qq_channels() -> list[dict[str, Any]]:
+    channels = []
+    path = _get_qq_channels_json_path()
+    if path.exists():
+        try:
+            channels = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("Failed to read %s: %s", path, e)
+    return channels
+
+def _save_qq_channels(channels: list[dict[str, Any]]) -> None:
+    path = _get_qq_channels_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def _get_email_channels_json_path() -> Path:
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+    if tenant == "default":
+        return Path(__file__).resolve().parents[3] / "sessions" / "email_channels.json"
+    return get_runtime_root() / "email_channels.json"
+
+def _load_email_channels() -> list[dict[str, Any]]:
+    channels = []
+    path = _get_email_channels_json_path()
+    if path.exists():
+        try:
+            channels = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("Failed to read %s: %s", path, e)
+    return channels
+
+def _save_email_channels(channels: list[dict[str, Any]]) -> None:
+    path = _get_email_channels_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def _get_msteams_channels_json_path() -> Path:
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+    if tenant == "default":
+        return Path(__file__).resolve().parents[3] / "sessions" / "msteams_channels.json"
+    return get_runtime_root() / "msteams_channels.json"
+
+def _load_msteams_channels() -> list[dict[str, Any]]:
+    channels = []
+    path = _get_msteams_channels_json_path()
+    if path.exists():
+        try:
+            channels = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("Failed to read %s: %s", path, e)
+    return channels
+
+def _save_msteams_channels(channels: list[dict[str, Any]]) -> None:
+    path = _get_msteams_channels_json_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def _get_websocket_channels_json_path() -> Path:
+    from src.config.paths import active_tenant_var, get_runtime_root
+    tenant = active_tenant_var.get()
+    if tenant == "default":
+        return Path(__file__).resolve().parents[3] / "sessions" / "websocket_channels.json"
+    return get_runtime_root() / "websocket_channels.json"
+
+def _load_websocket_channels() -> list[dict[str, Any]]:
+    channels = []
+    path = _get_websocket_channels_json_path()
+    if path.exists():
+        try:
+            channels = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.error("Failed to read %s: %s", path, e)
+    return channels
+
+def _save_websocket_channels(channels: list[dict[str, Any]]) -> None:
+    path = _get_websocket_channels_json_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -164,13 +274,17 @@ async def _reload_platform_manager() -> None:
             from src.platforms import PlatformManager, FeishuAdapter, WechatAdapter
             _platform_manager = PlatformManager(session_service, tenant_id="default")
             
-            tenants = ["default"]
+            tenants = []
             try:
-                for k in host._load_tenant_keys():
-                    if k.get("is_active", True):
-                        tenants.append(k["tenant_id"])
+                tenant_keys_list = host._load_tenant_keys()
+                active_tenant_ids = [k["tenant_id"] for k in tenant_keys_list if k.get("is_active", True)]
+                if active_tenant_ids:
+                    tenants.extend(active_tenant_ids)
+                else:
+                    tenants.append("default")
             except Exception as e:
                 logger.error("Failed to load tenant keys during platform reload: %s", e)
+                tenants = ["default"]
 
             from src.config.paths import active_tenant_var
             original_tenant = active_tenant_var.get()
@@ -210,6 +324,121 @@ async def _reload_platform_manager() -> None:
                                 tenant_id=t,
                             )
                             _platform_manager.register_adapter(w_adapter)
+                            registered_count += 1
+
+                    # 3. Load DingTalk channels
+                    ding_chans = _load_dingtalk_channels()
+                    for dchan in ding_chans:
+                        if dchan.get("enabled", True):
+                            from src.channels.dingtalk import DingTalkChannel
+                            from src.platforms.upstream_adapter import UpstreamChannelAdapter
+                            d_config = {
+                                "enabled": True,
+                                "client_id": dchan.get("client_id", ""),
+                                "client_secret": dchan.get("client_secret", ""),
+                                "allow_from": ["*"],
+                            }
+                            d_adapter = UpstreamChannelAdapter(
+                                channel_class=DingTalkChannel,
+                                channel_id=dchan["id"],
+                                name=dchan["name"],
+                                config_dict=d_config,
+                                tenant_id=t,
+                            )
+                            _platform_manager.register_adapter(d_adapter)
+                            registered_count += 1
+
+                    # 4. Load QQ channels
+                    qq_chans = _load_qq_channels()
+                    for qchan in qq_chans:
+                        if qchan.get("enabled", True):
+                            from src.channels.qq import QQChannel
+                            from src.platforms.upstream_adapter import UpstreamChannelAdapter
+                            q_config = {
+                                "enabled": True,
+                                "app_id": qchan.get("app_id", ""),
+                                "secret": qchan.get("secret", ""),
+                                "allow_from": ["*"],
+                            }
+                            q_adapter = UpstreamChannelAdapter(
+                                channel_class=QQChannel,
+                                channel_id=qchan["id"],
+                                name=qchan["name"],
+                                config_dict=q_config,
+                                tenant_id=t,
+                            )
+                            _platform_manager.register_adapter(q_adapter)
+                            registered_count += 1
+
+                    # 5. Load Email channels
+                    email_chans = _load_email_channels()
+                    for echan in email_chans:
+                        if echan.get("enabled", True):
+                            from src.channels.email import EmailChannel
+                            from src.platforms.upstream_adapter import UpstreamChannelAdapter
+                            e_config = {
+                                "enabled": True,
+                                "smtp_host": echan.get("smtp_host", ""),
+                                "smtp_port": int(echan.get("smtp_port", 587)),
+                                "smtp_username": echan.get("smtp_username", ""),
+                                "smtp_password": echan.get("smtp_password", ""),
+                                "from_address": echan.get("from_address", ""),
+                                "imap_host": "",  # Only enable outbound notification for tenant
+                            }
+                            e_adapter = UpstreamChannelAdapter(
+                                channel_class=EmailChannel,
+                                channel_id=echan["id"],
+                                name=echan["name"],
+                                config_dict=e_config,
+                                tenant_id=t,
+                            )
+                            _platform_manager.register_adapter(e_adapter)
+                            registered_count += 1
+
+                    # 6. Load MS Teams channels
+                    msteams_chans = _load_msteams_channels()
+                    for mchan in msteams_chans:
+                        if mchan.get("enabled", True):
+                            from src.channels.msteams import MSTeamsChannel
+                            from src.platforms.upstream_adapter import UpstreamChannelAdapter
+                            m_config = {
+                                "enabled": True,
+                                "app_id": mchan.get("app_id", ""),
+                                "app_password": mchan.get("app_password", ""),
+                                "allow_from": ["*"],
+                            }
+                            m_adapter = UpstreamChannelAdapter(
+                                channel_class=MSTeamsChannel,
+                                channel_id=mchan["id"],
+                                name=mchan["name"],
+                                config_dict=m_config,
+                                tenant_id=t,
+                            )
+                            _platform_manager.register_adapter(m_adapter)
+                            registered_count += 1
+
+                    # 7. Load WebSocket channels
+                    ws_chans = _load_websocket_channels()
+                    for wschan in ws_chans:
+                        if wschan.get("enabled", True):
+                            from src.channels.websocket import WebSocketChannel
+                            from src.platforms.upstream_adapter import UpstreamChannelAdapter
+                            ws_config = {
+                                "enabled": True,
+                                "host": wschan.get("host", "127.0.0.1"),
+                                "port": int(wschan.get("port", 8765)),
+                                "token": wschan.get("token", ""),
+                                "websocket_requires_token": bool(wschan.get("websocket_requires_token", True)),
+                                "allow_from": ["*"],
+                            }
+                            ws_adapter = UpstreamChannelAdapter(
+                                channel_class=WebSocketChannel,
+                                channel_id=wschan["id"],
+                                name=wschan["name"],
+                                config_dict=ws_config,
+                                tenant_id=t,
+                            )
+                            _platform_manager.register_adapter(ws_adapter)
                             registered_count += 1
             finally:
                 active_tenant_var.set(original_tenant)
@@ -853,10 +1082,554 @@ def register_channels_routes(
                                 logger.error(f"[WeChat iLink] Failed to send welcome message: {type(ex).__name__}: {ex}\n{traceback.format_exc()}")
                                 
                         asyncio.create_task(_send_welcome())
-                
                 return {"status": "success"}
         except Exception as e:
-            logger.warning("Failed to process official iLink QR status data: %s", e)
+            logger.error(f"[WeChat iLink] Error handling QR status confirmation: {e}")
             return {"status": "waiting"}
-
         return {"status": "waiting"}
+
+    # --- Custom DingTalk / QQ / Email / MS Teams CRUD Routes ---
+
+    class DingtalkChannelResponse(BaseModel):
+        id: str
+        name: str
+        client_id: str
+        client_secret_configured: bool
+        enabled: bool
+
+    class CreateDingtalkChannelRequest(BaseModel):
+        name: str
+        client_id: str
+        client_secret: str
+        enabled: bool = True
+
+    class UpdateDingtalkChannelRequest(BaseModel):
+        name: str
+        client_id: str
+        client_secret: Optional[str] = None
+        enabled: bool = True
+
+    @app.get(
+        "/settings/platforms/dingtalk/channels",
+        response_model=List[DingtalkChannelResponse],
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def list_dingtalk_channels():
+        channels = _load_dingtalk_channels()
+        return [
+            DingtalkChannelResponse(
+                id=c["id"],
+                name=c["name"],
+                client_id=c["client_id"],
+                client_secret_configured=bool(c.get("client_secret")),
+                enabled=c.get("enabled", True),
+            )
+            for c in channels
+        ]
+
+    @app.post(
+        "/settings/platforms/dingtalk/channels",
+        response_model=DingtalkChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def create_dingtalk_channel(payload: CreateDingtalkChannelRequest):
+        import secrets
+        channels = _load_dingtalk_channels()
+        new_id = f"chan_{secrets.token_hex(4)}"
+        new_channel = {
+            "id": new_id,
+            "name": payload.name.strip() or f"钉钉通道_{new_id[:4]}",
+            "client_id": payload.client_id.strip(),
+            "client_secret": payload.client_secret.strip(),
+            "enabled": payload.enabled,
+        }
+        channels.append(new_channel)
+        _save_dingtalk_channels(channels)
+        await _reload_platform_manager()
+        return DingtalkChannelResponse(
+            id=new_channel["id"],
+            name=new_channel["name"],
+            client_id=new_channel["client_id"],
+            client_secret_configured=bool(new_channel["client_secret"]),
+            enabled=new_channel["enabled"],
+        )
+
+    @app.put(
+        "/settings/platforms/dingtalk/channels/{channel_id}",
+        response_model=DingtalkChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_dingtalk_channel(channel_id: str, payload: UpdateDingtalkChannelRequest):
+        channels = _load_dingtalk_channels()
+        target = next((c for c in channels if c["id"] == channel_id), None)
+        if not target:
+            raise HTTPException(status_code=404, detail="DingTalk channel not found")
+        target["name"] = payload.name.strip()
+        target["client_id"] = payload.client_id.strip()
+        target["enabled"] = payload.enabled
+        if payload.client_secret is not None:
+            target["client_secret"] = payload.client_secret.strip()
+        _save_dingtalk_channels(channels)
+        await _reload_platform_manager()
+        return DingtalkChannelResponse(
+            id=target["id"],
+            name=target["name"],
+            client_id=target["client_id"],
+            client_secret_configured=bool(target.get("client_secret")),
+            enabled=target["enabled"],
+        )
+
+    @app.delete(
+        "/settings/platforms/dingtalk/channels/{channel_id}",
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def delete_dingtalk_channel(channel_id: str):
+        channels = _load_dingtalk_channels()
+        channels = [c for c in channels if c["id"] != channel_id]
+        _save_dingtalk_channels(channels)
+        await _reload_platform_manager()
+        return {"status": "success"}
+
+    # QQ
+    class QqChannelResponse(BaseModel):
+        id: str
+        name: str
+        app_id: str
+        secret_configured: bool
+        enabled: bool
+
+    class CreateQqChannelRequest(BaseModel):
+        name: str
+        app_id: str
+        secret: str
+        enabled: bool = True
+
+    class UpdateQqChannelRequest(BaseModel):
+        name: str
+        app_id: str
+        secret: Optional[str] = None
+        enabled: bool = True
+
+    @app.get(
+        "/settings/platforms/qq/channels",
+        response_model=List[QqChannelResponse],
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def list_qq_channels():
+        channels = _load_qq_channels()
+        return [
+            QqChannelResponse(
+                id=c["id"],
+                name=c["name"],
+                app_id=c["app_id"],
+                secret_configured=bool(c.get("secret")),
+                enabled=c.get("enabled", True),
+            )
+            for c in channels
+        ]
+
+    @app.post(
+        "/settings/platforms/qq/channels",
+        response_model=QqChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def create_qq_channel(payload: CreateQqChannelRequest):
+        import secrets
+        channels = _load_qq_channels()
+        new_id = f"chan_{secrets.token_hex(4)}"
+        new_channel = {
+            "id": new_id,
+            "name": payload.name.strip() or f"QQ通道_{new_id[:4]}",
+            "app_id": payload.app_id.strip(),
+            "secret": payload.secret.strip(),
+            "enabled": payload.enabled,
+        }
+        channels.append(new_channel)
+        _save_qq_channels(channels)
+        await _reload_platform_manager()
+        return QqChannelResponse(
+            id=new_channel["id"],
+            name=new_channel["name"],
+            app_id=new_channel["app_id"],
+            secret_configured=bool(new_channel["secret"]),
+            enabled=new_channel["enabled"],
+        )
+
+    @app.put(
+        "/settings/platforms/qq/channels/{channel_id}",
+        response_model=QqChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_qq_channel(channel_id: str, payload: UpdateQqChannelRequest):
+        channels = _load_qq_channels()
+        target = next((c for c in channels if c["id"] == channel_id), None)
+        if not target:
+            raise HTTPException(status_code=404, detail="QQ channel not found")
+        target["name"] = payload.name.strip()
+        target["app_id"] = payload.app_id.strip()
+        target["enabled"] = payload.enabled
+        if payload.secret is not None:
+            target["secret"] = payload.secret.strip()
+        _save_qq_channels(channels)
+        await _reload_platform_manager()
+        return QqChannelResponse(
+            id=target["id"],
+            name=target["name"],
+            app_id=target["app_id"],
+            secret_configured=bool(target.get("secret")),
+            enabled=target["enabled"],
+        )
+
+    @app.delete(
+        "/settings/platforms/qq/channels/{channel_id}",
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def delete_qq_channel(channel_id: str):
+        channels = _load_qq_channels()
+        channels = [c for c in channels if c["id"] != channel_id]
+        _save_qq_channels(channels)
+        await _reload_platform_manager()
+        return {"status": "success"}
+
+    # Email
+    class EmailChannelResponse(BaseModel):
+        id: str
+        name: str
+        smtp_host: str
+        smtp_port: int
+        smtp_username: str
+        smtp_password_configured: bool
+        from_address: str
+        enabled: bool
+
+    class CreateEmailChannelRequest(BaseModel):
+        name: str
+        smtp_host: str
+        smtp_port: int
+        smtp_username: str
+        smtp_password: str
+        from_address: str
+        enabled: bool = True
+
+    class UpdateEmailChannelRequest(BaseModel):
+        name: str
+        smtp_host: str
+        smtp_port: int
+        smtp_username: str
+        smtp_password: Optional[str] = None
+        from_address: str
+        enabled: bool = True
+
+    @app.get(
+        "/settings/platforms/email/channels",
+        response_model=List[EmailChannelResponse],
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def list_email_channels():
+        channels = _load_email_channels()
+        return [
+            EmailChannelResponse(
+                id=c["id"],
+                name=c["name"],
+                smtp_host=c["smtp_host"],
+                smtp_port=c["smtp_port"],
+                smtp_username=c["smtp_username"],
+                smtp_password_configured=bool(c.get("smtp_password")),
+                from_address=c.get("from_address", ""),
+                enabled=c.get("enabled", True),
+            )
+            for c in channels
+        ]
+
+    @app.post(
+        "/settings/platforms/email/channels",
+        response_model=EmailChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def create_email_channel(payload: CreateEmailChannelRequest):
+        import secrets
+        channels = _load_email_channels()
+        new_id = f"chan_{secrets.token_hex(4)}"
+        new_channel = {
+            "id": new_id,
+            "name": payload.name.strip() or f"邮件通道_{new_id[:4]}",
+            "smtp_host": payload.smtp_host.strip(),
+            "smtp_port": payload.smtp_port,
+            "smtp_username": payload.smtp_username.strip(),
+            "smtp_password": payload.smtp_password.strip(),
+            "from_address": payload.from_address.strip(),
+            "enabled": payload.enabled,
+        }
+        channels.append(new_channel)
+        _save_email_channels(channels)
+        await _reload_platform_manager()
+        return EmailChannelResponse(
+            id=new_channel["id"],
+            name=new_channel["name"],
+            smtp_host=new_channel["smtp_host"],
+            smtp_port=new_channel["smtp_port"],
+            smtp_username=new_channel["smtp_username"],
+            smtp_password_configured=bool(new_channel["smtp_password"]),
+            from_address=new_channel["from_address"],
+            enabled=new_channel["enabled"],
+        )
+
+    @app.put(
+        "/settings/platforms/email/channels/{channel_id}",
+        response_model=EmailChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_email_channel(channel_id: str, payload: UpdateEmailChannelRequest):
+        channels = _load_email_channels()
+        target = next((c for c in channels if c["id"] == channel_id), None)
+        if not target:
+            raise HTTPException(status_code=404, detail="Email channel not found")
+        target["name"] = payload.name.strip()
+        target["smtp_host"] = payload.smtp_host.strip()
+        target["smtp_port"] = payload.smtp_port
+        target["smtp_username"] = payload.smtp_username.strip()
+        target["from_address"] = payload.from_address.strip()
+        target["enabled"] = payload.enabled
+        if payload.smtp_password is not None:
+            target["smtp_password"] = payload.smtp_password.strip()
+        _save_email_channels(channels)
+        await _reload_platform_manager()
+        return EmailChannelResponse(
+            id=target["id"],
+            name=target["name"],
+            smtp_host=target["smtp_host"],
+            smtp_port=target["smtp_port"],
+            smtp_username=target["smtp_username"],
+            smtp_password_configured=bool(target.get("smtp_password")),
+            from_address=target["from_address"],
+            enabled=target["enabled"],
+        )
+
+    @app.delete(
+        "/settings/platforms/email/channels/{channel_id}",
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def delete_email_channel(channel_id: str):
+        channels = _load_email_channels()
+        channels = [c for c in channels if c["id"] != channel_id]
+        _save_email_channels(channels)
+        await _reload_platform_manager()
+        return {"status": "success"}
+
+    # MSTeams
+    class MsteamsChannelResponse(BaseModel):
+        id: str
+        name: str
+        app_id: str
+        app_password_configured: bool
+        enabled: bool
+
+    class CreateMsteamsChannelRequest(BaseModel):
+        name: str
+        app_id: str
+        app_password: str
+        enabled: bool = True
+
+    class UpdateMsteamsChannelRequest(BaseModel):
+        name: str
+        app_id: str
+        app_password: Optional[str] = None
+        enabled: bool = True
+
+    @app.get(
+        "/settings/platforms/msteams/channels",
+        response_model=List[MsteamsChannelResponse],
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def list_msteams_channels():
+        channels = _load_msteams_channels()
+        return [
+            MsteamsChannelResponse(
+                id=c["id"],
+                name=c["name"],
+                app_id=c["app_id"],
+                app_password_configured=bool(c.get("app_password")),
+                enabled=c.get("enabled", True),
+            )
+            for c in channels
+        ]
+
+    @app.post(
+        "/settings/platforms/msteams/channels",
+        response_model=MsteamsChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def create_msteams_channel(payload: CreateMsteamsChannelRequest):
+        import secrets
+        channels = _load_msteams_channels()
+        new_id = f"chan_{secrets.token_hex(4)}"
+        new_channel = {
+            "id": new_id,
+            "name": payload.name.strip() or f"Teams通道_{new_id[:4]}",
+            "app_id": payload.app_id.strip(),
+            "app_password": payload.app_password.strip(),
+            "enabled": payload.enabled,
+        }
+        channels.append(new_channel)
+        _save_msteams_channels(channels)
+        await _reload_platform_manager()
+        return MsteamsChannelResponse(
+            id=new_channel["id"],
+            name=new_channel["name"],
+            app_id=new_channel["app_id"],
+            app_password_configured=bool(new_channel["app_password"]),
+            enabled=new_channel["enabled"],
+        )
+
+    @app.put(
+        "/settings/platforms/msteams/channels/{channel_id}",
+        response_model=MsteamsChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_msteams_channel(channel_id: str, payload: UpdateMsteamsChannelRequest):
+        channels = _load_msteams_channels()
+        target = next((c for c in channels if c["id"] == channel_id), None)
+        if not target:
+            raise HTTPException(status_code=404, detail="MSTeams channel not found")
+        target["name"] = payload.name.strip()
+        target["app_id"] = payload.app_id.strip()
+        target["enabled"] = payload.enabled
+        if payload.app_password is not None:
+            target["app_password"] = payload.app_password.strip()
+        _save_msteams_channels(channels)
+        await _reload_platform_manager()
+        return MsteamsChannelResponse(
+            id=target["id"],
+            name=target["name"],
+            app_id=target["app_id"],
+            app_password_configured=bool(target.get("app_password")),
+            enabled=target["enabled"],
+        )
+
+    @app.delete(
+        "/settings/platforms/msteams/channels/{channel_id}",
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def delete_msteams_channel(channel_id: str):
+        channels = _load_msteams_channels()
+        channels = [c for c in channels if c["id"] != channel_id]
+        _save_msteams_channels(channels)
+        await _reload_platform_manager()
+        return {"status": "success"}
+
+    # WebSocket
+    class WebsocketChannelResponse(BaseModel):
+        id: str
+        name: str
+        host: str
+        port: int
+        token_configured: bool
+        websocket_requires_token: bool
+        enabled: bool
+
+    class CreateWebsocketChannelRequest(BaseModel):
+        name: str
+        host: str
+        port: int
+        token: str
+        websocket_requires_token: bool = True
+        enabled: bool = True
+
+    class UpdateWebsocketChannelRequest(BaseModel):
+        name: str
+        host: str
+        port: int
+        token: Optional[str] = None
+        websocket_requires_token: bool = True
+        enabled: bool = True
+
+    @app.get(
+        "/settings/platforms/websocket/channels",
+        response_model=List[WebsocketChannelResponse],
+        dependencies=[Depends(require_local_or_auth)],
+    )
+    async def list_websocket_channels():
+        channels = _load_websocket_channels()
+        return [
+            WebsocketChannelResponse(
+                id=c["id"],
+                name=c["name"],
+                host=c["host"],
+                port=c["port"],
+                token_configured=bool(c.get("token")),
+                websocket_requires_token=c.get("websocket_requires_token", True),
+                enabled=c.get("enabled", True),
+            )
+            for c in channels
+        ]
+
+    @app.post(
+        "/settings/platforms/websocket/channels",
+        response_model=WebsocketChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def create_websocket_channel(payload: CreateWebsocketChannelRequest):
+        import secrets
+        channels = _load_websocket_channels()
+        new_id = f"chan_{secrets.token_hex(4)}"
+        new_channel = {
+            "id": new_id,
+            "name": payload.name.strip() or f"WebSocket通道_{new_id[:4]}",
+            "host": payload.host.strip(),
+            "port": payload.port,
+            "token": payload.token.strip(),
+            "websocket_requires_token": payload.websocket_requires_token,
+            "enabled": payload.enabled,
+        }
+        channels.append(new_channel)
+        _save_websocket_channels(channels)
+        await _reload_platform_manager()
+        return WebsocketChannelResponse(
+            id=new_channel["id"],
+            name=new_channel["name"],
+            host=new_channel["host"],
+            port=new_channel["port"],
+            token_configured=bool(new_channel["token"]),
+            websocket_requires_token=new_channel["websocket_requires_token"],
+            enabled=new_channel["enabled"],
+        )
+
+    @app.put(
+        "/settings/platforms/websocket/channels/{channel_id}",
+        response_model=WebsocketChannelResponse,
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def update_websocket_channel(channel_id: str, payload: UpdateWebsocketChannelRequest):
+        channels = _load_websocket_channels()
+        target = next((c for c in channels if c["id"] == channel_id), None)
+        if not target:
+            raise HTTPException(status_code=404, detail="WebSocket channel not found")
+        target["name"] = payload.name.strip()
+        target["host"] = payload.host.strip()
+        target["port"] = payload.port
+        target["websocket_requires_token"] = payload.websocket_requires_token
+        target["enabled"] = payload.enabled
+        if payload.token is not None:
+            target["token"] = payload.token.strip()
+        _save_websocket_channels(channels)
+        await _reload_platform_manager()
+        return WebsocketChannelResponse(
+            id=target["id"],
+            name=target["name"],
+            host=target["host"],
+            port=target["port"],
+            token_configured=bool(target.get("token")),
+            websocket_requires_token=target["websocket_requires_token"],
+            enabled=target["enabled"],
+        )
+
+    @app.delete(
+        "/settings/platforms/websocket/channels/{channel_id}",
+        dependencies=[Depends(require_settings_write_auth)],
+    )
+    async def delete_websocket_channel(channel_id: str):
+        channels = _load_websocket_channels()
+        channels = [c for c in channels if c["id"] != channel_id]
+        _save_websocket_channels(channels)
+        await _reload_platform_manager()
+        return {"status": "success"}

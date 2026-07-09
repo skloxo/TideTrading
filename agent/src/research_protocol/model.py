@@ -163,7 +163,7 @@ class ResearchProtocol(BaseModel):
 def _reject_pandas_or_nonfinite(value: Any, *, path: str) -> None:
     module = type(value).__module__
     name = type(value).__name__
-    if module.startswith("pandas.") and name in {"DataFrame", "Series"}:
+    if (module == "pandas" or module.startswith("pandas.")) and name in {"DataFrame", "Series"}:
         raise ValueError(f"{path}: pandas objects are not allowed in ResearchProtocol")
     if isinstance(value, float) and not math.isfinite(value):
         raise ValueError(f"{path}: floats must be finite")
