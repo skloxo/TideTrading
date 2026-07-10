@@ -99,5 +99,5 @@ export const router = createBrowserRouter([
   },
   // Standalone pages — outside Layout, no auth required to render
   { path: "/login", element: wrap(TenantLogin) },
-  { path: "/claim-sandbox", element: wrap(TenantRegister) },
+  { path: "/claim", element: wrap(TenantRegister) },
 ]);
