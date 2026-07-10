@@ -285,7 +285,7 @@
     "clearApiKey": "清除已保存的 API 密钥",
     "channels": {
       "title": "IM 通道",
-      "description": "将聊天适配器接入 Web UI 和 CLI 使用的同一套 Vibe-Trading 会话运行时。",
+      "description": "将聊天适配器接入 Web UI 和 CLI 使用的同一套 TideTrading 会话运行时。",
       "runtime": "运行时",
       "running": "运行中",
       "stopped": "已停止",
