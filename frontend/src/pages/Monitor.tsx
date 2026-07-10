@@ -771,7 +771,7 @@ export function Monitor() {
             <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-amber-500" />
-                <h2 className="text-xs font-bold text-foreground">管理员身份管理</h2>
+                <h2 className="text-xs font-bold text-foreground">项目配置提权管理</h2>
               </div>
               <button
                 type="button"
@@ -783,16 +783,16 @@ export function Monitor() {
               </button>
             </div>
             
-            <p className="text-[11px] text-muted-foreground leading-relaxed pt-1.5">您当前处于系统管理员身份，可以修改管理员账户密码以保护服务端口及敏感配置。</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed pt-1.5">您当前已开启项目配置与运维功能，可以修改提权验证密码以保护服务端口及敏感配置。</p>
             
             <form onSubmit={handleAdminChangePassword} className="space-y-3 pt-2">
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block space-y-1">
-                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">原管理员密码</span>
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">原提权验证密码</span>
                   <input type="password" value={adminOldPassword} onChange={(e) => setAdminOldPassword(e.target.value)} className={fieldClass} placeholder="旧密码" required />
                 </label>
                 <label className="block space-y-1">
-                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">新管理员密码</span>
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">新提权验证密码</span>
                   <input type="password" value={adminNewPassword} onChange={(e) => setAdminNewPassword(e.target.value)} className={fieldClass} placeholder="新密码" required />
                 </label>
                 <label className="block space-y-1">
@@ -806,7 +806,7 @@ export function Monitor() {
                 className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[10px] font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-70 cursor-pointer shadow"
               >
                 {changingPwd ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                保存管理员密码
+                保存提权密码
               </button>
             </form>
           </div>

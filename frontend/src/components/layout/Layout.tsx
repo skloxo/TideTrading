@@ -1,14 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Activity, BarChart3, Bot, ChevronDown, ChevronRight, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, Cpu, KeyRound, ShieldCheck, LogOut } from "lucide-react";
+import { Activity, BarChart3, Bot, ChevronDown, ChevronRight, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, Cpu, KeyRound, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, isAuthRequiredError, type SessionItem, type UserProfile } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent";
 import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
 import { ICPFooter } from "@/components/layout/ICPFooter";
-import { clearApiAuthKey, clearAdminToken, getApiAuthKey } from "@/lib/apiAuth";
+import { clearApiAuthKey, getApiAuthKey } from "@/lib/apiAuth";
 
 export function Layout() {
   const { t, i18n: i18nHook } = useTranslation();
@@ -497,26 +497,6 @@ export function Layout() {
                       )}
                     </div>
                   </div>
-                  {/* Admin status & logout */}
-                  {profile.is_admin && (
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="flex items-center gap-1 text-amber-400">
-                        <ShieldCheck className="h-3 w-3" />
-                        {isZhLayout ? "项目运维模式" : "Ops Mode"}
-                      </span>
-                      <button
-                        onClick={() => {
-                          clearAdminToken();
-                          window.location.reload();
-                        }}
-                        className="flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                        title={isZhLayout ? "退出提权" : "Exit elevation"}
-                      >
-                        <LogOut className="h-3 w-3" />
-                        <span>{isZhLayout ? "锁定" : "Lock"}</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
               <ICPFooter className="border-t border-border/30 mt-2 pt-2 !pb-0" />

@@ -39,9 +39,6 @@ export function ProjectSettings() {
   const [form, setForm] = useState<LLMFormState | null>(null);
   const [dataSettings, setDataSettings] = useState<DataSourceSettings | null>(null);
   const [featureFlags, setFeatureFlags] = useState<FeatureFlagsResponse | null>(null);
-  const [yamlConfig, setYamlConfig] = useState<string>("");
-  const [configPath, setConfigPath] = useState<string>("");
-  const [yamlSaving, setYamlSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dataSaving, setDataSaving] = useState(false);
@@ -101,19 +98,16 @@ export function ProjectSettings() {
   const loadGlobalSettings = async () => {
     try {
       setLoading(true);
-      const [llmData, dataData, flagsData, configData, configJsonData] = await Promise.all([
+      const [llmData, dataData, flagsData, configJsonData] = await Promise.all([
         api.getLLMSettings({ headers: { "X-Vibe-Scope": "global" } }),
         api.getDataSourceSettings({ headers: { "X-Vibe-Scope": "global" } }),
         api.getFeatureFlags({ headers: { "X-Vibe-Scope": "global" } }),
-        api.getAgentConfig({ headers: { "X-Vibe-Scope": "global" } }),
         api.getAgentConfigJson({ headers: { "X-Vibe-Scope": "global" } }),
       ]);
       setSettings(llmData);
       setForm(toForm(llmData));
       setDataSettings(dataData);
       setFeatureFlags(flagsData);
-      setYamlConfig(configData.yaml_content);
-      setConfigPath(configData.config_path);
       setAgentConfigJson(configJsonData || {});
       if (configJsonData && configJsonData.channels) {
         setSendProgress(configJsonData.channels.send_progress !== false);
@@ -247,30 +241,6 @@ export function ProjectSettings() {
     }
   };
 
-  const submitYamlConfig = async (e: FormEvent) => {
-    e.preventDefault();
-    setYamlSaving(true);
-    try {
-      const updated = await api.updateAgentConfig({
-        yaml_content: yamlConfig
-      }, { headers: { "X-Vibe-Scope": "global" } });
-      setYamlConfig(updated.yaml_content);
-      // Reload JSON state too when raw yaml is saved
-      const updatedJson = await api.getAgentConfigJson({ headers: { "X-Vibe-Scope": "global" } });
-      setAgentConfigJson(updatedJson || {});
-      if (updatedJson && updatedJson.channels) {
-        setSendProgress(updatedJson.channels.send_progress !== false);
-        setSendToolHints(!!updatedJson.channels.send_tool_hints);
-        setSendMaxRetries(updatedJson.channels.send_max_retries ?? 2);
-        setReplyTimeoutS(updatedJson.channels.reply_timeout_s ?? 600);
-      }
-      toast.success(isZh ? "高级配置文件已成功保存并重新加载" : "Advanced configuration saved and reloaded successfully");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to save advanced configuration");
-    } finally {
-      setYamlSaving(false);
-    }
-  };
 
   const submitVisualChannelConfig = async (e: FormEvent) => {
     e.preventDefault();
@@ -289,9 +259,6 @@ export function ProjectSettings() {
       const response = await api.updateAgentConfigJson(updated, { headers: { "X-Vibe-Scope": "global" } });
       setAgentConfigJson(response);
       
-      // Sync back to raw yaml string too
-      const yamlData = await api.getAgentConfig({ headers: { "X-Vibe-Scope": "global" } });
-      setYamlConfig(yamlData.yaml_content);
       toast.success(isZh ? "高级推送与交互配置已成功保存" : "Notification settings saved successfully");
     } catch (err: any) {
       toast.error((isZh ? "保存失败: " : "Save failed: ") + (err?.message || "Unknown error"));
@@ -361,10 +328,6 @@ export function ProjectSettings() {
 
       await api.updateAgentConfigJson(updatedConfig, { headers: { "X-Vibe-Scope": "global" } });
       setAgentConfigJson(updatedConfig);
-      
-      const fallbackConfig = await api.getAgentConfig({ headers: { "X-Vibe-Scope": "global" } });
-      setYamlConfig(fallbackConfig.yaml_content);
-
       toast.success(isZh ? "保存 MCP 服务成功" : "Saved MCP server successfully");
       setIsMcpModalOpen(false);
     } catch (err: any) {
@@ -385,9 +348,6 @@ export function ProjectSettings() {
       }
       await api.updateAgentConfigJson(updatedConfig, { headers: { "X-Vibe-Scope": "global" } });
       setAgentConfigJson(updatedConfig);
-
-      const fallbackConfig = await api.getAgentConfig({ headers: { "X-Vibe-Scope": "global" } });
-      setYamlConfig(fallbackConfig.yaml_content);
 
       toast.success(isZh ? "删除 MCP 服务成功" : "Deleted MCP server successfully");
     } catch (err: any) {
@@ -980,49 +940,7 @@ export function ProjectSettings() {
         </form>
       </div>
 
-      {/* Advanced configuration source details (default collapsed) */}
-      <details className="group rounded-lg border bg-card p-3.5 shadow-sm space-y-4">
-        <summary className="flex cursor-pointer items-center justify-between font-semibold text-sm text-muted-foreground hover:text-foreground select-none">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-primary" />
-            <span>{isZh ? "项目高级配置文件编辑 (agent.yaml - 高级调试选项)" : "Advanced Configuration (agent.yaml - Advanced Mode)"}</span>
-          </div>
-          <span className="transition group-open:rotate-180">▼</span>
-        </summary>
-        
-        <form onSubmit={submitYamlConfig} className="space-y-4 pt-4 border-t border-border/40 mt-3 animate-in fade-in duration-200">
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {isZh 
-              ? "直接编辑后台的 agent.yaml 配置文件。仅供开发或维护人员在必要时手动编辑其他底层策略参数使用。" 
-              : "Directly edit the agent.yaml file. Intended for development and testing usage only."}
-          </p>
-          
-          <label className="grid gap-2">
-            <span className={labelClass}>{isZh ? "配置文件内容 (YAML 格式)" : "Configuration Content (YAML format)"}</span>
-            <textarea
-              value={yamlConfig}
-              onChange={(e) => setYamlConfig(e.target.value)}
-              className={`${fieldClass} font-mono h-80 resize-y`}
-              placeholder="# Enter agent.yaml configuration..."
-            />
-          </label>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-            <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{isZh ? "文件绝对路径" : "Absolute File Path"}: </span>
-              <span className="break-all font-mono">{configPath}</span>
-            </div>
-            <button
-              type="submit"
-              disabled={yamlSaving}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm"
-            >
-              {yamlSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {yamlSaving ? (isZh ? "保存并加载中..." : "Saving & Reloading...") : (isZh ? "保存并重载配置" : "Save & Reload Config")}
-            </button>
-          </div>
-        </form>
-      </details>
+
 
       {/* MCP Modal */}
       {isMcpModalOpen && (
