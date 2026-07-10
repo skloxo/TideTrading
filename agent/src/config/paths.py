@@ -262,9 +262,20 @@ def _get_active_runtime_dir() -> Path:
     if "PYTEST_CURRENT_TEST" in os.environ:
         return Path.home() / ".vibe-trading-cnx"
     old_dir = Path.home() / ".vibe-trading-cnx"
+    old_upstream = Path.home() / ".vibe-trading"
     new_dir = Path.home() / ".tide-trading"
-    if not new_dir.exists() and old_dir.exists():
-        return old_dir
+    
+    if not new_dir.exists():
+        if old_dir.exists():
+            try:
+                new_dir.symlink_to(old_dir)
+            except Exception:
+                return old_dir
+        elif old_upstream.exists():
+            try:
+                new_dir.symlink_to(old_upstream)
+            except Exception:
+                return old_upstream
     return new_dir
 
 def get_runtime_root(config_path: Path | None = None) -> Path:
@@ -397,3 +408,80 @@ def get_uploads_dir() -> Path:
     if tenant == "default":
         return Path(__file__).resolve().parents[2] / "uploads"
     return get_runtime_root() / "uploads"
+
+
+def get_workspace_path() -> Path:
+    """Return the workspace path for channel state data.
+
+    For channel adapters that need to persist state (e.g. conversation
+    references, auth tokens), this returns ``~/.tide-trading/workspace``.
+    """
+    p = get_runtime_root() / "workspace"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def get_research_ledger_path() -> Path:
+    """Return the path to the research ledger database."""
+    base = _get_active_runtime_dir()
+    return base / "research-ledger" / "ledger.sqlite"
+
+
+def get_research_protocols_dir() -> Path:
+    """Return the path to the research protocols directory."""
+    base = _get_active_runtime_dir()
+    return base / "research-protocols"
+
+
+def get_artifacts_dir() -> Path:
+    """Return the path to the artifacts directory."""
+    base = _get_active_runtime_dir()
+    return base / "artifacts"
+
+
+def get_feishu_channels_config_path() -> Path:
+    """Return the path to the Feishu channels configuration file."""
+    base = _get_active_runtime_dir()
+    return base / "feishu_channels.json"
+
+
+def get_shadow_accounts_dir() -> Path:
+    """Return the path to the shadow accounts directory."""
+    base = _get_active_runtime_dir()
+    return base / "shadow_accounts"
+
+
+def get_shadow_runs_dir() -> Path:
+    """Return the path to the shadow runs directory."""
+    base = _get_active_runtime_dir()
+    return base / "shadow_runs"
+
+
+def get_shadow_reports_dir() -> Path:
+    """Return the path to the shadow reports directory."""
+    base = _get_active_runtime_dir()
+    return base / "shadow_reports"
+
+
+def get_user_skills_dir() -> Path:
+    """Return the path to the user skills directory."""
+    base = _get_active_runtime_dir()
+    return base / "skills" / "user"
+
+
+def get_hypotheses_path() -> Path:
+    """Return the path to the hypotheses registry file."""
+    base = _get_active_runtime_dir()
+    return base / "hypotheses.json"
+
+
+def get_pairing_path() -> Path:
+    """Return the path to the pairing configuration file."""
+    base = _get_active_runtime_dir()
+    return base / "pairing.json"
+
+
+def get_connector_settings_path(connector_name: str) -> Path:
+    """Return the path to the settings file for a specific broker connector."""
+    base = _get_active_runtime_dir()
+    return base / f"{connector_name}.json"

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from src.agent.memory import WorkspaceMemory
@@ -175,7 +176,7 @@ class ContextBuilder:
         Returns:
             System prompt text.
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         # Build memory section only if there are saved memories
         memory_section = ""
@@ -192,7 +193,7 @@ class ContextBuilder:
             skill_descriptions=self.skills_loader.get_descriptions(),
             memory_summary=self.memory.to_summary(),
             memory_section=memory_section,
-            current_datetime=now.strftime("%A, %B %d, %Y %H:%M (local)"),
+            current_datetime=now.strftime("%A, %B %d, %Y %H:%M UTC"),
         )
 
     @staticmethod
@@ -292,21 +293,32 @@ class ContextBuilder:
         Returns:
             OpenAI-format assistant message.
         """
+        formatted_tool_calls = []
+        has_extra_content = False
+        for tc in tool_calls:
+            tool_call = {
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+                },
+            }
+            extra_content = getattr(tc, "extra_content", None)
+            if extra_content:
+                tool_call["extra_content"] = dict(extra_content)
+                has_extra_content = True
+            formatted_tool_calls.append(tool_call)
+
         message = {
             "role": "assistant",
             "content": content,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.name,
-                        "arguments": json.dumps(tc.arguments, ensure_ascii=False),
-                    },
-                }
-                for tc in tool_calls
-            ],
+            "tool_calls": formatted_tool_calls,
         }
+        if has_extra_content:
+            message["additional_kwargs"] = {
+                "tool_calls": copy.deepcopy(formatted_tool_calls),
+            }
         if reasoning_content is not None:
             message["reasoning_content"] = reasoning_content
         return message

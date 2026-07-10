@@ -17,6 +17,7 @@ import logging
 import subprocess
 import json
 import os
+import asyncio
 from typing import Any
 
 from starlette.applications import Starlette
@@ -99,6 +100,10 @@ AGENT_CARD = build_agent_card()
 class VTAgentExecutor(AgentExecutor):
     """Calls `tide-trading -p "prompt" --no-rich` and streams back output."""
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._running_processes: dict[str, asyncio.subprocess.Process] = {}
+
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         logger.info('VTAgentExecutor.execute')
 
@@ -124,18 +129,57 @@ class VTAgentExecutor(AgentExecutor):
         user_text = get_message_text(context.message) or '(empty)'
         logger.info(f'User input: {user_text[:120]}')
 
+        task_id = context.task_id or (task.id if task else "unknown")
+        process = None
+        reply_text = ""
         try:
-            result = subprocess.run(
-                [VT_BIN, '-p', user_text, '--no-rich'],
-                capture_output=True, text=True, timeout=180,
+            process = await asyncio.create_subprocess_exec(
+                VT_BIN, '-p', user_text, '--no-rich',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            reply_text = (result.stdout or '').strip()
-            if not reply_text and result.returncode != 0:
-                reply_text = f'[vt CLI exited {result.returncode}] {(result.stderr or "").strip()}'
+            self._running_processes[task_id] = process
+
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                process.communicate(),
+                timeout=180.0
+            )
+            
+            stdout_str = stdout_bytes.decode('utf-8', errors='replace')
+            stderr_str = stderr_bytes.decode('utf-8', errors='replace')
+            returncode = process.returncode
+            
+            reply_text = stdout_str.strip()
+            if not reply_text and returncode != 0:
+                reply_text = f'[vt CLI exited {returncode}] {stderr_str.strip()}'
+                
+        except asyncio.TimeoutError:
+            logger.warning(f"Process for task {task_id} timed out.")
+            reply_text = '[vt CLI] 分析超时（180s）'
         except FileNotFoundError:
             reply_text = f'[vt CLI] 找不到可执行文件: {VT_BIN}'
         except Exception as e:
             reply_text = f'[vt CLI] 执行错误: {e}'
+        finally:
+            self._running_processes.pop(task_id, None)
+            if process and process.returncode is None:
+                logger.info(f"Cleaning up running process for task {task_id}")
+                try:
+                    process.terminate()
+                except Exception as te:
+                    logger.warning(f"Failed to terminate process for task {task_id}: {te}")
+                
+                try:
+                    await asyncio.shield(asyncio.wait_for(process.wait(), timeout=2.0))
+                except (asyncio.TimeoutError, asyncio.CancelledError):
+                    logger.warning(f"Process for task {task_id} failed to exit. Sending SIGKILL.")
+                    try:
+                        process.kill()
+                        await asyncio.shield(asyncio.wait_for(process.wait(), timeout=1.0))
+                    except Exception as ke:
+                        logger.error(f"Failed to kill process for task {task_id}: {ke}")
+                except Exception as e:
+                    logger.error(f"Error reaming process for task {task_id}: {e}")
 
         # 4. Add result as artifact
         await task_updater.add_artifact(
@@ -150,8 +194,36 @@ class VTAgentExecutor(AgentExecutor):
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        """Cancel is not supported yet."""
-        raise NotImplementedError('Cancel is not supported.')
+        task_id = context.task_id
+        logger.info(f"VTAgentExecutor.cancel called for task: {task_id}")
+        if not task_id:
+            logger.warning("Cancel called with no task_id in context.")
+            return
+
+        process = self._running_processes.get(task_id)
+        if process and process.returncode is None:
+            logger.info(f"Terminating running process for task: {task_id}")
+            try:
+                process.terminate()
+                await asyncio.wait_for(process.wait(), timeout=3.0)
+                logger.info(f"Process terminated successfully for task: {task_id}")
+            except Exception as e:
+                logger.warning(f"Failed to terminate process for task {task_id}: {e}. Trying SIGKILL.")
+                try:
+                    process.kill()
+                    await asyncio.wait_for(process.wait(), timeout=2.0)
+                    logger.info(f"Process killed successfully for task: {task_id}")
+                except Exception as ke:
+                    logger.error(f"Failed to kill process for task {task_id}: {ke}")
+        else:
+            logger.info(f"No active process found for task: {task_id} or already finished.")
+
+        task_updater = TaskUpdater(
+            event_queue=event_queue,
+            task_id=task_id,
+            context_id=context.context_id,
+        )
+        await task_updater.cancel(new_text_message('Task cancelled!'))
 
 
 # ─── App Factory ────────────────────────────────────────────────────────────

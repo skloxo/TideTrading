@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("vibetrading-theme");
+        var resolved = stored === "dark" || stored === "light"
+          ? stored
+          : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", resolved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vibe-Trading 中文入门教程 | Vibe-Trading Wiki</title>
+  <meta name="description" content="面向非金融专业读者的 Vibe-Trading 中文入门教程：理解因子、策略、回测、多市场数据源、券商连接器与 Shadow Account。">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Vibe-Trading Wiki">
+  <meta property="og:title" content="Vibe-Trading 中文入门教程">
+  <meta property="og:description" content="从金融术语到项目使用路径，帮助非金融背景读者读懂并开始使用 Vibe-Trading。">
+  <meta property="og:image" content="https://vibetrading.wiki/assets/icon.png">
+  <meta property="og:url" content="https://vibetrading.wiki/tutorials/vibe-trading-beginner-zh.html">
+  <link rel="canonical" href="https://vibetrading.wiki/tutorials/vibe-trading-beginner-zh.html">
+  <link rel="icon" type="image/png" href="/assets/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/main.js"></script>
+  <style>
+    .tutorial {
+      width: min(940px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 64px 0 96px;
+    }
+
+    .tutorial header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 36px;
+      margin-bottom: 36px;
+    }
+
+    .tutorial h1 {
+      max-width: 900px;
+      font-size: clamp(2rem, 6vw, 5.4rem);
+      line-height: 1;
+      line-break: anywhere;
+      overflow-wrap: anywhere;
+    }
+
+    .tutorial .lede {
+      max-width: 760px;
+      margin: 22px 0 0;
+      color: var(--ink);
+      font-family: var(--serif);
+      font-size: clamp(1.12rem, 2.4vw, 1.38rem);
+      line-height: 1.55;
+    }
+
+    .tutorial section {
+      margin: 54px 0;
+      scroll-margin-top: 92px;
+    }
+
+    .tutorial h2 {
+      margin-bottom: 16px;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: 1.08;
+    }
+
+    .tutorial h3 {
+      margin-top: 28px;
+      font-size: 1.16rem;
+    }
+
+    .tutorial p,
+    .tutorial li,
+    .tutorial td,
+    .tutorial th {
+      font-size: 1.02rem;
+      line-height: 1.72;
+    }
+
+    .tutorial p,
+    .tutorial li {
+      color: var(--ink);
+    }
+
+    .tutorial a {
+      color: var(--accent-3);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .toc,
+    .callout,
+    .term-grid,
+    .module-grid,
+    .route-grid,
+    .workflow-flow {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface) 88%, transparent);
+    }
+
+    .toc {
+      padding: 18px 20px;
+    }
+
+    .toc ol {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 22px;
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+
+    .callout {
+      padding: 18px 20px;
+      border-left: 4px solid var(--accent);
+    }
+
+    .callout.warning {
+      border-left-color: var(--accent-2);
+    }
+
+    .callout p {
+      margin: 0;
+    }
+
+    .module-grid,
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+    }
+
+    .module-card,
+    .route-card {
+      background: var(--surface);
+      padding: 18px;
+    }
+
+    .module-card code,
+    .route-card code,
+    .tutorial td code,
+    .tutorial li code,
+    .tutorial p code {
+      font-family: var(--mono);
+      font-size: 0.9em;
+      color: var(--accent);
+    }
+
+    .module-card p,
+    .route-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .term-grid {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+    }
+
+    .term-grid th,
+    .term-grid td {
+      border-bottom: 1px solid var(--line);
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .term-grid th {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .term-grid tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .workflow-flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      min-height: 132px;
+      background: var(--surface);
+      padding: 16px;
+    }
+
+    .flow-step span {
+      display: block;
+      margin-bottom: 20px;
+      color: var(--accent-2);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .flow-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .tutorial pre {
+      margin: 18px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+      padding: 18px;
+      white-space: pre-wrap;
+    }
+
+    .tutorial pre code {
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.92rem;
+    }
+
+    .meta-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .meta-list span {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      padding: 8px 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 800px) {
+      .toc ol,
+      .module-grid,
+      .route-grid,
+      .workflow-flow {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .tutorial {
+        width: min(100% - 32px, 940px);
+        padding-top: 44px;
+      }
+
+      .tutorial h1 {
+        font-size: clamp(2.05rem, 10vw, 2.75rem);
+        line-height: 1.06;
+        line-break: anywhere;
+        word-break: break-all;
+      }
+
+      .tutorial .lede {
+        font-size: 1rem;
+      }
+
+      .tutorial p,
+      .tutorial li,
+      .tutorial td,
+      .tutorial th {
+        font-size: 0.97rem;
+      }
+
+      .term-grid {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .term-grid th,
+      .term-grid td {
+        min-width: 160px;
+      }
+
+      .meta-list span {
+        font-size: 0.74rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header" id="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="/home/" aria-label="Vibe-Trading home">
+        <img class="brand__mark" src="/assets/icon.png" alt="" width="40" height="40">
+        <span class="brand__text">Vibe-Trading</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="/docs/">Docs</a>
+        <a href="/tutorials/">Tutorials</a>
+        <a href="/alpha-library/">Alpha Library</a>
+        <a href="/research-lab/">Research Lab</a>
+        <a href="https://github.com/HKUDS/Vibe-Trading">Source</a>
+      </nav>
+      <div class="site-actions">
+        <a class="star-pill" href="https://github.com/HKUDS/Vibe-Trading" aria-label="Vibe-Trading on GitHub">
+          <span aria-hidden="true">Star</span>
+          <strong id="star-count">--</strong>
+        </a>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle color theme">
+          <span class="theme-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="tutorial">
+    <header>
+      <p class="eyebrow">中文教程 · Beginner Guide</p>
+      <h1>从金融术语到项目使用：读懂 Vibe-Trading</h1>
+      <p class="lede">这份教程写给没有金融专业背景、交易经验也不多的读者。它不教你“稳赚策略”，而是帮助你理解 Vibe-Trading 里的因子、策略、回测、数据源、券商连接器和 Shadow Account 分别是什么，以及如何按安全顺序把它用起来。</p>
+      <div class="meta-list" aria-label="Guide scope">
+        <span>多市场</span>
+        <span>数据源</span>
+        <span>因子 / Alpha</span>
+        <span>回测</span>
+        <span>券商 Connector</span>
+        <span>Shadow Account</span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="教程目录">
+      <ol>
+        <li><a href="#mental-model">先建立项目地图</a></li>
+        <li><a href="#terms">常见金融术语翻译</a></li>
+        <li><a href="#factors">因子和 Alpha Zoo</a></li>
+        <li><a href="#strategy">策略和 Signal Engine</a></li>
+        <li><a href="#backtest">回测如何工作</a></li>
+        <li><a href="#markets">市场和数据源怎么选</a></li>
+        <li><a href="#connectors">券商连接器</a></li>
+        <li><a href="#shadow">Shadow Account</a></li>
+        <li><a href="#learning-path">建议学习路线</a></li>
+        <li><a href="#contribute">可以贡献什么</a></li>
+      </ol>
+    </nav>
+
+    <section id="mental-model">
+      <h2>1. 先建立项目地图</h2>
+      <p>Vibe-Trading 可以先理解成“交易研究工作台”。你用自然语言提出问题，项目把问题拆成数据读取、因子计算、策略生成、回测、报告和账户连接等步骤。它不是券商，也不托管资金；核心价值是让研究步骤能运行、能复查、能沉淀。</p>
+
+      <div class="workflow-flow" aria-label="Vibe-Trading workflow">
+        <div class="flow-step">
+          <span>01 Prompt</span>
+          <p>你提出问题，例如“回测一组大盘股的动量策略”。</p>
+        </div>
+        <div class="flow-step">
+          <span>02 Data</span>
+          <p>loader 拉取股票、加密、期货、外汇等市场数据。</p>
+        </div>
+        <div class="flow-step">
+          <span>03 Signal</span>
+          <p>因子或策略代码把数据变成买卖信号。</p>
+        </div>
+        <div class="flow-step">
+          <span>04 Backtest</span>
+          <p>回测引擎按市场规则模拟交易路径。</p>
+        </div>
+        <div class="flow-step">
+          <span>05 Report</span>
+          <p>输出指标、图表、报告、run card 和可复查 artifacts。</p>
+        </div>
+      </div>
+
+      <div class="module-grid">
+        <article class="module-card">
+          <h3>数据层：loader</h3>
+          <p><code>agent/backtest/loaders/</code> 负责行情和财务数据。它按市场类型选择公开源、可选 key 数据源、券商网关数据源或本地文件，并在可用时做 fallback。</p>
+        </article>
+        <article class="module-card">
+          <h3>因子层：factor / alpha</h3>
+          <p><code>agent/src/factors/</code> 内置 456 个 alpha。因子是给股票打分的数值信号，不是下单规则，也不是收益保证。</p>
+        </article>
+        <article class="module-card">
+          <h3>回测层：backtest</h3>
+          <p><code>agent/backtest/</code> 根据 <code>config.json</code> 和 <code>code/signal_engine.py</code> 运行模拟交易。股票、加密、期货、外汇和组合资产有不同引擎。</p>
+        </article>
+        <article class="module-card">
+          <h3>券商层：connector</h3>
+          <p><code>agent/src/trading/</code> 把不同券商统一成账户、持仓、委托、行情、历史 K 线、下单、撤单等 profile。这里和 loader 不同：loader 读市场数据，connector 读或操作你的券商账户。</p>
+        </article>
+        <article class="module-card">
+          <h3>工具层：MCP tools</h3>
+          <p><code>agent/src/tools/</code> 把能力暴露成 agent 可以调用的工具，例如 <code>backtest</code>、<code>factor_analysis</code>、<code>trading_positions</code>、<code>analyze_trade_journal</code>。</p>
+        </article>
+        <article class="module-card">
+          <h3>复盘层：Shadow Account</h3>
+          <p><code>agent/src/shadow_account/</code> 从你的交易流水里提取习惯规则，回测一个“规则版的你”，再和真实交易做差异归因。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="terms">
+      <h2>2. 常见金融术语翻译</h2>
+      <p>先把词翻译成人话，再看代码会轻松很多。下面这些词会反复出现在 README、Alpha Zoo、回测和券商连接器里。</p>
+
+      <table class="term-grid">
+        <thead>
+          <tr>
+            <th>术语</th>
+            <th>普通话解释</th>
+            <th>项目里对应哪里</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>标的 / symbol</td>
+            <td>你研究或交易的对象，比如 <code>AAPL</code>、<code>BTC-USDT</code>、<code>600519.SH</code>。</td>
+            <td>回测配置里的 <code>codes</code>，券商工具里的 <code>symbol</code>。</td>
+          </tr>
+          <tr>
+            <td>K 线 / OHLCV</td>
+            <td>一段时间内的开盘价、最高价、最低价、收盘价、成交量。</td>
+            <td>loader 返回的基础行情列：<code>open/high/low/close/volume</code>。</td>
+          </tr>
+          <tr>
+            <td>VWAP</td>
+            <td>按成交量加权的平均价格，粗略理解为“这段时间市场真实成交的平均成本”。</td>
+            <td>一些 alpha 需要 <code>vwap</code> 列。</td>
+          </tr>
+          <tr>
+            <td>amount</td>
+            <td>成交额，通常等于价格乘以成交量的金额口径。</td>
+            <td>某些成交量、流动性和短周期因子会用到，部分股票数据源会提供。</td>
+          </tr>
+          <tr>
+            <td>因子 / factor / alpha</td>
+            <td>给一组股票打分的公式。分数高可能代表更值得买，也可能代表更值得卖，要靠 IC、回测和业务解释验证。</td>
+            <td><code>agent/src/factors/zoo/</code>。</td>
+          </tr>
+          <tr>
+            <td>策略 / strategy</td>
+            <td>把信号变成交易规则：买什么、买多少、什么时候卖、最多持仓多少、如何止损。</td>
+            <td><code>signal_engine.py</code> 和回测配置。</td>
+          </tr>
+          <tr>
+            <td>Signal Engine</td>
+            <td>项目里承载策略逻辑的 Python 类。它读取 bar 或 panel，输出目标仓位或买卖信号。</td>
+            <td>回测 run dir 里的 <code>code/signal_engine.py</code>。</td>
+          </tr>
+          <tr>
+            <td>回测 / backtest</td>
+            <td>用历史数据模拟“如果当时按这套规则交易，会发生什么”。它只能证明历史表现，不能证明未来收益。</td>
+            <td><code>agent/backtest/runner.py</code> 和各市场 engine。</td>
+          </tr>
+          <tr>
+            <td>IC</td>
+            <td>Information Coefficient。这里是某天因子排名和未来收益排名的 Spearman 相关。正 IC 说明分数高的股票之后更容易涨。</td>
+            <td><code>compute_ic_series()</code>。</td>
+          </tr>
+          <tr>
+            <td>IR</td>
+            <td>IC 均值除以 IC 波动。粗略理解为“这个因子稳定不稳定”。</td>
+            <td><code>alpha bench</code> 的排序指标之一。</td>
+          </tr>
+          <tr>
+            <td>lookahead</td>
+            <td>偷看未来数据。比如用今天收盘后才知道的信息去假装今天开盘前就知道。</td>
+            <td>factor operator 禁止负向 shift；回测用下一根 bar 执行来降低偷看风险。</td>
+          </tr>
+          <tr>
+            <td>PIT</td>
+            <td>Point-in-time，只使用当时已经公开、已经可获得的数据。</td>
+            <td>财务字段、Shadow Account 入场上下文和回测验证都强调这个边界。</td>
+          </tr>
+          <tr>
+            <td>warmup</td>
+            <td>滚动窗口刚开始时数据不够。例如 20 日均线前 19 天没有有效值。</td>
+            <td>alpha metadata 的 <code>min_warmup_bars</code>。</td>
+          </tr>
+          <tr>
+            <td>NaN</td>
+            <td>空值。金融数据里空值不是 0，很多时候代表停牌、数据源缺失或窗口不足。</td>
+            <td>因子算子保留 NaN，不静默填 0。</td>
+          </tr>
+          <tr>
+            <td>滑点 / slippage</td>
+            <td>你想成交的价格和实际成交价格之间的差距。</td>
+            <td>不同市场引擎都有自己的简化滑点参数。</td>
+          </tr>
+          <tr>
+            <td>回撤 / drawdown</td>
+            <td>账户净值从高点跌到低点的幅度。最大回撤是衡量策略痛苦程度的重要指标。</td>
+            <td>回测 metrics。</td>
+          </tr>
+          <tr>
+            <td>benchmark</td>
+            <td>对照组，例如沪深 300、恒生指数、SPY。策略不是只看赚钱，还要看有没有跑赢参照物。</td>
+            <td>回测报告和 benchmark comparison。</td>
+          </tr>
+          <tr>
+            <td>paper / live</td>
+            <td>paper 是模拟盘，live 是真实账户。真实账户必须非常谨慎。</td>
+            <td>connector profile 的 <code>environment</code>。</td>
+          </tr>
+          <tr>
+            <td>mandate</td>
+            <td>实盘授权边界：能交易哪些标的、单笔多少、最大仓位、每日亏损限制等。</td>
+            <td>实盘下单路径的风控门。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="factors">
+      <h2>3. 因子和 Alpha Zoo</h2>
+      <p>因子是 Vibe-Trading 里最容易让非金融读者困惑的部分。你可以把它理解成“排序公式”：每天给很多股票各打一个分，然后看分数高的一组未来表现是否更好。</p>
+
+      <div class="callout">
+        <p>重要：因子不是策略。因子只回答“哪个标的分数更高”。策略还要回答“买多少、什么时候买、什么时候卖、交易成本多少、是否允许集中持仓、是否能成交”。</p>
+      </div>
+
+      <p>当前仓库的 Alpha Zoo 有 456 个 alpha，分成四类：</p>
+      <table class="term-grid">
+        <thead>
+          <tr>
+            <th>Zoo</th>
+            <th>数量</th>
+            <th>适合怎么理解</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>academic</code></td>
+            <td>10</td>
+            <td>学术风格因子，例如动量、反转、52 周高点、非流动性等，适合入门理解。</td>
+          </tr>
+          <tr>
+            <td><code>alpha101</code></td>
+            <td>101</td>
+            <td>公式化 alpha，很多公式混合价格、成交量、排名、滚动相关。</td>
+          </tr>
+          <tr>
+            <td><code>gtja191</code></td>
+            <td>191</td>
+            <td>国泰君安短周期交易型因子，A 股语境更强。</td>
+          </tr>
+          <tr>
+            <td><code>qlib158</code></td>
+            <td>154</td>
+            <td>Qlib Alpha158 特征，常作为机器学习模型的输入特征。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>常见 theme 可以这样读：</p>
+      <ul>
+        <li><strong>momentum</strong>：最近强的标的是否继续强。</li>
+        <li><strong>reversal</strong>：最近跌多或涨多后是否反向修复。</li>
+        <li><strong>volume</strong>：成交量变化是否包含资金行为信息。</li>
+        <li><strong>volatility</strong>：波动率是否能解释之后的收益或风险。</li>
+        <li><strong>liquidity / microstructure</strong>：流动性、盘口、成交结构相关信号。</li>
+        <li><strong>value / quality</strong>：估值或质量风格，通常更偏中长期。</li>
+      </ul>
+
+      <p>先用 CLI 浏览，而不是直接读 456 个源码文件：</p>
+      <pre><code>vibe-trading alpha list --zoo academic
+vibe-trading alpha show academic_mkt_rf
+vibe-trading alpha bench --zoo academic --universe sp500 --period 2020-2025 --top 10</code></pre>
+
+      <p><code>alpha bench</code> 会把因子放到一个 universe 上测试。项目内置的分类逻辑是：IC 均值大于 0.02、IC 为正的比例至少 55%、t 统计显著时归为 <code>alive</code>；IC 显著为负时归为 <code>reversed</code>；其他归为 <code>dead</code>。这不是“可以买入”的结论，只是研究阶段的第一道筛选。</p>
+    </section>
+
+    <section id="strategy">
+      <h2>4. 策略和 Signal Engine</h2>
+      <p>策略是把研究想法变成可执行规则。一个很朴素的策略可以是：“如果 20 日均线高于 60 日均线，就持有；否则空仓。”多因子策略则可能是：“在一个股票池里，用动量、质量、波动率三个因子合成分数，买前 20 只，每月调仓一次。”</p>
+
+      <p>在 Vibe-Trading 里，策略通常落到一个 run dir：</p>
+      <pre><code>my_run/
+  config.json
+  code/
+    signal_engine.py</code></pre>
+
+      <p><code>config.json</code> 告诉回测系统：标的、起止日期、数据源、bar 周期、使用哪个市场引擎。<code>signal_engine.py</code> 告诉系统：每根 K 线或每个交易日应该生成什么信号。</p>
+
+      <div class="callout warning">
+        <p>新手最常见错误是把“因子分数高”直接等同于“马上满仓买入”。实际策略还需要仓位上限、调仓频率、交易成本、停牌/涨跌停、风险控制和 benchmark 对比。</p>
+      </div>
+    </section>
+
+    <section id="backtest">
+      <h2>5. 回测如何工作</h2>
+      <p>回测不是预测器，而是历史模拟器。它的价值是让你在投入真实资金前，先看清一套规则在历史数据里经历过什么：赚了多少、最大亏了多少、交易频率多高、是否只是某一年有效、是否被手续费吃掉。</p>
+
+      <h3>回测入口</h3>
+      <pre><code>vibe-trading run -p "Backtest a momentum strategy on a broad equity universe from 2020 to 2025. Include benchmark comparison, drawdown, turnover, and a short explanation."</code></pre>
+
+      <p>如果 agent 生成了 run dir，最终会调用 <code>backtest</code> 工具。这个工具会校验 <code>config.json</code> 和 <code>code/signal_engine.py</code>，再运行 <code>agent/backtest/runner.py</code>。</p>
+
+      <h3>为什么市场引擎很重要</h3>
+      <p>不同市场不是同一套交易规则。项目里股票、加密、期货、外汇和组合资产会走不同 engine；某些股票市场需要处理 T+1、涨跌停、一手股数、佣金、印花税、结算费和滑点，另一些市场可能支持 T+0、做空或小数股。</p>
+
+      <p>这意味着你不能只看“信号准不准”，还要看它落到真实市场规则后能不能成交、成本有多高、仓位会不会过度集中。很多看起来很漂亮的短线策略，一加入滑点和费用就会失效。</p>
+    </section>
+
+    <section id="markets">
+      <h2>6. 市场和数据源怎么选</h2>
+      <p>陌生用户第一次使用时，最容易混淆的是“市场”“数据源”和“券商账户”。市场决定交易规则，数据源决定历史数据从哪里来，券商账户只在你需要读取真实账户或模拟/真实下单时才涉及。</p>
+
+      <div class="route-grid">
+        <article class="route-card">
+          <h3>公开行情源</h3>
+          <p>适合入门研究、普通价格数据和快速试跑。优点是启动门槛低；缺点是覆盖、速率、复权、字段质量和可用性会随来源变化。</p>
+        </article>
+        <article class="route-card">
+          <h3>可选 key 数据源</h3>
+          <p>适合更稳定的研究和更丰富的字段，例如指数成分、财务数据、基本面字段或专业行情。缺点是需要申请 token 或付费。</p>
+        </article>
+        <article class="route-card">
+          <h3>本地数据</h3>
+          <p><code>local</code> loader 可以读你自己的 CSV、Parquet 或 DuckDB 数据。对于清洗后的历史数据、离线研究、可复现实验，本地数据通常最可控。</p>
+        </article>
+        <article class="route-card">
+          <h3>组合市场</h3>
+          <p>CompositeEngine 可以做跨市场组合研究。比如同一个策略里同时持有股票、加密和期货时，不同市场由不同 engine 处理。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="connectors">
+      <h2>7. 券商连接器</h2>
+      <p>connector 和 loader 要分清：loader 读行情，connector 连接券商账户。connector 的典型能力包括读取账户、持仓、委托、报价、历史 K 线，以及在允许的 profile 下下单或撤单。</p>
+
+      <pre><code>vibe-trading connector list
+vibe-trading connector use &lt;profile-id&gt;
+vibe-trading connector check</code></pre>
+
+      <p>看 connector 时，不要先问“能不能自动交易”，先看 profile 的安全属性：</p>
+      <table class="term-grid">
+        <thead>
+          <tr>
+            <th>Profile 类型</th>
+            <th>含义</th>
+            <th>适合阶段</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>readonly</code></td>
+            <td>只读账户、持仓、订单或行情，不会提交订单。</td>
+            <td>第一次连接真实账户时优先使用。</td>
+          </tr>
+          <tr>
+            <td><code>paper</code></td>
+            <td>连接模拟盘或沙盒账户，即使下单也不动用真实资金。</td>
+            <td>验证策略、订单字段、成交回报和撤单流程。</td>
+          </tr>
+          <tr>
+            <td><code>live</code></td>
+            <td>连接真实账户。任何写操作都必须经过授权边界、kill switch、fail-closed 检查和审计记录。</td>
+            <td>只在你完全理解风险、并先经过 read-only 与 paper 验证后使用。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>如果你只是想学习项目，建议先只用 read-only 和 paper。等你能解释每一笔 simulated order 为什么产生，再考虑真实账户连接。</p>
+    </section>
+
+    <section id="shadow">
+      <h2>8. Shadow Account</h2>
+      <p>Shadow Account 是“复盘你自己”的功能。它不是从网上找一个通用策略，而是读取你的交易流水，配对买入和卖出，找出你赚钱交易里反复出现的规则，再回测一个规则版的 shadow strategy。</p>
+
+      <p>当前交易流水解析支持若干常见券商导出格式和 generic CSV。它会输出持仓天数、胜率、盈亏比、回撤、处置效应、过度交易、追涨、锚定等行为诊断。随后 Shadow Account 会提取 3 到 5 条 if-then 规则，生成策略代码，跑多市场回测，最后渲染 HTML/PDF 报告。</p>
+
+      <pre><code>vibe-trading --upload trades_export.csv
+vibe-trading run -p "Analyze my trading behavior, extract my shadow strategy, and compare it with my actual trades."</code></pre>
+
+      <p>如果你想给某个新券商补齐这条路径，优先方向是：把官方 API 或用户导出的交易记录归一化成项目里的 <code>TradeRecord</code> 格式，然后复用现有 Trade Journal 和 Shadow Account 流程。</p>
+    </section>
+
+    <section id="learning-path">
+      <h2>9. 建议学习路线</h2>
+      <ol>
+        <li><strong>第一天：只跑起来。</strong> 安装、初始化、打开 CLI 或 Web UI，问一个你熟悉的问题，不连券商，不下单。</li>
+        <li><strong>第二天：只看数据。</strong> 选几个你熟悉的标的，理解 symbol、OHLCV、数据源 fallback 和缺失值。</li>
+        <li><strong>第三天：只看因子。</strong> 从 <code>academic</code> zoo 开始，用 <code>alpha show</code> 看公式，用 <code>alpha bench</code> 看 IC/IR，不急着交易。</li>
+        <li><strong>第四天：做一个简单回测。</strong> 让 agent 生成一个动量或均线策略，重点看 config、signal_engine、回测指标和交易明细。</li>
+        <li><strong>第五天：复盘自己的交易。</strong> 如果你有券商导出的 CSV，先用 Trade Journal 和 Shadow Account 看行为画像。没有也没关系，先读报告模板和数据结构。</li>
+        <li><strong>第六天以后：连接券商。</strong> 从 read-only 和 paper 开始，确认账户、持仓、订单读取正常，再理解 mandate、kill switch 和 fail-closed 的实盘边界。</li>
+      </ol>
+
+      <p>一组适合入门的命令：</p>
+      <pre><code>pip install vibe-trading-ai
+vibe-trading init
+vibe-trading
+vibe-trading serve --port 8899
+vibe-trading alpha list --zoo academic
+vibe-trading alpha bench --zoo academic --universe sp500 --period 2020-2025 --top 10
+vibe-trading connector list</code></pre>
+    </section>
+
+    <section id="contribute">
+      <h2>10. 可以贡献什么</h2>
+      <p>如果你想给项目做贡献，不必一上来碰实盘下单。更稳的路线是从文档、例子、解析器和测试开始。</p>
+
+      <ul>
+        <li><strong>入门文档。</strong> 把因子、策略、回测、数据源、券商连接器这些概念写得更适合普通投资者。</li>
+        <li><strong>可复现实例。</strong> 增加多市场教学 run，包含数据源、参数、回测指标和风险提示，但不要写成投资建议。</li>
+        <li><strong>交易记录导入。</strong> 如果某个券商的官方 API 或导出文件能拿到成交、订单、持仓，就把它归一化到 <code>TradeRecord</code>，接入 Trade Journal 和 Shadow Account。</li>
+        <li><strong>连接器文档。</strong> 把 paper/live/read-only/trade profile 的差异讲清楚，避免用户误以为所有连接器都可以直接实盘下单。</li>
+        <li><strong>安全测试。</strong> 给 connector guard、live mandate、paper-only 限制、路径 sandbox、上传文件解析补回归测试。</li>
+      </ul>
+
+      <div class="callout warning">
+        <p>这份教程和 Vibe-Trading 都不是投资建议。任何真实交易都应先经过你自己的判断、券商确认、模拟盘验证和风险控制。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Vibe-Trading Wiki</span>
+    <a href="/docs/">Docs</a>
+    <a href="/tutorials/">Tutorials</a>
+    <a href="/alpha-library/">Alpha Library</a>
+    <a href="/research-lab/">Research Lab</a>
+    <a href="https://github.com/HKUDS/Vibe-Trading">GitHub</a>
+  </footer>
+</body>
+</html>

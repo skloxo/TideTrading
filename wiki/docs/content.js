@@ -367,6 +367,38 @@ vibe-trading-mcp</code></pre>
         ]
       },
       {
+        id: "reference/digital-assets",
+        title: "数字资产与域名解析",
+        description: "潮汐投研 (TideTrading) 的域名解析与品牌多语言设置说明。",
+        lead: "本页记录 潮汐投研 (TideTrading) 绑定的生产环境域名以及多语言本地化配置规范。",
+        sections: [
+          {
+            id: "brand-localization",
+            title: "品牌与本地化定义",
+            body: `
+              <ul>
+                <li><strong>项目默认名称：</strong> 潮汐投研 (英文名: TideTrading)</li>
+                <li><strong>生产环境域名：</strong> <code>https://tide.red/</code></li>
+                <li><strong>默认语言：</strong> 中文 (Chinese)</li>
+                <li><strong>多语言支持：</strong> 英语 (English)</li>
+              </ul>
+            `
+          },
+          {
+            id: "domain-dns",
+            title: "域名资产与阿里云 DNS 解析",
+            body: `
+              <p>系统已购得核心域名 <code>tide.red</code> 并于阿里云完成解析配置，将其作为潮汐投研项目的主要公网访问入口：</p>
+              <ul>
+                <li><strong>主域名：</strong> <code>tide.red</code> (用于正式环境与 SaaS 控制面，反向代理至公网入口)。</li>
+                <li><strong>测试环境：</strong> 使用 <code>*.bbr</code> 后缀域名（如 <code>test.bbr</code>），用于开发测试、API 灰度发布及内网穿透验证。</li>
+                <li><strong>解析记录：</strong> 阿里云 DNS 包含针对公网 IP 的 <code>A</code> 记录，以及用于多分支穿透的 <code>TXT</code> 证书所有权验证记录。</li>
+              </ul>
+            `
+          }
+        ]
+      },
+      {
         id: "reference/cloudflare-pages",
         title: "Cloudflare Pages",
         description: "Deploy this wiki without running a server.",
@@ -380,7 +412,7 @@ vibe-trading-mcp</code></pre>
                 <li>Project root: <code>wiki</code></li>
                 <li>Build command: leave empty</li>
                 <li>Output directory: <code>.</code></li>
-                <li>Custom domain: <code>vibetrading.wiki</code></li>
+                <li>Custom domain: <code>tide.red</code></li>
               </ul>
             `
           },

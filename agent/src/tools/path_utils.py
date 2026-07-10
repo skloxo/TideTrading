@@ -47,7 +47,7 @@ def safe_path(p: str, workdir: Path) -> Path:
     """
     _rejects_unc(p)
     base = Path(workdir).resolve()
-    # Expand ~ so home-relative paths (e.g. ~/.vibe-trading/scripts/foo.py)
+    # Expand ~ so home-relative paths (e.g. ~/.tide-trading/scripts/foo.py)
     # resolve correctly instead of being treated as literal directory names.
     expanded = Path(p).expanduser()
     if expanded.is_absolute():
@@ -81,16 +81,17 @@ def _configured_file_roots() -> list[Path]:
 
 def _default_file_roots() -> list[Path]:
     """Return default roots for uploaded/imported user files."""
+    from src.config.paths import _get_active_runtime_dir
     cwd = Path.cwd().resolve()
-    home = Path.home().resolve()
     agent_root = _agent_root()
+    runtime_base = _get_active_runtime_dir()
     roots = [
         agent_root / "uploads",
         agent_root / "runs",
         cwd / "uploads",
         cwd / "data",
-        home / ".vibe-trading-cnx" / "uploads",
-        home / ".vibe-trading-cnx" / "imports",
+        runtime_base / "uploads",
+        runtime_base / "imports",
     ]
     # Inject active tenant's dedicated uploads/runs dirs so the security
     # gateway does not block per-tenant file access in multi-tenant mode.
@@ -106,16 +107,17 @@ def _default_file_roots() -> list[Path]:
 def _default_run_roots() -> list[Path]:
     """Return default roots for generated backtest/tool run directories."""
     from src.swarm.store import swarm_runs_root
+    from src.config.paths import _get_active_runtime_dir
 
     cwd = Path.cwd().resolve()
-    home = Path.home().resolve()
     agent_root = _agent_root()
+    runtime_base = _get_active_runtime_dir()
     roots = [
         agent_root / "runs",
         swarm_runs_root(),
         cwd / "runs",
-        home / ".vibe-trading-cnx" / "shadow_runs",
-        home / ".vibe-trading-cnx" / "runs",
+        runtime_base / "shadow_runs",
+        runtime_base / "runs",
     ]
     # Inject tenant-specific runs dir for non-default tenants.
     try:
@@ -151,14 +153,15 @@ def allowed_write_roots() -> list[Path]:
         configured.append(Path(item).expanduser().resolve())
 
     cwd = Path.cwd().resolve()
-    home = Path.home().resolve()
     agent_root = _agent_root()
+    from src.config.paths import _get_active_runtime_dir
+    runtime_base = _get_active_runtime_dir()
     defaults = [
         agent_root / "uploads",
         agent_root / "runs",
         cwd / "uploads",
-        home / ".vibe-trading-cnx" / "uploads",
-        home / ".vibe-trading-cnx" / "runs",
+        runtime_base / "uploads",
+        runtime_base / "runs",
     ]
     # Inject active tenant's write-allowed directories.
     try:

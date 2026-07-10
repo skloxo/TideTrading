@@ -1,9 +1,9 @@
-"""Shadow Account persistence (~/.vibe-trading/shadow_accounts/).
+"""Shadow Account persistence (~/.tide-trading/shadow_accounts/).
 
 Layout:
-    ~/.vibe-trading/shadow_accounts/<shadow_id>.json   ShadowProfile
-    ~/.vibe-trading/shadow_runs/<shadow_id>/           backtest run dir
-    ~/.vibe-trading/shadow_reports/<shadow_id>.pdf     rendered report
+    ~/.tide-trading/shadow_accounts/<shadow_id>.json   ShadowProfile
+    ~/.tide-trading/shadow_runs/<shadow_id>/           backtest run dir
+    ~/.tide-trading/shadow_reports/<shadow_id>.pdf     rendered report
 """
 
 from __future__ import annotations
@@ -18,28 +18,23 @@ from typing import Any
 from src.shadow_account.models import ShadowProfile, ShadowRule
 
 
-def _root() -> Path:
-    """Return the Shadow Account root directory (auto-created)."""
-    from src.config.paths import get_runtime_root
-    root = get_runtime_root()
-    root.mkdir(parents=True, exist_ok=True)
-    return root
-
-
 def profiles_dir() -> Path:
-    d = _root() / "shadow_accounts"
+    from src.config.paths import get_shadow_accounts_dir
+    d = get_shadow_accounts_dir()
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def runs_dir(shadow_id: str) -> Path:
-    d = _root() / "shadow_runs" / shadow_id
+    from src.config.paths import get_shadow_runs_dir
+    d = get_shadow_runs_dir() / shadow_id
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def reports_dir() -> Path:
-    d = _root() / "shadow_reports"
+    from src.config.paths import get_shadow_reports_dir
+    d = get_shadow_reports_dir()
     d.mkdir(parents=True, exist_ok=True)
     return d
 

@@ -16,12 +16,13 @@ from src.platforms.wechat import WechatAdapter
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     # Setup mock channels JSON file path
+    import src.api.channels_routes as channels_routes
     mock_json_path = tmp_path / "wechat_channels.json"
-    monkeypatch.setattr(api_server, "_get_wechat_channels_json_path", lambda: mock_json_path)
+    monkeypatch.setattr(channels_routes, "_get_wechat_channels_json_path", lambda: mock_json_path)
     
     # Mock platform manager reload to avoid starting actual background tasks
     mock_reload = AsyncMock()
-    monkeypatch.setattr(api_server, "_reload_platform_manager", mock_reload)
+    monkeypatch.setattr(channels_routes, "_reload_platform_manager", mock_reload)
     
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
     
@@ -125,7 +126,7 @@ def test_wechat_ilink_auth_flow(client: TestClient) -> None:
         mock_get.return_value = mock_status_response
         res = client.get(f"/settings/platforms/wechat/channels/{chan_id}/status")
         assert res.status_code == 200
-        assert res.json() == {"status": "logged_in"}
+        assert res.json() == {"status": "success"}
         mock_get.assert_called_once()
         
     # 4. Verify updated channel fields

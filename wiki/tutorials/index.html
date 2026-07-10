@@ -29,7 +29,7 @@
   <link rel="icon" type="image/png" href="/assets/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,750&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script type="module" src="/main.js"></script>
 </head>
@@ -60,9 +60,18 @@
   </header>
 
   <main class="section-page">
-    <section class="section-hero section-hero--blank">
+    <section class="section-hero">
       <p class="eyebrow">Tutorials</p>
       <h1>Hands-on AI Quant.</h1>
+      <p class="section-hero__lede">Guides for turning finance ideas into inspectable Vibe-Trading workflows.</p>
+    </section>
+
+    <section class="knowledge-grid" aria-label="Tutorial list">
+      <a class="knowledge-card" href="/tutorials/vibe-trading-beginner-zh.html">
+        <strong>入门</strong>
+        <h3>Vibe-Trading 中文入门教程</h3>
+        <p>面向非金融专业读者，解释因子、策略、回测、多市场数据源、券商 connector 和 Shadow Account。</p>
+      </a>
     </section>
   </main>
 

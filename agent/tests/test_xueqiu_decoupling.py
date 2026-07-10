@@ -91,21 +91,27 @@ async def test_xueqiu_decoupling_flow(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.setattr(dispatcher, "_notify_influencer_change", notify_influencer_mock)
     
     # Mock asyncio.sleep only in event_dispatcher to speed up its alert loop
-    monkeypatch.setattr("src.platforms.event_dispatcher.asyncio.sleep", AsyncMock())
+    original_sleep = asyncio.sleep
+    def custom_sleep(delay=0):
+        if 0 < delay < 1:
+            return original_sleep(delay)
+        return original_sleep(0)
+    monkeypatch.setattr(asyncio, "sleep", custom_sleep)
     
     # 3. Trigger the tick loop
     await watcher.tick()
-    
-    # Await all background tasks to ensure they finish executing before assertions
-    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    if pending:
-        await asyncio.gather(*pending, return_exceptions=True)
     
     # 4. Assertions
     # Ensure logs were written to respective folders for AOP-driven Tenant Decoupling
     t1_log_path = tmp_path / "tenants" / "tenant_a" / "xueqiu_rebalancing_logs.json"
     t2_log_path = tmp_path / "tenants" / "tenant_b" / "xueqiu_rebalancing_logs.json"
-    
+
+    # Await until the logs are written (up to 5 seconds)
+    for _ in range(50):
+        if t1_log_path.exists() and t2_log_path.exists():
+            break
+        await asyncio.sleep(0.1)
+
     assert t1_log_path.exists()
     assert t2_log_path.exists()
     

@@ -18,6 +18,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 
 from backtest.loaders.rsshub_events import (
@@ -484,6 +485,13 @@ class BaseEngine(ABC):
         )
 
         # 9. Trust Layer run card
+        try:
+            from src.reliability.quant.scorecard import write_backtest_scorecard_artifact
+
+            write_backtest_scorecard_artifact(config=config, metrics=m, run_dir=run_dir)
+        except Exception:  # noqa: BLE001
+            logger.exception("failed to generate quant reliability scorecard")
+
         from backtest.run_card import write_run_card
         write_run_card(
             run_dir,
@@ -492,6 +500,8 @@ class BaseEngine(ABC):
             data_sources=_run_card_data_sources(config, loader),
             strategy_path=run_dir / "code" / "signal_engine.py",
             warnings=config.get("content_filter_warnings") or None,
+            artifact_refs=config.get("_irr_artifact_refs") or None,
+            scorecard_refs=config.get("_quant_scorecard_refs") or None,
         )
 
         # Print scalar metrics (skip nested dicts for JSON compat)
@@ -528,10 +538,20 @@ class BaseEngine(ABC):
 
             # c. Record equity snapshot
             snap_equity = self._calc_equity(close_df, ts)
-            total_unrealized = 0.0
-            for p in self.positions.values():
-                cp = self._safe_price(close_df, ts, p.symbol, p.entry_price)
-                total_unrealized += self._calc_pnl(p.symbol, p.direction, p.size, p.entry_price, cp)
+            if self.positions and type(self)._calc_pnl is BaseEngine._calc_pnl:
+                _syms = list(self.positions.keys())
+                _eps = np.array([p.entry_price for p in self.positions.values()])
+                _dirs = np.array([p.direction for p in self.positions.values()])
+                _sizes = np.array([p.size for p in self.positions.values()])
+                _cps = np.array(
+                    [self._safe_price(close_df, ts, s, ep) for s, ep in zip(_syms, _eps)]
+                )
+                total_unrealized = float(np.sum(_dirs * _sizes * (_cps - _eps)))
+            else:
+                total_unrealized = 0.0
+                for p in self.positions.values():
+                    cp = self._safe_price(close_df, ts, p.symbol, p.entry_price)
+                    total_unrealized += self._calc_pnl(p.symbol, p.direction, p.size, p.entry_price, cp)
             self.equity_snapshots.append(EquitySnapshot(
                 timestamp=ts,
                 capital=self.capital,
@@ -548,7 +568,32 @@ class BaseEngine(ABC):
                 self._close_position(c, price, last_ts, "end_of_backtest")
 
     def _calc_equity(self, close_df: pd.DataFrame, ts: pd.Timestamp) -> float:
-        """Total equity = free cash + sum(margin + unrealised) per position."""
+        """Total equity = free cash + sum(margin + unrealised) per position.
+
+        Uses vectorized numpy path when _calc_pnl/_calc_margin are not
+        overridden by a subclass (FuturesBaseEngine, CompositeEngine).
+        """
+        if not self.positions:
+            return self.capital
+
+        _base_pnl = type(self)._calc_pnl is BaseEngine._calc_pnl
+        _base_margin = type(self)._calc_margin is BaseEngine._calc_margin
+
+        if _base_pnl and _base_margin:
+            syms = list(self.positions.keys())
+            sizes = np.array([p.size for p in self.positions.values()])
+            entry_prices = np.array([p.entry_price for p in self.positions.values()])
+            directions = np.array([p.direction for p in self.positions.values()])
+            leverages = np.array([p.leverage for p in self.positions.values()])
+
+            current_prices = np.array(
+                [self._safe_price(close_df, ts, s, ep) for s, ep in zip(syms, entry_prices)]
+            )
+
+            margins = sizes * entry_prices / leverages
+            pnls = directions * sizes * (current_prices - entry_prices)
+            return self.capital + float(np.sum(margins + pnls))
+
         equity = self.capital
         for sym, pos in self.positions.items():
             cp = self._safe_price(close_df, ts, sym, pos.entry_price)

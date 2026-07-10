@@ -11,7 +11,13 @@ export function setApiAuthKey(value: string): void {
     window.localStorage.setItem(STORAGE_KEY, trimmed);
   } else {
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(ADMIN_TOKEN_KEY);
   }
+}
+
+export function clearApiAuthKey(): void {
+  window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 export function getAdminToken(): string {
@@ -25,6 +31,10 @@ export function setAdminToken(value: string): void {
   } else {
     window.localStorage.removeItem(ADMIN_TOKEN_KEY);
   }
+}
+
+export function clearAdminToken(): void {
+  window.localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 export function authHeaders(): Record<string, string> {
@@ -55,3 +65,9 @@ export function withAuthQuery(url: string): string {
 export function isAdminElevated(): boolean {
   return Boolean(window.localStorage.getItem(ADMIN_TOKEN_KEY));
 }
+
+/** Returns true when a tenant API key is stored. */
+export function isTenantLoggedIn(): boolean {
+  return Boolean(window.localStorage.getItem(STORAGE_KEY));
+}
+

@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type LogEntry, type UserProfile } from "@/lib/api";
+import { setAdminToken } from "@/lib/apiAuth";
 import { toast } from "sonner";
 import { RefreshCw, Search, Terminal, Play, Pause, AlertTriangle, ShieldAlert, Lock, Loader2 } from "lucide-react";
-import { setAdminToken } from "@/lib/apiAuth";
 
 export function Logs() {
   const { i18n } = useTranslation();
@@ -32,17 +32,11 @@ export function Logs() {
   useEffect(() => {
     let alive = true;
     api.getSettingsProfile()
-      .then((p) => {
-        if (alive) {
-          setProfile(p);
-          setAuthLoading(false);
-        }
-      })
-      .catch(() => {
-        if (alive) setAuthLoading(false);
-      });
+      .then((p) => { if (alive) { setProfile(p); setAuthLoading(false); } })
+      .catch(() => { if (alive) setAuthLoading(false); });
     return () => { alive = false; };
   }, []);
+
   const handleAdminElevate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminPassword) return;
@@ -59,8 +53,9 @@ export function Logs() {
       setElevating(false);
     }
   };
+
   const fetchLogs = async () => {
-    if (paused || authLoading || profile?.role !== "admin") return;
+    if (paused || authLoading || !profile?.is_admin) return;
     try {
       setLogsLoading(true);
       const data = await api.getMonitorLogs({ limit, level, keyword });
@@ -74,13 +69,13 @@ export function Logs() {
 
   // Fetch logs whenever filters change or on periodic interval
   useEffect(() => {
-    if (!authLoading && profile?.role === "admin") {
+    if (!authLoading && profile?.is_admin) {
       fetchLogs();
     }
   }, [limit, level, keyword, paused, authLoading, profile]);
 
   useEffect(() => {
-    if (refreshInterval <= 0 || paused || authLoading || profile?.role !== "admin") return;
+    if (refreshInterval <= 0 || paused || authLoading || !profile?.is_admin) return;
     const interval = setInterval(fetchLogs, refreshInterval);
     return () => clearInterval(interval);
   }, [refreshInterval, limit, level, keyword, paused, authLoading, profile]);
@@ -117,7 +112,7 @@ export function Logs() {
   }
 
   // 阻断非管理员访问，就地展示提权卡片
-  if (profile?.role !== "admin") {
+  if (!profile?.is_admin) {
     const fieldClass = "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
       <div className="mx-auto max-w-7xl space-y-4 p-4">
@@ -133,24 +128,28 @@ export function Logs() {
         </div>
         <div className="rounded-lg border bg-card p-4 shadow-sm space-y-4 max-w-xl">
           <div className="flex items-center gap-2 border-b pb-3">
-            <ShieldAlert className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold">管理员提权 (查看日志)</h2>
+            <ShieldAlert className="h-4 w-4 text-amber-500" />
+            <h2 className="text-base font-semibold">{isZh ? "管理员提权 (查看日志)" : "Admin Elevation (View Logs)"}</h2>
           </div>
-          <p className="text-xs text-muted-foreground">此页面属于系统运维日志功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
+          <p className="text-xs text-muted-foreground">
+            {isZh 
+              ? "此页面属于系统运维日志功能，仅限系统管理员访问。请输入管理员账号密码进行提权。" 
+              : "This page contains system logs and is restricted to admin. Please enter admin credentials to elevate."}
+          </p>
           <form onSubmit={handleAdminElevate} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">{isZh ? "管理员账号" : "Admin Username"}</span>
                 <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} className={fieldClass} required />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
-                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder="请输入管理员密码" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">{isZh ? "管理员密码" : "Admin Password"}</span>
+                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder={isZh ? "请输入管理员密码" : "Password"} required />
               </label>
             </div>
-            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
+            <button type="submit" disabled={elevating} className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-70 cursor-pointer shadow-sm">
               {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-              进行管理员提权
+              {isZh ? "进行管理员提权" : "Elevate as Admin"}
             </button>
           </form>
         </div>

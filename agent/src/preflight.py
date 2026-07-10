@@ -109,7 +109,7 @@ def _check_llm_provider() -> CheckResult:
         ping_url = base_url.rstrip("/")
         if ping_url.endswith("/v1"):
             ping_url = ping_url[:-3]
-        requests.get(ping_url, timeout=10)
+        requests.get(ping_url, timeout=10, allow_redirects=False)
         return CheckResult(
             name=f"LLM ({provider})",
             status="ready",
@@ -248,6 +248,24 @@ def _check_ccxt() -> CheckResult:
     return CheckResult(name="ccxt", status="ready", message="installed", impact="")
 
 
+def _safe_mootdx_setup() -> None:
+    """Run mootdx setup silently to suppress misleading console logs."""
+    import contextlib
+    import io
+    import logging
+    
+    mootdx_logger = logging.getLogger("mootdx")
+    old_level = mootdx_logger.level
+    mootdx_logger.setLevel(logging.CRITICAL)
+    
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            from mootdx import config
+            config.setup()
+    finally:
+        mootdx_logger.setLevel(old_level)
+
+
 def _check_mootdx_and_heal() -> CheckResult:
     """Verify mootdx config integrity and self-heal if corrupted."""
     try:
@@ -261,8 +279,7 @@ def _check_mootdx_and_heal() -> CheckResult:
                 if not bestip or not bestip.get("HQ") or not bestip.get("EX"):
                     # Corrupted config detected, delete it to trigger auto-recreation
                     config_path.unlink()
-                    from mootdx import config
-                    config.setup()
+                    _safe_mootdx_setup()
                     return CheckResult(
                         name="mootdx config",
                         status="ready",
@@ -273,8 +290,7 @@ def _check_mootdx_and_heal() -> CheckResult:
                 # Failed to parse, delete it
                 try:
                     config_path.unlink()
-                    from mootdx import config
-                    config.setup()
+                    _safe_mootdx_setup()
                     return CheckResult(
                         name="mootdx config",
                         status="ready",
@@ -286,8 +302,7 @@ def _check_mootdx_and_heal() -> CheckResult:
         else:
             # Create config on startup if not present
             try:
-                from mootdx import config
-                config.setup()
+                _safe_mootdx_setup()
                 return CheckResult(
                     name="mootdx config",
                     status="ready",

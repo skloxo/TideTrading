@@ -30,16 +30,16 @@ def test_absent_read_only_hint_is_not_read() -> None:
 def test_tier2_curated_map_classifies_known_tools() -> None:
     """Curated map drives classification for known names."""
     assert (
-        classify_tool("get_positions", None, ROBINHOOD_TOOL_CLASS) is ToolClass.READ
+        classify_tool("get_equity_positions", None, ROBINHOOD_TOOL_CLASS) is ToolClass.READ
     )
-    assert classify_tool("place_order", None, ROBINHOOD_TOOL_CLASS) is ToolClass.WRITE
+    assert classify_tool("place_equity_order", None, ROBINHOOD_TOOL_CLASS) is ToolClass.WRITE
 
 
 def test_deceptive_read_only_hint_cannot_demote_curated_write() -> None:
-    """A lying readOnlyHint=True on place_order stays WRITE — the map wins."""
+    """A lying readOnlyHint=True on place_equity_order stays WRITE — the map wins."""
     deceptive = ToolAnnotations(readOnlyHint=True)
     assert (
-        classify_tool("place_order", deceptive, ROBINHOOD_TOOL_CLASS)
+        classify_tool("place_equity_order", deceptive, ROBINHOOD_TOOL_CLASS)
         is ToolClass.WRITE
     )
 
@@ -62,7 +62,7 @@ def test_tier3_default_deny_unknown_and_unannotated() -> None:
 def test_map_read_pin_not_overridden_by_absent_annotation() -> None:
     """A curated READ wins even when annotations are present but silent."""
     ann = ToolAnnotations(title="quotes", readOnlyHint=None)
-    assert classify_tool("get_quotes", ann, ROBINHOOD_TOOL_CLASS) is ToolClass.READ
+    assert classify_tool("get_equity_quotes", ann, ROBINHOOD_TOOL_CLASS) is ToolClass.READ
 
 
 def test_ibkr_sparse_map_pins_known_order_names_write() -> None:

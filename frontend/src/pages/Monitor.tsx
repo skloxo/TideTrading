@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { api, type MonitorStats, type QuoteGatewayStatus, type SystemVersionInfo, type LiveStatus, type UserProfile } from "@/lib/api";
-import { setAdminToken } from "@/lib/apiAuth";
-import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, Loader2, Save, ShieldAlert, Lock, LogOut, ArrowUpCircle, Cpu, Bot } from "lucide-react";
+import { clearAdminToken, setAdminToken } from "@/lib/apiAuth";
+import { Activity, Server, Database, FolderHeart, RefreshCw, Wifi, Loader2, Save, ShieldCheck, LogOut, ArrowUpCircle, Cpu, Bot, ShieldAlert, Lock } from "lucide-react";
 
 export function Monitor() {
   const { i18n } = useTranslation();
@@ -129,7 +129,7 @@ export function Monitor() {
 
   // Initial load and periodic stats/quote refresh
   useEffect(() => {
-    if (profile?.role !== "admin") return;
+    if (!profile?.is_admin) return;
 
     fetchStats();
     fetchQuoteStatus(true, false);
@@ -175,7 +175,13 @@ export function Monitor() {
     }
   };
 
-  const handleAdminElevate = async (e: FormEvent) => {
+  const handleAdminDeelevate = () => {
+    clearAdminToken();
+    toast.success("已退出管理员提权状态");
+    window.location.reload();
+  };
+
+  const handleAdminElevate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminPassword) return;
     setElevating(true);
@@ -192,7 +198,7 @@ export function Monitor() {
     }
   };
 
-  const handleAdminChangePassword = async (e: FormEvent) => {
+  const handleAdminChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (adminNewPassword !== adminConfirmPassword) {
       toast.error("两次输入的新密码不一致");
@@ -212,11 +218,6 @@ export function Monitor() {
     }
   };
 
-  const handleAdminDeelevate = () => {
-    setAdminToken("");
-    toast.success("已退出管理员提权状态");
-    window.location.reload();
-  };
 
   if (profileLoading) {
     return (
@@ -226,7 +227,7 @@ export function Monitor() {
     );
   }
 
-  if (!profileLoading && profile?.role !== "admin") {
+  if (!profileLoading && !profile?.is_admin) {
     const fieldClass = "w-full rounded-md border border-border/70 bg-background/50 backdrop-blur-sm px-3.5 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
     return (
       <div className="mx-auto max-w-7xl space-y-4 p-4">
@@ -244,30 +245,34 @@ export function Monitor() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-xl pointer-events-none group-hover:bg-primary/10 transition-all duration-500" />
           
           <div className="flex items-center gap-2.5 border-b border-border/40 pb-4">
-            <ShieldAlert className="h-5 w-5 text-primary animate-pulse" />
-            <h2 className="text-sm font-bold text-foreground">管理员提权 (系统运维)</h2>
+            <ShieldAlert className="h-5 w-5 text-amber-500 animate-pulse" />
+            <h2 className="text-sm font-bold text-foreground">{isZh ? "管理员提权 (系统运维)" : "Admin Elevation (Monitor)"}</h2>
           </div>
           
-          <p className="text-xs text-muted-foreground leading-relaxed pt-3">此页面属于系统运维管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。</p>
+          <p className="text-xs text-muted-foreground leading-relaxed pt-3">
+            {isZh 
+              ? "此页面属于系统运维管理功能，仅限系统管理员访问。请输入管理员账号密码进行提权。" 
+              : "This page is for system ops and is restricted to admin. Please enter credentials to elevate."}
+          </p>
           
           <form onSubmit={handleAdminElevate} className="space-y-4 pt-3">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">管理员账号</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">{isZh ? "管理员账号" : "Admin Username"}</span>
                 <input type="text" value={adminUsername} onChange={(e) => setAdminUsername(e.target.value)} className={fieldClass} required />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">管理员密码</span>
-                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder="请输入管理员密码" />
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">{isZh ? "管理员密码" : "Admin Password"}</span>
+                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} className={fieldClass} placeholder={isZh ? "请输入管理员密码" : "Password"} required />
               </label>
             </div>
             <button
               type="submit"
               disabled={elevating}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-70 cursor-pointer shadow-md shadow-primary/20"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-5 py-2.5 text-xs font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-70 cursor-pointer shadow-md shadow-amber-500/20"
             >
               {elevating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-              进行管理员提权
+              {isZh ? "进行管理员提权" : "Elevate as Admin"}
             </button>
           </form>
         </div>
@@ -765,8 +770,8 @@ export function Monitor() {
             
             <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-primary" />
-                <h2 className="text-xs font-bold text-foreground">管理员身份管理</h2>
+                <ShieldCheck className="h-4 w-4 text-amber-500" />
+                <h2 className="text-xs font-bold text-foreground">项目配置提权管理</h2>
               </div>
               <button
                 type="button"
@@ -778,16 +783,16 @@ export function Monitor() {
               </button>
             </div>
             
-            <p className="text-[11px] text-muted-foreground leading-relaxed pt-1.5">您当前处于系统管理员身份，可以修改管理员账户密码以保护服务端口及敏感配置。</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed pt-1.5">您当前已开启项目配置与运维功能，可以修改提权验证密码以保护服务端口及敏感配置。</p>
             
             <form onSubmit={handleAdminChangePassword} className="space-y-3 pt-2">
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block space-y-1">
-                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">原管理员密码</span>
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">原提权验证密码</span>
                   <input type="password" value={adminOldPassword} onChange={(e) => setAdminOldPassword(e.target.value)} className={fieldClass} placeholder="旧密码" required />
                 </label>
                 <label className="block space-y-1">
-                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">新管理员密码</span>
+                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">新提权验证密码</span>
                   <input type="password" value={adminNewPassword} onChange={(e) => setAdminNewPassword(e.target.value)} className={fieldClass} placeholder="新密码" required />
                 </label>
                 <label className="block space-y-1">
@@ -801,7 +806,7 @@ export function Monitor() {
                 className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[10px] font-semibold text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:opacity-70 cursor-pointer shadow"
               >
                 {changingPwd ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                保存管理员密码
+                保存提权密码
               </button>
             </form>
           </div>

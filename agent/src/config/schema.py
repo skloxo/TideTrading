@@ -44,7 +44,7 @@ LIVE_BROKER_READONLY_WILDCARD_ALLOWED_EXTRA_SCOPES: dict[str, frozenset[str]] = 
 LIVE_BROKER_WRITE_SCOPES: dict[str, frozenset[str]] = {
     "ibkr": frozenset({"mcp.write"}),
 }
-ROBINHOOD_AGENT_CONFIG_PATH = "~/.vibe-trading/agent.json"
+ROBINHOOD_AGENT_CONFIG_PATH = "~/.tide-trading/agent.json"
 LIVE_BROKER_WILDCARD_ALLOWLIST_ERROR = (
     "enabledTools allowlist ('*'); pin an explicit read-only tool list"
 )
@@ -178,7 +178,7 @@ def _allows_readonly_wildcard_probe(
     allowed = set(required | allowed_extras)
     return required.issubset(scopes) and scopes.isdisjoint(write_scopes) and scopes <= allowed
 
-# Canonical seed for the operator-side ``~/.vibe-trading-cnx/agent.json`` mcpServers
+# Canonical seed for the operator-side ``~/.tide-trading/agent.json`` mcpServers
 # entry that wires the Robinhood Agentic Trading channel. It ships OFF-by-default
 # read-only: an explicit READ allowlist (never ``["*"]``), OAuth auth, and the
 # streamableHttp transport. Operators copy this block into their protected config
@@ -197,21 +197,23 @@ ROBINHOOD_MCP_SERVER_SEED: dict[str, object] = {
     "auth": {
         "type": "oauth",
         "scopes": ["trading.read"],
-        "client_name": "Vibe-Trading-CNX",
-        "cache_dir": "~/.vibe-trading-cnx/live/robinhood/oauth",
+        "client_name": "TideTrading-CNX",
+        "cache_dir": "~/.tide-trading/live/robinhood/oauth",
     },
     # Seed the OFF-by-default READ allowlist to EXACTLY the canonical curated
     # READ tool names (``src.trading.connectors.robinhood.classification.ROBINHOOD_TOOL_CLASS``).
     # These MUST match the curated map's READ entries: a name here that the map
     # does not classify READ would resolve UNKNOWN -> gated -> refused, silently
-    # hiding the real read tool. Canonical READ catalog: get_account,
-    # get_positions, get_quotes, list_orders. WRITE (place_order, cancel_order)
-    # is never seeded — the user adds those by hand once a mandate exists.
+    # hiding the real read tool. Canonical READ catalog: get_accounts,
+    # get_portfolio, get_equity_positions, get_equity_quotes, get_equity_orders.
+    # WRITE (place_equity_order, cancel_equity_order) is never seeded — the user
+    # adds those by hand once a mandate exists.
     "enabled_tools": [
-        "get_account",
-        "get_positions",
-        "get_quotes",
-        "list_orders",
+        "get_accounts",
+        "get_portfolio",
+        "get_equity_positions",
+        "get_equity_quotes",
+        "get_equity_orders",
     ],
 }
 
@@ -228,8 +230,8 @@ IBKR_MCP_SERVER_SEED: dict[str, object] = {
     "auth": {
         "type": "oauth",
         "scopes": ["mcp.read"],
-        "client_name": "Vibe-Trading-CNX",
-        "cache_dir": "~/.vibe-trading-cnx/live/ibkr/oauth",
+        "client_name": "TideTrading-CNX",
+        "cache_dir": "~/.tide-trading/live/ibkr/oauth",
     },
     "enabled_tools": ["*"],
 }
@@ -336,8 +338,8 @@ class MCPOAuthConfig(ConfigBase):
 
     type: Literal["oauth"] = "oauth"
     scopes: list[str] = Field(default_factory=list)
-    client_name: str = "Vibe-Trading-CNX"
-    cache_dir: str = "~/.vibe-trading-cnx/live/robinhood/oauth"
+    client_name: str = "TideTrading-CNX"
+    cache_dir: str = "~/.tide-trading/live/robinhood/oauth"
     callback_port: int | None = Field(default=None, ge=1, le=65535)
     client_id: str | None = None
     client_secret: str | None = None
@@ -424,10 +426,27 @@ class MCPServerConfigOverride(ConfigBase):
     enabled_tools: list[str] | None = None
 
 
+class ChannelsConfig(ConfigBase):
+    """Top-level IM channel config.
+
+    Built-in adapters parse their own per-channel sections. This model keeps
+    the operator file strict for global fields while allowing platform-specific
+    channel keys such as ``telegram`` or ``feishu``.
+    """
+
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True, extra="allow")
+
+    send_progress: bool = True
+    send_tool_hints: bool = False
+    send_max_retries: int = Field(default=2, ge=1, le=10)
+    reply_timeout_s: float = Field(default=600.0, ge=1.0, le=86400.0)
+
+
 class AgentConfig(ConfigBase):
     """Top-level structured agent config."""
 
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
+    channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
 
     @model_validator(mode="after")
     def validate_live_broker_servers(self) -> "AgentConfig":
@@ -483,3 +502,4 @@ class AgentConfigOverride(ConfigBase):
     )
 
     mcp_servers: dict[str, MCPServerConfigOverride] = Field(default_factory=dict)
+    channels: ChannelsConfig | None = None

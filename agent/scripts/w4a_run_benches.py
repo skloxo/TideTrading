@@ -4,9 +4,9 @@ Usage:
     cd agent && python scripts/w4a_run_benches.py
 
 Output:
-    ~/.vibe-trading/reports/alpha_bench_*.html      — per-run HTML reports
-    ~/.vibe-trading/reports/bench_<zoo>_<uni>.json  — per-run raw results
-    ~/.vibe-trading/reports/bench_summary.json      — aggregate summary
+    ~/.tide-trading/reports/alpha_bench_*.html      — per-run HTML reports
+    ~/.tide-trading/reports/bench_<zoo>_<uni>.json  — per-run raw results
+    ~/.tide-trading/reports/bench_summary.json      — aggregate summary
 
 Safe to re-run; each bench result is cached by ``_load_universe_panel`` so the
 expensive Tushare/yfinance fetches only happen once per (universe, period).
@@ -42,7 +42,8 @@ from src.factors.bench_runner import run_bench  # noqa: E402
 from src.tools.alpha_bench_tool import run_alpha_bench  # noqa: E402
 
 
-REPORTS_DIR = Path.home() / ".vibe-trading" / "reports"
+from src.config.paths import _get_active_runtime_dir
+REPORTS_DIR = _get_active_runtime_dir() / "reports"
 
 BENCHES = [
     {"key": "gtja191_csi300", "zoo": "gtja191", "universe": "csi300", "period": "2018-2025"},

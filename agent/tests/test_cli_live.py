@@ -359,7 +359,7 @@ class TestLiveAuthorize:
                 "type": "streamableHttp",
                 "url": "https://agent.robinhood.com/mcp/trading",
                 "auth": {"type": "oauth", "scopes": ["trading.read"]},
-                "enabledTools": ["get_account"],
+                "enabledTools": ["get_portfolio"],
             }
         )
         with patch("cli._legacy._live_server_config", return_value=cfg), patch(
@@ -384,7 +384,7 @@ class TestLiveAuthorize:
                 "type": "streamableHttp",
                 "url": "https://agent.robinhood.com/mcp/trading",
                 "auth": {"type": "oauth", "scopes": ["trading.read"]},
-                "enabledTools": ["get_account"],
+                "enabledTools": ["get_portfolio"],
                 "toolTimeout": 600,
                 "initTimeout": 600,
             }
@@ -411,7 +411,7 @@ class TestLiveAuthorize:
                 "type": "streamableHttp",
                 "url": "https://agent.robinhood.com/mcp/trading",
                 "auth": {"type": "oauth", "scopes": ["trading.read"]},
-                "enabledTools": ["get_account"],
+                "enabledTools": ["get_portfolio"],
             }
         )
         with patch("cli._legacy._live_server_config", return_value=cfg), patch(

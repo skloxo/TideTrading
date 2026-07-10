@@ -61,9 +61,9 @@ class _MockAdapter:
 
     def call_tool(self, remote_name: str, arguments: dict, *, local_name: str | None = None) -> dict:
         self.call_records.append({"remote": remote_name, "arguments": arguments})
-        if remote_name in ("get_positions", "list_positions"):
+        if remote_name == "get_equity_positions":
             return {"positions": self._positions, "status": "ok"}
-        if remote_name in ("get_account", "get_balance", "get_buying_power"):
+        if remote_name == "get_portfolio":
             return {"equity": self._balance, "status": "ok"}
         # The order placement itself (super().execute forwards here).
         self.order_calls.append({"remote": remote_name, "arguments": arguments})
@@ -73,8 +73,8 @@ class _MockAdapter:
 def _spec() -> MCPRemoteToolSpec:
     return MCPRemoteToolSpec(
         server_name="robinhood",
-        remote_name="place_order",
-        local_name="mcp_robinhood_place_order",
+        remote_name="place_equity_order",
+        local_name="mcp_robinhood_place_equity_order",
         description="Place an order.",
         parameters={
             "type": "object",
@@ -174,7 +174,7 @@ def _check(intent: OrderIntent, mandate: Mandate, *, positions=None, daily_count
         positions if positions is not None else [],
         {"equity": 5000.0},
         broker="robinhood",
-        remote_tool="place_order",
+        remote_tool="place_equity_order",
         daily_count=daily_count,
     )
 
@@ -357,9 +357,9 @@ class _FailingForwardAdapter:
         self.order_calls: list[dict[str, Any]] = []
 
     def call_tool(self, remote_name: str, arguments: dict, *, local_name: str | None = None) -> dict:
-        if remote_name == "get_positions":
+        if remote_name == "get_equity_positions":
             return {"positions": [], "status": "ok"}
-        if remote_name == "get_account":
+        if remote_name == "get_portfolio":
             return {"equity": 5000.0, "status": "ok"}
         # The order placement fails at the broker.
         self.order_calls.append({"remote": remote_name, "arguments": arguments})
@@ -427,7 +427,7 @@ def test_successful_forward_consumes_count_and_audits_accepted(live_runtime: Pat
 
 
 class _QuoteAdapter:
-    """Adapter with a working ``get_quotes`` read tool returning a fixed price."""
+    """Adapter with a working ``get_equity_quotes`` read tool returning a fixed price."""
 
     def __init__(self, *, price: float, positions: Any = (), balance: Any = 5000.0) -> None:
         self.server_name = "robinhood"
@@ -438,11 +438,11 @@ class _QuoteAdapter:
         self.quote_calls: list[dict[str, Any]] = []
 
     def call_tool(self, remote_name: str, arguments: dict, *, local_name: str | None = None) -> dict:
-        if remote_name == "get_positions":
+        if remote_name == "get_equity_positions":
             return {"positions": self._positions, "status": "ok"}
-        if remote_name == "get_account":
+        if remote_name == "get_portfolio":
             return {"equity": self._balance, "status": "ok"}
-        if remote_name == "get_quotes":
+        if remote_name == "get_equity_quotes":
             self.quote_calls.append({"arguments": arguments})
             return {"status": "ok", "symbol": arguments.get("symbol"), "price": self._price}
         self.order_calls.append({"remote": remote_name, "arguments": arguments})

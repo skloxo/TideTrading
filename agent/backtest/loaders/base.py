@@ -222,6 +222,7 @@ def retry_with_budget(
 # ---------------------------------------------------------------------------
 
 LOADER_CACHE_ENV = "VIBE_TRADING_DATA_CACHE"
+LOADER_CACHE_ROOT_ENV = "VIBE_TRADING_DATA_CACHE_ROOT"
 _LOADER_CACHE_TRUE_VALUES = {"1", "true", "yes", "on"}
 # Bump when the key payload or on-disk layout changes so stale entries are
 # simply never matched (old files become unreachable garbage, safe to delete).
@@ -231,6 +232,18 @@ _LOADER_CACHE_VERSION = 2
 def loader_cache_enabled() -> bool:
     """Return whether the local market-data cache is explicitly enabled."""
     return os.getenv(LOADER_CACHE_ENV, "").strip().lower() in _LOADER_CACHE_TRUE_VALUES
+
+
+def loader_cache_root() -> Path:
+    """Return the root directory for opt-in loader cache files."""
+    raw = os.getenv(LOADER_CACHE_ROOT_ENV)
+    if raw and raw.strip():
+        return Path(raw).expanduser()
+    try:
+        from src.config.paths import _get_active_runtime_dir
+        return _get_active_runtime_dir() / "cache" / "loaders"
+    except ImportError:
+        return Path.home() / ".tide-trading" / "cache" / "loaders"
 
 
 def make_loader_cache_key(
@@ -274,7 +287,7 @@ def loader_cache_path(
         fields=fields,
     )
     source_dir = _sanitize_cache_segment(source)
-    return Path.home() / ".vibe-trading-cnx" / "cache" / "loaders" / source_dir / f"{key}.parquet"
+    return loader_cache_root() / source_dir / f"{key}.parquet"
 
 
 def loader_cache_range_is_final(end_date: str) -> bool:

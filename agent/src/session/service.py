@@ -89,6 +89,7 @@ class SessionService:
         role: str = "user",
         *,
         include_shell_tools: bool = False,
+        governance_surface: str | None = None,
     ) -> Dict[str, Any]:
         """Send a message to a session and trigger execution.
 
@@ -116,6 +117,8 @@ class SessionService:
         attempt = Attempt(session_id=session_id, parent_attempt_id=session.last_attempt_id, prompt=content)
         self.store.create_attempt(attempt)
         session.config["include_shell_tools"] = include_shell_tools
+        if governance_surface:
+            session.config["governance_surface"] = governance_surface
         session.last_attempt_id = attempt.attempt_id
         session.updated_at = datetime.now().isoformat()
         self.store.update_session(session)
@@ -213,11 +216,17 @@ class SessionService:
         Returns:
             Result dictionary containing status, run_dir, run_id, metrics, and related fields.
         """
+        import contextvars
         from src.tools import build_registry
         from src.providers.chat import ChatLLM
         from src.agent.loop import AgentLoop
         from src.memory.persistent import PersistentMemory
         from src.config.loader import load_runtime_agent_config, sanitize_session_overrides
+        from src.governance.config import get_governance_mode
+        from src.governance.decisions import RuntimeContext
+        from src.governance.runtime import govern_registry
+
+        ctx = contextvars.copy_context()
 
         llm = ChatLLM()
         pm = PersistentMemory()
@@ -240,13 +249,25 @@ class SessionService:
 
         registry = await loop.run_in_executor(
             _AGENT_EXECUTOR,
-            lambda: build_registry(
+            lambda: ctx.run(
+                build_registry,
                 persistent_memory=pm,
                 include_shell_tools=include_shell_tools,
                 agent_config=agent_config,
                 session_id=session_id,
                 event_callback=event_callback,
                 warn_callback=_mcp_collision_warn,
+            ),
+        )
+        surface = self._governance_surface_from_config(session_config)
+        registry = govern_registry(
+            registry,
+            surface=surface,
+            context=RuntimeContext(
+                surface=surface,
+                mode=get_governance_mode(),
+                session_id=session_id,
+                run_id=attempt_id,
             ),
         )
 
@@ -265,7 +286,8 @@ class SessionService:
         try:
             result = await loop.run_in_executor(
                 _AGENT_EXECUTOR,
-                lambda: agent.run(
+                lambda: ctx.run(
+                    agent.run,
                     user_message=attempt.prompt,
                     history=history,
                     session_id=session_id,
@@ -281,6 +303,18 @@ class SessionService:
                 result["metrics"] = metrics
 
         return result
+
+    @staticmethod
+    def _governance_surface_from_config(session_config: Optional[Dict[str, Any]]) -> "ToolSurface":
+        from src.governance.config import parse_surface
+        from src.governance.manifest import ToolSurface
+
+        config = session_config or {}
+        if config.get("governance_surface"):
+            return parse_surface(config.get("governance_surface"), default=ToolSurface.LOCAL_API)
+        if config.get("channel"):
+            return ToolSurface.CHANNEL_BOT
+        return ToolSurface.LOCAL_API
 
     @staticmethod
     def _convert_messages_to_history(messages: list) -> list[Dict[str, Any]]:

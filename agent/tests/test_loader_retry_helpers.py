@@ -29,6 +29,7 @@ from backtest.loaders.base import (
     DEFAULT_BACKOFF,
     DEFAULT_MAX_RETRIES,
     LOADER_CACHE_ENV,
+    LOADER_CACHE_ROOT_ENV,
     cached_loader_fetch,
     check_budget,
     loader_cache_get,
@@ -203,6 +204,13 @@ def fake_duckdb(monkeypatch):
     )
 
 
+@pytest.fixture
+def loader_cache_root(tmp_path, monkeypatch):
+    cache_root = tmp_path / "loader-cache"
+    monkeypatch.setenv(LOADER_CACHE_ROOT_ENV, str(cache_root))
+    return cache_root
+
+
 def _cache_frame(value: float = 1.0) -> pd.DataFrame:
     frame = pd.DataFrame(
         {
@@ -266,9 +274,9 @@ def test_loader_cache_happy_path_writes_then_reuses(
     tmp_path,
     monkeypatch,
     fake_duckdb,
+    loader_cache_root,
 ):
     monkeypatch.setenv(LOADER_CACHE_ENV, "1")
-    monkeypatch.setenv("HOME", str(tmp_path))
     calls = {"count": 0}
     frame = _cache_frame()
 
@@ -291,16 +299,16 @@ def test_loader_cache_happy_path_writes_then_reuses(
     pd.testing.assert_frame_equal(first, frame)
     pd.testing.assert_frame_equal(second, frame)
     assert loader_cache_path(**kwargs).is_file()
-    assert str(loader_cache_path(**kwargs)).startswith(str(tmp_path / ".vibe-trading-cnx" / "cache"))
+    assert str(loader_cache_path(**kwargs)).startswith(str(loader_cache_root))
 
 
 def test_loader_cache_corrupt_entry_falls_back_to_live_fetch(
     tmp_path,
     monkeypatch,
     fake_duckdb,
+    loader_cache_root,
 ):
     monkeypatch.setenv(LOADER_CACHE_ENV, "true")
-    monkeypatch.setenv("HOME", str(tmp_path))
     kwargs = {
         "source": "tushare",
         "symbol": "000001.SZ",
@@ -333,9 +341,9 @@ def test_tushare_daily_fetch_uses_opt_in_cache_for_bars_and_fields(
     tmp_path,
     monkeypatch,
     fake_duckdb,
+    loader_cache_root,
 ):
     monkeypatch.setenv(LOADER_CACHE_ENV, "yes")
-    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
 
     class _FakeApi:
@@ -394,10 +402,9 @@ def test_loader_cache_range_is_final_only_for_settled_past():
     assert loader_cache_range_is_final("not-a-date") is False
 
 
-def test_loader_cache_skips_unsettled_today_range(tmp_path, monkeypatch):
+def test_loader_cache_skips_unsettled_today_range(tmp_path, monkeypatch, loader_cache_root):
     """A range ending today must never be cached: its last bar is still forming."""
     monkeypatch.setenv(LOADER_CACHE_ENV, "1")
-    monkeypatch.setenv("HOME", str(tmp_path))
     today = dt.date.today().isoformat()
     start = (dt.date.today() - dt.timedelta(days=5)).isoformat()
     kwargs = {
@@ -413,14 +420,13 @@ def test_loader_cache_skips_unsettled_today_range(tmp_path, monkeypatch):
 
     assert loader_cache_get(**kwargs) is None
     assert not loader_cache_path(**kwargs).exists()
-    assert not (tmp_path / ".vibe-trading-cnx").exists()
+    assert not loader_cache_root.exists()
 
 
-def test_loader_cache_real_duckdb_round_trip(tmp_path, monkeypatch):
+def test_loader_cache_real_duckdb_round_trip(tmp_path, monkeypatch, loader_cache_root):
     """Exercise the real duckdb -> parquet -> duckdb path (CI mocks duckdb elsewhere)."""
     pytest.importorskip("duckdb")
     monkeypatch.setenv(LOADER_CACHE_ENV, "1")
-    monkeypatch.setenv("HOME", str(tmp_path))
     frame = _cache_frame()
     kwargs = {
         "source": "yfinance",
@@ -443,10 +449,9 @@ def test_loader_cache_real_duckdb_round_trip(tmp_path, monkeypatch):
     pd.testing.assert_frame_equal(restored, frame)
 
 
-def test_yfinance_loader_serves_second_fetch_from_cache(tmp_path, monkeypatch, fake_duckdb):
+def test_yfinance_loader_serves_second_fetch_from_cache(tmp_path, monkeypatch, fake_duckdb, loader_cache_root):
     """A batch loader (yfinance) must skip its bulk download on a full cache hit."""
     monkeypatch.setenv(LOADER_CACHE_ENV, "1")
-    monkeypatch.setenv("HOME", str(tmp_path))
     import backtest.loaders.yfinance_loader as yfl
 
     calls = {"n": 0}

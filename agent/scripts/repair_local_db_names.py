@@ -87,10 +87,9 @@ def main():
         print("No static names loaded, aborting database repair.")
         return
         
-    # Search for all .db files under /home/vibe/.vibe-trading-cnx or ~/.vibe-trading-cnx
-    db_root = Path("/home/vibe/.vibe-trading-cnx")
-    if not db_root.exists():
-        db_root = Path.home() / ".vibe-trading-cnx"
+    # Resolve the active runtime root dynamically
+    from src.config.paths import _get_active_runtime_dir
+    db_root = _get_active_runtime_dir()
     if not db_root.exists():
         print(f"Database root {db_root} does not exist.")
         return

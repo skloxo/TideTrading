@@ -92,8 +92,13 @@ SEED_INDEXES = [
 
 def find_source_db() -> Path:
     """Find the best available source database."""
+    from src.config.paths import _get_active_runtime_dir
+    base = _get_active_runtime_dir()
     home = Path.home()
     candidates = [
+        base / "stocks_default.db",
+        base / "stocks.db",
+        home / ".tide-trading" / "stocks_default.db",
         home / ".vibe-trading-cnx" / "stocks_default.db",
         home / ".vibe-trading" / "stocks_default.db",
         home / ".vibe-trading-cnx" / "stocks.db",

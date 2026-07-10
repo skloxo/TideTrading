@@ -47,7 +47,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw await errorFromResponse(res);
   }
   const text = await res.text();
-  return text ? JSON.parse(text) : ({} as T);
+  if (!text) return {} as T;
+
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const preview = text.slice(0, 80).replace(/\s+/g, " ");
+    throw new ApiError(
+      `Expected JSON from ${path}, got ${contentType || "unknown content type"}: ${preview}`,
+      res.status,
+    );
+  }
+
+  return JSON.parse(text) as T;
 }
 
 export interface UploadResult {
@@ -83,6 +94,8 @@ export const api = {
   },
   getRunCode: (id: string) => request<Record<string, string>>(`/runs/${id}/code`),
   getRunPine: (id: string) => request<PineScriptResult>(`/runs/${id}/pine`),
+  getPolicyDecisions: (runId: string) =>
+    request<PolicyDecisionsResponse>(`/governance/policy-decisions?run_id=${encodeURIComponent(runId)}`),
   listSessions: () => request<SessionItem[]>("/sessions"),
   createSession: (title?: string) => request<SessionItem>("/sessions", { method: "POST", body: JSON.stringify({ title: title || "" }) }),
   deleteSession: (sid: string) => request<{ status: string }>(`/sessions/${sid}`, { method: "DELETE" }),
@@ -139,6 +152,20 @@ export const api = {
       ...options,
     }),
   getFeatureFlags: (options?: RequestInit) => request<FeatureFlagsResponse>("/settings/feature-flags", options),
+  getAgentConfig: (options?: RequestInit) => request<AgentConfigTextResponse>("/settings/agent-config", options),
+  updateAgentConfig: (body: UpdateAgentConfigRequest, options?: RequestInit) =>
+    request<AgentConfigTextResponse>("/settings/agent-config", {
+      method: "PUT",
+      body: JSON.stringify(body),
+      ...options,
+    }),
+  getAgentConfigJson: (options?: RequestInit) => request<any>("/settings/agent-config/json", options),
+  updateAgentConfigJson: (body: any, options?: RequestInit) =>
+    request<any>("/settings/agent-config/json", {
+      method: "PUT",
+      body: JSON.stringify(body),
+      ...options,
+    }),
   getDataSourceSettings: (options?: RequestInit) => request<DataSourceSettings>("/settings/data-sources", options),
   updateDataSourceSettings: (settings: UpdateDataSourceSettingsRequest, options?: RequestInit) =>
     request<DataSourceSettings>("/settings/data-sources", {
@@ -204,6 +231,95 @@ export const api = {
       ilink_bot_id?: string;
       ilink_user_id?: string;
     }>(`/settings/platforms/wechat/transient/status?temp_id=${tempId}`),
+
+  getDingtalkChannels: () => request<DingtalkChannel[]>("/settings/platforms/dingtalk/channels"),
+  createDingtalkChannel: (channel: CreateDingtalkChannelRequest) =>
+    request<DingtalkChannel>("/settings/platforms/dingtalk/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateDingtalkChannel: (id: string, channel: UpdateDingtalkChannelRequest) =>
+    request<DingtalkChannel>(`/settings/platforms/dingtalk/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteDingtalkChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/dingtalk/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getQqChannels: () => request<QqChannel[]>("/settings/platforms/qq/channels"),
+  createQqChannel: (channel: CreateQqChannelRequest) =>
+    request<QqChannel>("/settings/platforms/qq/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateQqChannel: (id: string, channel: UpdateQqChannelRequest) =>
+    request<QqChannel>(`/settings/platforms/qq/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteQqChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/qq/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getEmailChannels: () => request<EmailChannel[]>("/settings/platforms/email/channels"),
+  createEmailChannel: (channel: CreateEmailChannelRequest) =>
+    request<EmailChannel>("/settings/platforms/email/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateEmailChannel: (id: string, channel: UpdateEmailChannelRequest) =>
+    request<EmailChannel>(`/settings/platforms/email/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteEmailChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/email/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getMsteamsChannels: () => request<MsteamsChannel[]>("/settings/platforms/msteams/channels"),
+  createMsteamsChannel: (channel: CreateMsteamsChannelRequest) =>
+    request<MsteamsChannel>("/settings/platforms/msteams/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateMsteamsChannel: (id: string, channel: UpdateMsteamsChannelRequest) =>
+    request<MsteamsChannel>(`/settings/platforms/msteams/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteMsteamsChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/msteams/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getWebsocketChannels: () => request<WebsocketChannel[]>("/settings/platforms/websocket/channels"),
+  createWebsocketChannel: (channel: CreateWebsocketChannelRequest) =>
+    request<WebsocketChannel>("/settings/platforms/websocket/channels", {
+      method: "POST",
+      body: JSON.stringify(channel),
+    }),
+  updateWebsocketChannel: (id: string, channel: UpdateWebsocketChannelRequest) =>
+    request<WebsocketChannel>(`/settings/platforms/websocket/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(channel),
+    }),
+  deleteWebsocketChannel: (id: string) =>
+    request<{ status: string }>(`/settings/platforms/websocket/channels/${id}`, {
+      method: "DELETE",
+    }),
+
+  getChannelStatus: () => request<ChannelRuntimeStatus>("/channels/status"),
+  startChannels: () => request<ChannelRuntimeActionResponse>("/channels/start", { method: "POST" }),
+  stopChannels: () => request<ChannelRuntimeActionResponse>("/channels/stop", { method: "POST" }),
+  runChannelPairingCommand: (body: ChannelPairingCommandRequest) =>
+    request<ChannelPairingCommandResponse>("/channels/pairing/command", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   // Alpha Zoo API
   listAlphas: (params: AlphaListParams = {}) => {
@@ -492,6 +608,131 @@ export interface UpdateWechatChannelRequest {
   ilink_user_id?: string;
 }
 
+export interface DingtalkChannel {
+  id: string;
+  name: string;
+  client_id: string;
+  client_secret_configured: boolean;
+  enabled: boolean;
+}
+
+export interface CreateDingtalkChannelRequest {
+  name: string;
+  client_id: string;
+  client_secret: string;
+  enabled: boolean;
+}
+
+export interface UpdateDingtalkChannelRequest {
+  name: string;
+  client_id: string;
+  client_secret?: string;
+  enabled: boolean;
+}
+
+export interface QqChannel {
+  id: string;
+  name: string;
+  app_id: string;
+  secret_configured: boolean;
+  enabled: boolean;
+}
+
+export interface CreateQqChannelRequest {
+  name: string;
+  app_id: string;
+  secret: string;
+  enabled: boolean;
+}
+
+export interface UpdateQqChannelRequest {
+  name: string;
+  app_id: string;
+  secret?: string;
+  enabled: boolean;
+}
+
+export interface EmailChannel {
+  id: string;
+  name: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password_configured: boolean;
+  from_address: string;
+  enabled: boolean;
+}
+
+export interface CreateEmailChannelRequest {
+  name: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password: string;
+  from_address: string;
+  enabled: boolean;
+}
+
+export interface UpdateEmailChannelRequest {
+  name: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password?: string;
+  from_address: string;
+  enabled: boolean;
+}
+
+export interface MsteamsChannel {
+  id: string;
+  name: string;
+  app_id: string;
+  app_password_configured: boolean;
+  enabled: boolean;
+}
+
+export interface CreateMsteamsChannelRequest {
+  name: string;
+  app_id: string;
+  app_password: string;
+  enabled: boolean;
+}
+
+export interface UpdateMsteamsChannelRequest {
+  name: string;
+  app_id: string;
+  app_password?: string;
+  enabled: boolean;
+}
+
+export interface WebsocketChannel {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  token_configured: boolean;
+  websocket_requires_token: boolean;
+  enabled: boolean;
+}
+
+export interface CreateWebsocketChannelRequest {
+  name: string;
+  host: string;
+  port: number;
+  token: string;
+  websocket_requires_token: boolean;
+  enabled: boolean;
+}
+
+export interface UpdateWebsocketChannelRequest {
+  name: string;
+  host: string;
+  port: number;
+  token?: string;
+  websocket_requires_token: boolean;
+  enabled: boolean;
+}
+
 export interface DataSourceSettings {
   tushare_token_configured: boolean;
   tushare_token_hint?: string | null;
@@ -525,6 +766,49 @@ export interface FeatureFlagsResponse {
   scheduler_enabled: boolean;
   session_runtime_enabled: boolean;
   env_path: string;
+}
+
+export interface AgentConfigTextResponse {
+  yaml_content: string;
+  config_path: string;
+}
+
+export interface UpdateAgentConfigRequest {
+  yaml_content: string;
+}
+
+export interface ChannelAdapterStatus {
+  name: string;
+  display_name: string;
+  configured: boolean;
+  enabled: boolean;
+  available: boolean;
+  loaded: boolean;
+  running: boolean;
+  error?: string;
+  install_hint?: string;
+}
+
+export interface ChannelRuntimeStatus {
+  running: boolean;
+  inbound_queue: number;
+  outbound_queue: number;
+  session_count: number;
+  channels: Record<string, ChannelAdapterStatus>;
+}
+
+export interface ChannelRuntimeActionResponse extends ChannelRuntimeStatus {
+  status: string;
+}
+
+export interface ChannelPairingCommandRequest {
+  channel: string;
+  command: string;
+}
+
+export interface ChannelPairingCommandResponse {
+  channel: string;
+  reply: string;
 }
 
 // --- Types matching backend API contracts ---
@@ -632,6 +916,7 @@ export interface RunData {
   metrics?: BacktestMetrics;
   artifacts?: ArtifactInfo[];
   run_card?: RunCard;
+  research_card?: ResearchCard;
   validation?: ValidationData;
 
   chart_symbols?: string[];
@@ -661,6 +946,51 @@ export interface RunCardArtifact {
   path: string;
   size_bytes: number;
   sha256: string;
+}
+
+export interface StructuredResearchIssue {
+  code: string;
+  severity?: string;
+  message?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ResearchCard {
+  card_id: string;
+  schema_version?: string;
+  title?: string;
+  hypothesis?: string | null;
+  universe?: Record<string, unknown>;
+  data_sources?: Array<Record<string, unknown>>;
+  data_audit_refs?: string[];
+  policy_decision_refs?: string[];
+  policy_decisions?: Array<Record<string, unknown>>;
+  tool_trace_refs?: string[];
+  backtest_refs?: string[];
+  alpha_bench_refs?: string[];
+  scorecard?: Record<string, unknown> | null;
+  key_metrics?: Record<string, unknown>;
+  benchmark?: Record<string, unknown>;
+  cost_model?: Record<string, unknown>;
+  execution_assumptions?: Record<string, unknown>;
+  oos_results?: Record<string, unknown>;
+  warnings?: StructuredResearchIssue[];
+  hard_failures?: StructuredResearchIssue[];
+  reproducibility?: Record<string, unknown>;
+  conclusion_level?: string;
+}
+
+export interface PolicyDecisionRecord {
+  decision_id?: string;
+  tool_name?: string;
+  action?: string;
+  rule_id?: string | null;
+  [key: string]: unknown;
+}
+
+export interface PolicyDecisionsResponse {
+  schema_version: string;
+  decisions: PolicyDecisionRecord[];
 }
 
 export interface BacktestMetrics {
@@ -1177,6 +1507,8 @@ export interface UserProfile {
   tenant_id: string;
   name?: string;
   is_local: boolean;
+  is_tenant?: boolean;  // Has a valid tenant Bearer Token
+  is_admin?: boolean;   // Has a valid admin session token
 }
 
 export interface TenantKey {

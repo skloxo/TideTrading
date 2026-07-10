@@ -20,7 +20,8 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-_DB_PATH = Path.home() / ".vibe-trading-cnx" / "sessions.db"
+from src.config.paths import get_runtime_root
+_DB_PATH = get_runtime_root() / "sessions.db"
 
 
 @dataclass(frozen=True)
@@ -343,20 +344,23 @@ class SessionSearchIndex:
 
 import threading as _threading
 
-_shared_index: Optional[SessionSearchIndex] = None
+_shared_indexes: dict[str, SessionSearchIndex] = {}
 _shared_lock = _threading.Lock()
 
 
 def get_shared_index() -> SessionSearchIndex:
-    """Return a process-wide singleton SessionSearchIndex.
+    """Return a process-wide, tenant-specific SessionSearchIndex.
 
     Thread-safe via double-checked locking. Used by both
     SessionService (indexing) and SessionSearchTool (searching)
-    so they share one SQLite connection.
+    so they share one SQLite connection per tenant.
     """
-    global _shared_index
-    if _shared_index is None:
+    from src.config.paths import active_tenant_var
+    tenant = active_tenant_var.get() or "default"
+
+    global _shared_indexes
+    if tenant not in _shared_indexes:
         with _shared_lock:
-            if _shared_index is None:
-                _shared_index = SessionSearchIndex()
-    return _shared_index
+            if tenant not in _shared_indexes:
+                _shared_indexes[tenant] = SessionSearchIndex()
+    return _shared_indexes[tenant]

@@ -26,8 +26,8 @@ Some features.
 """
     mock_readme.write_text(mock_content, encoding="utf-8")
 
-    # Run parser
-    entries = api_server._parse_readme_changelog(mock_readme, max_entries=5)
+    from src.api.system_routes import _parse_readme_changelog
+    entries = _parse_readme_changelog(mock_readme, max_entries=5)
     
     assert len(entries) == 2
     

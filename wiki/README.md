@@ -1,6 +1,6 @@
-# Vibe-Trading Wiki
+# TideTrading Wiki
 
-Static source for `https://vibetrading.wiki`.
+Static source for `https://tide.red`.
 
 ## Local preview
 
@@ -23,7 +23,7 @@ Direct docs URLs such as `/docs/latest/getting-started/vibe-trading-overview` ar
 - Project root: `wiki`
 - Build command: leave empty
 - Output directory: `.`
-- Custom domain: `vibetrading.wiki`
+- Custom domain: `tide.red`
 
 The site is static and needs no build step. The only dynamic piece is a small
 analytics layer in `functions/` (Cloudflare Pages Functions): `_middleware.js`

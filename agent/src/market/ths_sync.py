@@ -20,10 +20,12 @@ def get_ths_cookie(tenant_id: str) -> Optional[str]:
     if cookie:
         return cookie
 
+    from src.config.paths import _get_active_runtime_dir
+    base_dir = _get_active_runtime_dir()
     if tenant_id == "default":
-        env_path = Path.home() / ".vibe-trading-cnx" / ".env"
+        env_path = base_dir / ".env"
     else:
-        env_path = Path.home() / ".vibe-trading-cnx" / "tenants" / tenant_id / ".env"
+        env_path = base_dir / "tenants" / tenant_id / ".env"
 
     if env_path.exists():
         try:

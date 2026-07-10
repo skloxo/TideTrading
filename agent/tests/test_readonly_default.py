@@ -44,8 +44,16 @@ from src.tools.mcp import MCPRemoteTool, build_mcp_tool_wrappers
 
 pytestmark = pytest.mark.unit
 
-# The full Robinhood catalog a mock server would expose (4 READ + 2 WRITE).
-_CATALOG = ("get_account", "get_positions", "get_quotes", "list_orders", "place_order", "cancel_order")
+# The current Robinhood Agentic Trading MCP catalog subset this layer supports.
+_CATALOG = (
+    "get_accounts",
+    "get_portfolio",
+    "get_equity_positions",
+    "get_equity_quotes",
+    "get_equity_orders",
+    "place_equity_order",
+    "cancel_equity_order",
+)
 
 
 class _FakeClient:
@@ -190,8 +198,8 @@ def test_order_tools_absent_with_seed_allowlist() -> None:
     tools = _assemble(list(ROBINHOOD_MCP_SERVER_SEED["enabled_tools"]))
     names = {t._spec.remote_name for t in tools}
     assert names == set(ROBINHOOD_MCP_SERVER_SEED["enabled_tools"])
-    assert "place_order" not in names
-    assert "cancel_order" not in names
+    assert "place_equity_order" not in names
+    assert "cancel_equity_order" not in names
     # Every surviving tool is a plain read-only MCPRemoteTool (no gate).
     assert all(type(t) is MCPRemoteTool and t.is_readonly for t in tools)
     assert not any(isinstance(t, LiveOrderGuardTool) for t in tools)
@@ -202,17 +210,20 @@ def test_order_tools_absent_with_seed_allowlist() -> None:
 
 def test_order_tools_appear_gate_wrapped_when_allowlisted(live_runtime: Path) -> None:
     _commit_mandate(live_runtime)
-    enabled = list(ROBINHOOD_MCP_SERVER_SEED["enabled_tools"]) + ["place_order", "cancel_order"]
+    enabled = list(ROBINHOOD_MCP_SERVER_SEED["enabled_tools"]) + [
+        "place_equity_order",
+        "cancel_equity_order",
+    ]
     tools = _assemble(enabled)
     by_name = {t._spec.remote_name: t for t in tools}
 
-    assert "place_order" in by_name and "cancel_order" in by_name
-    assert isinstance(by_name["place_order"], LiveOrderGuardTool)
-    assert isinstance(by_name["cancel_order"], LiveOrderGuardTool)
-    assert by_name["place_order"].broker == "robinhood"
+    assert "place_equity_order" in by_name and "cancel_equity_order" in by_name
+    assert isinstance(by_name["place_equity_order"], LiveOrderGuardTool)
+    assert isinstance(by_name["cancel_equity_order"], LiveOrderGuardTool)
+    assert by_name["place_equity_order"].broker == "robinhood"
     # Reads stay plain read-only.
-    assert type(by_name["get_account"]) is MCPRemoteTool
-    assert by_name["get_account"].is_readonly is True
+    assert type(by_name["get_portfolio"]) is MCPRemoteTool
+    assert by_name["get_portfolio"].is_readonly is True
 
 
 # --- H8: a Robinhood URL under an aliased key is still a live broker ----------
@@ -230,17 +241,17 @@ def test_aliased_key_with_robinhood_url_is_gated() -> None:
             "type": "streamableHttp",
             "url": "https://agent.robinhood.com/mcp/trading",
             "auth": {"type": "oauth"},
-            "enabled_tools": ["get_positions", "place_order"],
+            "enabled_tools": ["get_equity_positions", "place_equity_order"],
         }
     )
     wrappers = build_mcp_tool_wrappers("rh", cfg, client_factory=_factory)
     gated = wrap_live_broker_tools("rh", wrappers, url=cfg.url)
     by_name = {t._spec.remote_name: t for t in gated}
 
-    assert isinstance(by_name["place_order"], LiveOrderGuardTool)
+    assert isinstance(by_name["place_equity_order"], LiveOrderGuardTool)
     # Broker namespace resolves to the real broker, not the alias.
-    assert by_name["place_order"].broker == "robinhood"
-    assert type(by_name["get_positions"]) is MCPRemoteTool
+    assert by_name["place_equity_order"].broker == "robinhood"
+    assert type(by_name["get_equity_positions"]) is MCPRemoteTool
 
 
 def test_lookalike_host_is_not_a_live_broker() -> None:
@@ -257,16 +268,19 @@ def test_halt_omits_order_tools_at_registration(live_runtime: Path) -> None:
     _commit_mandate(live_runtime)
     trip_halt(by="test", reason="reg-time halt", broker="robinhood")
 
-    enabled = list(ROBINHOOD_MCP_SERVER_SEED["enabled_tools"]) + ["place_order", "cancel_order"]
+    enabled = list(ROBINHOOD_MCP_SERVER_SEED["enabled_tools"]) + [
+        "place_equity_order",
+        "cancel_equity_order",
+    ]
     tools = _assemble(enabled)
     names = {t._spec.remote_name for t in tools}
 
     # Order tools are not even present in the assembled list.
-    assert "place_order" not in names
-    assert "cancel_order" not in names
+    assert "place_equity_order" not in names
+    assert "cancel_equity_order" not in names
     assert not any(isinstance(t, LiveOrderGuardTool) for t in tools)
     # Read tools survive a halt.
-    assert "get_account" in names
+    assert "get_portfolio" in names
     assert all(t.is_readonly for t in tools)
 
 

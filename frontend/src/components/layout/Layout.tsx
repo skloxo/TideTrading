@@ -1,23 +1,21 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
-import { Activity, BarChart3, Bot, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, ChevronDown, ChevronRight, Cpu, KeyRound } from "lucide-react";
+import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Activity, BarChart3, Bot, ChevronDown, ChevronRight, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, Menu, X, Terminal, Compass, Cpu, KeyRound, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, isAuthRequiredError, type SessionItem, type UserProfile } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent";
 import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
-import { AuthBarrier } from "@/components/layout/AuthBarrier";
-import { setApiAuthKey } from "@/lib/apiAuth";
-
-// Bump on each release; one place keeps the footer in sync with package.json.
-const APP_VERSION = "v1.7.5.5";
+import { ICPFooter } from "@/components/layout/ICPFooter";
+import { clearApiAuthKey, getApiAuthKey } from "@/lib/apiAuth";
 
 export function Layout() {
   const { t, i18n: i18nHook } = useTranslation();
-
+  const isZhLayout = i18nHook.language === "zh-CN";
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { dark, toggle } = useDarkMode();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -60,10 +58,10 @@ export function Layout() {
     { to: "/agent", icon: Bot, label: t('layout.agent') },
     { to: "/runtime", icon: Activity, label: t('layout.runtime') },
     { to: "/reports", icon: FileText, label: t('layout.reports') },
-    { to: "/alpha-zoo", icon: Layers, label: t('layout.alphaZoo') },
     { to: "/xueqiu", icon: Activity, label: i18nHook.language === "zh-CN" ? "雪球监控" : "Xueqiu Watcher" },
-    { to: "/settings", icon: Settings, label: t('layout.settings') },
+    { to: "/alpha-zoo", icon: Layers, label: t('layout.alphaZoo') },
     { to: "/correlation", icon: BarChart3, label: t('layout.correlation') },
+    { to: "/settings", icon: Settings, label: t('layout.settings') },
   ];
 
   useEffect(() => {
@@ -84,6 +82,18 @@ export function Layout() {
       });
     return () => { alive = false; };
   }, []);
+
+  // Redirect to /login if auth fails (no tenant key stored)
+  useEffect(() => {
+    const key = getApiAuthKey();
+    if (!key) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    if (!profileLoading && authFailed) {
+      navigate("/login", { replace: true });
+    }
+  }, [profileLoading, authFailed, navigate]);
 
   useEffect(() => {
     localStorage.setItem("qa-sidebar", collapsed ? "collapsed" : "expanded");
@@ -140,22 +150,16 @@ export function Layout() {
   }
 
   if (authFailed) {
+    // Redirect handled in useEffect above — show spinner while redirecting
     return (
       <div className="flex h-screen items-center justify-center bg-background">
-        <div className="mx-auto max-w-md w-full p-4 space-y-4">
-          <AuthBarrier
-            onLogin={(key) => {
-              setApiAuthKey(key);
-              window.location.reload();
-            }}
-          />
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-background relative overflow-hidden">
+    <div className="flex h-screen bg-background relative overflow-hidden rtl:flex-row-reverse">
       {/* Mobile Drawer Overlay Backdrop */}
       {mobileOpen && (
         <div 
@@ -166,7 +170,7 @@ export function Layout() {
 
       {/* Sidebar - responsive absolute drawer on mobile */}
       <aside className={cn(
-        "border-r bg-card flex flex-col shrink-0 transition-all duration-200 z-50",
+        "border-e bg-card flex flex-col shrink-0 transition-all duration-200 z-50 overflow-visible",
         "max-md:fixed max-md:top-0 max-md:bottom-0 max-md:left-0 max-md:w-64 max-md:shadow-2xl",
         mobileOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
         isCollapsed ? "md:w-12" : "md:w-64"
@@ -345,16 +349,16 @@ export function Layout() {
                         onChange={(e) => setRenameValue(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") renameSession(s.session_id); if (e.key === "Escape") setRenameTarget(null); }}
                         onBlur={() => renameSession(s.session_id)}
-                        className="flex-1 min-w-0 pl-3 pr-2 py-1 rounded-md text-xs border border-primary bg-background outline-none"
+                        className="flex-1 min-w-0 ps-3 pe-2 py-1 rounded-md text-xs border border-primary bg-background outline-none"
                       />
                     ) : (
                       <Link
                         to={`/agent?session=${s.session_id}`}
                         className={cn(
-                          "flex-1 min-w-0 pl-3 pr-14 py-1.5 rounded-md text-xs transition-colors truncate block border-l-2",
+                          "flex-1 min-w-0 ps-3 pe-14 py-1.5 rounded-md text-xs transition-colors truncate block border-s-2",
                           isActive
-                            ? "border-l-primary bg-primary/10 text-primary font-medium"
-                            : "border-l-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? "border-s-primary bg-primary/10 text-primary font-medium"
+                            : "border-s-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                         title={s.title || s.session_id}
                       >
@@ -408,12 +412,46 @@ export function Layout() {
         <div className={cn("border-t", isCollapsed ? "p-1 flex flex-col items-center gap-1" : "p-3 space-y-2")}>
           {isCollapsed ? (
             <>
-              <button onClick={toggle} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={dark ? t('layout.light') : t('layout.dark')}>
-                {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              </button>
-              <button onClick={() => setCollapsed(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={t('layout.expand')}>
+              {/* 1. Expand sidebar */}
+              <button
+                onClick={() => setCollapsed(false)}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title={t('layout.expand')}
+              >
                 <ChevronsRight className="h-3.5 w-3.5" />
               </button>
+              {/* 2. Toggle dark/light */}
+              <button
+                onClick={toggle}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title={dark ? t('layout.light') : t('layout.dark')}
+              >
+                {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              </button>
+              {/* 3. Toggle language */}
+              <button
+                onClick={() => {
+                  const nextLang = i18nHook.language === "zh-CN" ? "en" : "zh-CN";
+                  i18nHook.changeLanguage(nextLang).catch(console.error);
+                }}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title={i18nHook.language === "zh-CN" ? "Switch to English" : "切换为中文"}
+              >
+                <Languages className="h-3.5 w-3.5" />
+              </button>
+              {/* 4. Exit tenant */}
+              {profile?.is_tenant && (
+                <button
+                  onClick={() => {
+                    clearApiAuthKey();
+                    navigate("/login", { replace: true });
+                  }}
+                  className="p-1.5 text-muted-foreground hover:text-destructive rounded transition-colors"
+                  title={isZhLayout ? "退出租户" : "Log out"}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -435,20 +473,33 @@ export function Layout() {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => { i18nHook.changeLanguage(i18nHook.language === "zh-CN" ? "en" : "zh-CN"); }}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Languages className="h-3.5 w-3.5" />
-                  {i18nHook.language === "zh-CN" ? "English" : "中文"}
-                </button>
-                <p className="text-[10px] text-muted-foreground/60">{APP_VERSION}</p>
+              <div className="flex flex-col gap-1.5">
+                <LanguageSwitcher />
               </div>
-              <div className="text-[10px] text-muted-foreground/50 border-t pt-1.5 border-border/30 truncate flex justify-between gap-2">
-                <span className="truncate" title={profile?.name}>User: {profile?.name}</span>
-                <span className="shrink-0 uppercase">{profile?.role}</span>
-              </div>
+              {/* Identity footer */}
+              {profile && (
+                <div className="text-[10px] text-muted-foreground/50 border-t pt-1.5 border-border/30 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate" title={profile.name}>User: {profile.name}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="uppercase">{profile.role}</span>
+                      {profile.is_tenant && (
+                        <button
+                          onClick={() => {
+                            clearApiAuthKey();
+                            navigate("/login", { replace: true });
+                          }}
+                          className="p-0.5 text-muted-foreground/60 hover:text-destructive transition-colors animate-pulse"
+                          title={isZhLayout ? "退出租户" : "Log out"}
+                        >
+                          <LogOut className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <ICPFooter className="border-t border-border/30 mt-2 pt-2 !pb-0" />
             </>
           )}
         </div>
@@ -482,3 +533,26 @@ export function Layout() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Language switcher — toggles instantly between English and Chinese.
+// ---------------------------------------------------------------------------
+function LanguageSwitcher() {
+  const { i18n } = useTranslation();
+  const isZh = i18n.language === "zh-CN";
+
+  const toggleLang = () => {
+    const nextLang = isZh ? "en" : "zh-CN";
+    i18n.changeLanguage(nextLang).catch(console.error);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggleLang}
+      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <Languages className="h-3.5 w-3.5 shrink-0" />
+      <span className="whitespace-nowrap">{isZh ? "English" : "中文"}</span>
+    </button>
+  );
+}

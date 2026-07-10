@@ -25,10 +25,10 @@ returned tool_result carries that redacted record under the frozen
 ``"live_action"`` key so the api_server SSE relay can emit a ``live.action``
 event without touching the agent loop.
 
-When the order is sized by ``quantity``, the gate derives a live quote (broker
-``get_quotes`` READ tool first, then the data loaders) and enforces the LARGER of
-the explicit notional and ``quantity`` × price — fail-closed DENY when no quote
-is obtainable — so the notional/exposure/leverage caps stay enforceable.
+When the order is sized by ``quantity``, the gate derives a live quote (the
+broker-specific quote READ tool first, then the data loaders) and enforces the
+LARGER of the explicit notional and ``quantity`` × price — fail-closed DENY when
+no quote is obtainable — so the notional/exposure/leverage caps stay enforceable.
 
 ``repeatable = False`` mirrors the no-retry stance in
 ``MCPServerAdapter._call_tool`` — a live order must never be silently re-issued.
@@ -38,9 +38,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Any
 
+from src.live.advisory import (
+    AdvisoryContext,
+    AdvisoryOrchestrator,
+    Verdict,
+    get_advisory_providers,
+)
 from src.live.audit import LiveActionEvent, write_live_action
 from src.live.enforcement import (
     BREACH_KIND_INSTRUMENT,
@@ -73,6 +80,12 @@ _QUOTE_TOOLS = ("get_quotes",)
 _DECISION_ALLOW = "allow"
 _DECISION_DENY = "deny"
 _DECISION_PAUSE = "pause_for_reauth"
+
+#: Environment variable controlling advisory review activation.
+#: Truthy values (case-insensitive): ``"1"``, ``"true"``, ``"yes"``.
+#: Default: off (advisory layer is purely observational and opt-in).
+_ADVISORY_ENABLED_ENV = "VIBE_TRADING_ENABLE_ADVISORY"
+_ADVISORY_TRUTHY = frozenset({"1", "true", "yes"})
 
 
 class LiveOrderGuardTool(MCPRemoteTool):
@@ -177,7 +190,10 @@ class LiveOrderGuardTool(MCPRemoteTool):
         )
 
         if breach is None:
-            return self._allow(mandate=mandate, intent=intent, kwargs=kwargs)
+            return self._allow(
+                mandate=mandate, intent=intent, kwargs=kwargs,
+                positions=positions, balance=balance,
+            )
 
         if breach.kind in (BREACH_KIND_UNIVERSE, BREACH_KIND_INSTRUMENT):
             return self._deny_breach(breach, mandate=mandate, intent=intent, reauth=False)
@@ -233,8 +249,8 @@ class LiveOrderGuardTool(MCPRemoteTool):
     def _quote_price(self, intent: OrderIntent) -> float | None:
         """Return a live USD price for the intent's symbol, fail-closed.
 
-        Prefers the broker's READ quote tool (``get_quotes``) so the price is
-        the broker's own; falls back to Vibe-Trading's data loaders
+        Prefers the broker's mapped READ quote tool so the price is the broker's
+        own; falls back to Vibe-Trading's data loaders
         (:func:`src.live.enforcement.last_price_usd`, standard auto-fallback)
         when the broker quote is unavailable. Returns ``None`` when no source
         yields a usable price.
@@ -260,8 +276,8 @@ class LiveOrderGuardTool(MCPRemoteTool):
     def _broker_quote_price(self, symbol: str) -> float | None:
         """Read a USD price for ``symbol`` from the broker's quote tool.
 
-        Calls the ungated read path (never the guard) for ``get_quotes`` with the
-        symbol argument and parses a price from the common envelope shapes.
+        Calls the ungated read path (never the guard) for the mapped quote tool
+        with the symbol argument and parses a price from the common envelope shapes.
         Returns ``None`` on any error envelope, missing field, or unparseable
         value — the caller then falls back to the data loaders.
 
@@ -288,7 +304,15 @@ class LiveOrderGuardTool(MCPRemoteTool):
 
     # -- decision helpers ---------------------------------------------------
 
-    def _allow(self, *, mandate: Mandate, intent: OrderIntent, kwargs: dict) -> str:
+    def _allow(
+        self,
+        *,
+        mandate: Mandate,
+        intent: OrderIntent,
+        kwargs: dict,
+        positions: object = None,
+        balance: object = None,
+    ) -> str:
         """Forward the order unchanged; consume a count + audit only on success.
 
         ``MCPServerAdapter.call_tool`` does NOT raise on broker/network failure —
@@ -305,6 +329,7 @@ class LiveOrderGuardTool(MCPRemoteTool):
         under :data:`LIVE_ACTION_RESULT_KEY` so the api_server SSE relay can emit
         a ``live.action`` event without touching the agent loop (H5).
         """
+        advisory = self._advisory_review(intent, positions, balance, mandate)
         forwarded = super().execute(**kwargs)
         broker_response = self._safe_json(forwarded)
         is_error = self._is_error_envelope(broker_response)
@@ -316,6 +341,14 @@ class LiveOrderGuardTool(MCPRemoteTool):
             "max_leverage", "max_trades_per_day", "account_funding_usd",
             "universe_floors",
         ]
+        if advisory is not None:
+            checked.append("advisory")
+        gate_decision: dict[str, Any] = {
+            "allowed": True,
+            "decision": _DECISION_ALLOW,
+            "checked_limits": checked,
+            "advisory": advisory,
+        }
         if is_error:
             record = self._audit(
                 kind="order_rejected",
@@ -324,7 +357,7 @@ class LiveOrderGuardTool(MCPRemoteTool):
                 intent=intent,
                 broker_request=dict(kwargs),
                 broker_response=broker_response,
-                gate_decision={"allowed": True, "decision": _DECISION_ALLOW, "checked_limits": checked},
+                gate_decision=gate_decision,
                 error=self._error_message(broker_response),
             )
         else:
@@ -337,9 +370,90 @@ class LiveOrderGuardTool(MCPRemoteTool):
                 intent=intent,
                 broker_request=dict(kwargs),
                 broker_response=broker_response,
-                gate_decision={"allowed": True, "decision": _DECISION_ALLOW, "checked_limits": checked},
+                gate_decision=gate_decision,
             )
         return self._embed_live_action(forwarded, record)
+
+    # -- advisory review (observational, never blocks) ----------------------
+
+    def _advisory_review(
+        self,
+        intent: OrderIntent,
+        positions: object,
+        balance: object,
+        mandate: Mandate,
+    ) -> dict | None:
+        """Run advisory providers if enabled; return verdict dict or None.
+
+        Returns None when advisory is disabled or no providers are configured.
+        Returns a dict with ``verdict``, ``concerns``, ``results`` keys otherwise.
+        Never raises — all exceptions are caught and converted to
+        REVIEW_UNAVAILABLE.
+        """
+        env_val = os.getenv(_ADVISORY_ENABLED_ENV, "").strip().lower()
+        if env_val not in _ADVISORY_TRUTHY:
+            return None
+
+        providers = get_advisory_providers()
+        if not providers:
+            logger.info(
+                "advisory enabled but no providers registered — skipping review"
+            )
+            return None
+
+        try:
+            from src.live.enforcement import (
+                account_balance_market_value,
+                coerce_position_rows,
+                positions_market_value,
+            )
+
+            equity = account_balance_market_value(balance) or 0.0
+            exposure = positions_market_value(positions) or 0.0
+            funding_usd = mandate.hard_caps.account_funding_usd
+
+            if equity > 0 and funding_usd > 0:
+                utilization = max(0.0, 1.0 - equity / funding_usd)
+            else:
+                utilization = 0.0
+
+            pos_rows = coerce_position_rows(positions)
+            open_count = len(pos_rows) if pos_rows is not None else 0
+
+            context = AdvisoryContext(
+                symbol=intent.symbol,
+                side=intent.side,
+                notional_usd=intent.notional_usd or 0.0,
+                account_equity=equity,
+                utilization_ratio=utilization,
+                open_position_count=open_count,
+                total_exposure_usd=exposure,
+                funding_usd=funding_usd,
+            )
+
+            orchestrator = AdvisoryOrchestrator(providers)
+            aggregated = orchestrator.review(context)
+            return {
+                "verdict": aggregated.verdict.value,
+                "concerns": list(aggregated.all_concerns),
+                "results": [
+                    {
+                        "verdict": r.verdict.value,
+                        "summary": r.summary,
+                        "concerns": list(r.concerns),
+                        "provider": r.provider,
+                        "confidence": r.confidence,
+                    }
+                    for r in aggregated.results
+                ],
+            }
+        except Exception as exc:
+            logger.warning("advisory review failed: %s", exc, exc_info=True)
+            return {
+                "verdict": Verdict.REVIEW_UNAVAILABLE.value,
+                "concerns": [],
+                "error": type(exc).__name__,
+            }
 
     def _deny(
         self,

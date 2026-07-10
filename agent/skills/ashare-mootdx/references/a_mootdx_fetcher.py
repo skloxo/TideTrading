@@ -5,9 +5,12 @@ Free, no API key, no IP rate limits.
 Usage:
     from a_mootdx_fetcher import fetch_daily, fetch_realtime, batch_fetch_daily
 """
+import logging
 from mootdx.quotes import Quotes
 import pandas as pd
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 FREQ_MAP = {'5min':0,'15min':1,'30min':2,'60min':3,'daily':9,'weekly':5,'monthly':6,'1min':8}
 
@@ -68,7 +71,9 @@ def batch_fetch_daily(codes, limit=250, sleep_sec=0.3):
         try:
             df = fetch_daily(code, limit=limit)
             if len(df) > 0: results[code] = df
-        except: results[code] = pd.DataFrame()
+        except Exception as e:
+            logger.warning("Failed to fetch daily bars for %s: %s", code, e)
+            results[code] = pd.DataFrame()
         if i < len(codes) - 1: time.sleep(sleep_sec)
     return results
 

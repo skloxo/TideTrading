@@ -782,7 +782,7 @@ def test_admin_tenant_keys_crud_and_config_inheritance(
     assert resp.status_code == 200
     llm_settings = resp.json()
     assert llm_settings["api_key_configured"] is True
-    assert llm_settings["api_key_hint"] == "sk-c...-key"
+    assert llm_settings["api_key_hint"] is None
     
     # 6. Test toggling tenant key activation status by Admin
     resp = admin_client.put(

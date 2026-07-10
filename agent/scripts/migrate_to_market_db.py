@@ -108,7 +108,8 @@ def migrate(src_path, dst_path):
 
 
 def main():
-    base = Path.home() / '.vibe-trading-cnx'
+    from src.config.paths import _get_active_runtime_dir
+    base = _get_active_runtime_dir()
     src_path = base / 'stocks_default.db'
     dst_path = base / 'stocks_market.db'
     if dst_path.exists() and dst_path.stat().st_size > 1024 * 1024:

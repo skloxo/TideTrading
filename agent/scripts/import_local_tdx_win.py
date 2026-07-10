@@ -89,5 +89,5 @@ def import_market_data(tdx_path, db_path):
     logger.info('='*60)
 if __name__ == '__main__':
     tdx_dir = "C:/tdx/vipdoc"
-    wsl_db = "//wsl.localhost/Ubuntu-24.04/home/skloxo/.vibe-trading-cnx/stocks_market.db"
+    wsl_db = "//wsl.localhost/Ubuntu-24.04/home/skloxo/.tide-trading/stocks_market.db"
     import_market_data(tdx_dir, wsl_db)

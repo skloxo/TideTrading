@@ -18,7 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, isAuthRequiredError, type BacktestMetrics, type RunCard, type RunData } from "@/lib/api";
+import { api, isAuthRequiredError, type BacktestMetrics, type PolicyDecisionRecord, type ResearchCard, type RunCard, type RunData } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
@@ -29,6 +29,11 @@ import { Skeleton, SkeletonMetrics, SkeletonChart } from "@/components/common/Sk
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { AuthBarrier } from "@/components/layout/AuthBarrier";
 import { setApiAuthKey } from "@/lib/apiAuth";
+import { DataProvenancePanel, type DataSourceSummary } from "@/components/research/DataProvenancePanel";
+import { PITWarningsPanel } from "@/components/research/PITWarningsPanel";
+import { PolicyDecisionsPanel } from "@/components/research/PolicyDecisionsPanel";
+import { QuantScorecardPanel, type QuantScorecardSummary } from "@/components/research/QuantScorecardPanel";
+import { ResearchCardPanel } from "@/components/research/ResearchCardPanel";
 
 const rehypePlugins = [rehypeHighlight];
 
@@ -108,11 +113,12 @@ export function RunDetail() {
   const [chartLoadingSymbols, setChartLoadingSymbols] = useState<Record<string, boolean>>({});
   const [bulkChartLoading, setBulkChartLoading] = useState(false);
   const [bulkChartProgress, setBulkChartProgress] = useState<ChartLoadProgress>({ done: 0, total: 0 });
+  const [policyDecisions, setPolicyDecisions] = useState<PolicyDecisionRecord[]>([]);
   const chartCacheRef = useRef<ChartCache>({});
   const cancelBulkChartLoadRef = useRef(false);
 
   const hasValidation = !!run?.validation;
-  const hasRunCard = !!run?.run_card;
+  const hasRunCard = !!run?.run_card || !!run?.research_card;
   const TABS: { id: Tab; label: string; icon: typeof BarChart3; hidden?: boolean }[] = [
     { id: "chart", label: i18n.t("runDetail.chart"), icon: BarChart3 },
     { id: "trades", label: i18n.t("runDetail.trades"), icon: List },
@@ -131,10 +137,12 @@ export function RunDetail() {
     Promise.all([
       api.getRun(runId, { chart_payload: "summary" }),
       api.getRunCode(runId).catch(() => ({})),
-    ]).then(([r, c]) => {
+      api.getPolicyDecisions(runId).catch(() => ({ decisions: [] })),
+    ]).then(([r, c, policy]) => {
       if (!isMounted) return;
       setRun(r);
       setCode(c || {});
+      setPolicyDecisions(policy.decisions || []);
       const firstSymbol = r?.chart_symbols?.[0] || Object.keys(r?.price_series || {})[0] || "";
       setSelectedSymbol(firstSymbol);
       setChartPickerSymbol(firstSymbol);
@@ -358,7 +366,9 @@ export function RunDetail() {
           )}
           {tab === "trades" && <TradesTab run={run} />}
           {tab === "validation" && run.validation && <ValidationPanel data={run.validation} />}
-          {tab === "runCard" && run.run_card && <RunCardTab card={run.run_card} />}
+          {tab === "runCard" && hasRunCard && (
+            <RunCardTab card={run.run_card} researchCard={run.research_card} policyDecisions={policyDecisions} />
+          )}
           {tab === "code" && <CodeTab code={code} />}
         </ErrorBoundary>
       </div>
@@ -366,19 +376,39 @@ export function RunDetail() {
   );
 }
 
-function RunCardTab({ card }: { card: RunCard }) {
-  const backtest = card.backtest || {};
-  const reproducibility = card.reproducibility || {};
-  const metrics = card.metrics || {};
-  const artifacts = card.artifacts || [];
-  const warnings = card.warnings || [];
-  const dataSources = card.data_sources || [];
+function RunCardTab({
+  card,
+  researchCard,
+  policyDecisions,
+}: {
+  card?: RunCard;
+  researchCard?: ResearchCard | null;
+  policyDecisions?: PolicyDecisionRecord[];
+}) {
+  const backtest = card?.backtest || {};
+  const reproducibility = card?.reproducibility || {};
+  const metrics = card?.metrics || {};
+  const artifacts = card?.artifacts || [];
+  const warnings = card?.warnings || [];
+  const dataSources = card?.data_sources || [];
+  const cardPolicies = (researchCard?.policy_decisions as PolicyDecisionRecord[] | undefined) || policyDecisions || [];
 
   return (
     <div className="p-4 space-y-4">
+      <ResearchCardPanel card={researchCard || null} />
+
+      {researchCard && (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <DataProvenancePanel dataSources={researchCard.data_sources as DataSourceSummary[] | undefined} />
+          <PITWarningsPanel warnings={researchCard.warnings} hardFailures={researchCard.hard_failures} />
+          <PolicyDecisionsPanel decisions={cardPolicies} />
+          <QuantScorecardPanel scorecard={researchCard.scorecard as QuantScorecardSummary | undefined} />
+        </div>
+      )}
+
       <div className="grid gap-3 md:grid-cols-4">
-        <RunCardStat label={i18n.t("runDetail.schema")} value={card.schema_version || "unknown"} />
-        <RunCardStat label={i18n.t("runDetail.generated")} value={formatRunCardValue(card.generated_at)} />
+        <RunCardStat label={i18n.t("runDetail.schema")} value={card?.schema_version || "unknown"} />
+        <RunCardStat label={i18n.t("runDetail.generated")} value={formatRunCardValue(card?.generated_at)} />
         <RunCardStat label={i18n.t("runDetail.dataSources")} value={dataSources.length ? dataSources.join(", ") : "None recorded"} />
         <RunCardStat label={i18n.t("runDetail.warnings")} value={String(warnings.length)} tone={warnings.length ? "warning" : "normal"} />
       </div>
@@ -409,7 +439,7 @@ function RunCardTab({ card }: { card: RunCard }) {
           <KeyValueTable data={metrics} empty={i18n.t("runDetail.noScalarMetrics")} />
         </RunCardPanel>
         <RunCardPanel title={i18n.t("runDetail.validationPayload")} icon={ShieldCheck}>
-          {card.validation ? (
+          {card?.validation ? (
             <pre className="max-h-80 overflow-auto rounded-md bg-muted/40 p-3 text-xs leading-relaxed">
               {JSON.stringify(card.validation, null, 2)}
             </pre>

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""研报舆情 + 美股/港股财报基本面研究示例。
+"""研报舆情 + 跨源财报基本面研究示例。
 
 运行前提：在 agent/ 目录下执行（导入根为 agent/）。无需 token。
-研报/财报经东方财富（及新浪/同花顺）共享 IP 限速层节流。
+研报走东方财富；财报由 get_financial_statements 按市场路由
+（美股 SEC EDGAR，A 股/港股东财），并经共享 per-host 限速层节流。
 """
 
 import json
@@ -26,7 +27,7 @@ def broker_consensus(code: str, limit: int = 10) -> None:
 
 
 def us_hk_indicators(code: str) -> None:
-    """打印美股/港股主要指标（GMAININDICATOR）的最新报告期。"""
+    """打印美股/港股主要指标的最新报告期。"""
     envelope = json.loads(
         FinancialStatementsTool().execute(
             code=code, statement="indicators", period="annual"

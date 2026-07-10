@@ -26,7 +26,19 @@
 
 ## 📰 最新动态
 
-- **2026-07-07** 🚀 **v1.7.5.5 — Refactored service monitor and unified global card rounding & visual density**：
+- **2026-07-10** 🚀 **v1.7.6 — Three-Part SemVer Format, Full Channel SDK Packaging & Active Memory Tasks Reclamation**:
+  - **Reverted Version Format**: Reverted to the standard three-part semantic versioning system `vX.Y.Z` (`1.7.6` instead of `1.7.5.7`), using `Z` for automated and minor updates.
+  - **Full Channel SDK Packaging**: Enabled the `[channels]` extra dependencies group in the `Dockerfile` to bundle all messaging adapters SDKs (DingTalk, QQ, MS Teams, Slack, Telegram, etc.) into the container image, making all frontend adapters available by default. Fixed `slackify-markdown` PyPI version bounds.
+  - **Tenant Lifecycle Memory Cleanup**: Triggered platform manager reloads on tenant delete and update operations, ensuring deleted tenant WeChat iLink poller tasks are terminated instantly in memory.
+  - **Xueqiu Watcher Lifespan integration**: Bound the `XueqiuWatcher` loop to the FastAPI lifespan startup/shutdown lifecycle, and configured it to reload configurations dynamically from disk on each tick.
+  - **Mootdx Persistence & Silent Startup**: Persisted `.mootdx` configurations using a symbolic link to the Docker home volume, and silenced misleading console errors during server startup.
+
+- **2026-07-09** 🚀 **v1.7.5.6 — Brand Domain Standardization, Multilingual Portal Alignment & Digital Assets Documentation**:
+  - **Domain Redirection**: Corrected legacy `vibetrading.wiki` URLs to `tide.red` in the codebase.
+  - **Digital Assets Documentation**: Created `wiki/DIGITAL_ASSETS.md` listing project naming guidelines and DNS setup.
+  - **Portal Synchronization**: Refactored static docs site metadata to align with physical markdown documentation.
+
+- **2026-07-07** 🚀 **v1.7.5.5 — Refactored service monitor and unified global card rounding & visual density**:
   - **Service Monitor Expansion**: Added status cards for Swarm Agent Execution Engine (active instances count) and MCP Component Gateway (protocols, auth status) to the service monitor (`/monitor`), with live display of global Xueqiu cache sharing rates.
   - **Global Theme & Radius Unification**: Tightened overall visual guidelines based on Robinhood cards, refactoring all card border-radiuses from bulky 16px to unified 6px (`rounded-md`); globally contracted padding and gaps for a much higher information density.
   - **Glassmorphism Redesign**: Polished container widgets background opacity and neon accent shadows for smooth dark/light mode integration.

@@ -14,6 +14,7 @@ Tool execution:
 from __future__ import annotations
 
 import concurrent.futures
+import copy
 import json
 import logging
 import os
@@ -36,6 +37,7 @@ from src.goal.context import (
     goal_needs_continuation,
     goal_progress_tuple,
 )
+from src.governance.errors import PolicyDenied
 from src.providers.chat import ChatLLM, ProviderStreamError
 from src.providers.content_filter import (
     CONTENT_FILTER_SKIP_MESSAGE,
@@ -292,35 +294,72 @@ def _fix_tool_pairs(messages: list) -> None:
         messages.insert(pos, stub)
 
 
-def _attach_tool_call_thought_signatures(message: dict[str, Any], tool_calls: list) -> None:
-    """Attach Gemini thought signatures to replayed assistant tool calls."""
+def _attach_tool_call_thought_signatures(message: dict[str, Any], tool_calls: list) -> dict[str, Any]:
+    """Attach Gemini thought signatures to assistant replay tool calls.
+
+    The replay message is later converted back into LangChain messages from a
+    plain dict history. Keep signatures in both the provider-neutral
+    ``extra_content.thought_signature`` slot and Gemini's OpenAI-compatible
+    ``extra_content.google.thought_signature`` slot so both local replay tests
+    and the Gemini request injector can recover the value.
+    """
     outbound_tool_calls = message.get("tool_calls")
     if not isinstance(outbound_tool_calls, list):
-        return
+        return message
 
-    signatures_by_id = {
-        tc.id: tc.thought_signature
-        for tc in tool_calls
-        if getattr(tc, "thought_signature", None)
-    }
-    for index, outbound_tool_call in enumerate(outbound_tool_calls):
-        if not isinstance(outbound_tool_call, dict):
-            continue
-        signature = signatures_by_id.get(outbound_tool_call.get("id"))
-        if not signature and index < len(tool_calls):
-            signature = getattr(tool_calls[index], "thought_signature", None)
+    signatures_by_id: dict[str, str] = {}
+    signatures_by_index: dict[int, str] = {}
+    for index, tc in enumerate(tool_calls):
+        extra_content = getattr(tc, "extra_content", None)
+        signature = None
+        if isinstance(extra_content, dict):
+            signature = extra_content.get("thought_signature")
+            google_extra = extra_content.get("google")
+            if not signature and isinstance(google_extra, dict):
+                signature = google_extra.get("thought_signature") or google_extra.get(
+                    "thoughtSignature"
+                )
+        signature = signature or getattr(tc, "thought_signature", None)
         if not signature:
             continue
+        tc_id = getattr(tc, "id", None)
+        if tc_id:
+            signatures_by_id[str(tc_id)] = signature
+        signatures_by_index[index] = signature
 
-        extra_content = outbound_tool_call.get("extra_content")
+    if not signatures_by_id and not signatures_by_index:
+        return message
+
+    def attach(raw_tool_call: Any, index: int) -> None:
+        if not isinstance(raw_tool_call, dict):
+            return
+        signature = signatures_by_id.get(str(raw_tool_call.get("id"))) or signatures_by_index.get(index)
+        if not signature:
+            return
+        extra_content = raw_tool_call.setdefault("extra_content", {})
         if not isinstance(extra_content, dict):
             extra_content = {}
-            outbound_tool_call["extra_content"] = extra_content
-        google = extra_content.get("google")
+            raw_tool_call["extra_content"] = extra_content
+        extra_content["thought_signature"] = signature
+        google = extra_content.setdefault("google", {})
         if not isinstance(google, dict):
             google = {}
             extra_content["google"] = google
         google["thought_signature"] = signature
+
+    for index, raw_tool_call in enumerate(outbound_tool_calls):
+        attach(raw_tool_call, index)
+
+    additional_kwargs = message.setdefault("additional_kwargs", {})
+    raw_tool_calls = additional_kwargs.setdefault(
+        "tool_calls",
+        copy.deepcopy(outbound_tool_calls),
+    )
+    if isinstance(raw_tool_calls, list):
+        for index, raw_tool_call in enumerate(raw_tool_calls):
+            attach(raw_tool_call, index)
+
+    return message
 
 
 # -- Structured summary templates ------------------------------------------
@@ -404,6 +443,17 @@ def _is_tool_success(result: str) -> bool:
     except (json.JSONDecodeError, TypeError):
         pass
     return True
+
+
+def _policy_denied_payload(result: str) -> dict[str, Any] | None:
+    """Return a parsed policy-denied payload if a tool result carries one."""
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if isinstance(data, dict) and data.get("error_code") == "policy_denied":
+        return data
+    return None
 
 
 def _normalize_tool_run_dir(args: dict[str, Any], memory_run_dir: str | None) -> dict[str, Any]:
@@ -532,6 +582,9 @@ class AgentLoop:
 
         trace_dir = sessions_dir / session_id if session_id else run_dir
         trace = TraceWriter(trace_dir)
+        set_trace_writer = getattr(self.registry, "set_trace_writer", None)
+        if callable(set_trace_writer):
+            set_trace_writer(trace)
         if self._run_iteration == 0 and trace.path.exists():
             existing = TraceWriter.read(trace_dir)
             self._run_iteration = max(
@@ -1281,7 +1334,10 @@ class AgentLoop:
             _set_emitter(_on_progress)
             try:
                 with _heartbeat_timer():
-                    result = self.registry.execute(tool_name, args)
+                    try:
+                        result = self.registry.execute(tool_name, args)
+                    except PolicyDenied as exc:
+                        result = exc.user_safe_message
             finally:
                 finished.set()
                 _set_emitter(None)
@@ -1296,6 +1352,8 @@ class AgentLoop:
             _set_emitter(_on_progress)
             try:
                 result_queue.put((self.registry.execute(tool_name, args), None))
+            except PolicyDenied as exc:
+                result_queue.put((exc.user_safe_message, None))
             except BaseException as exc:  # noqa: BLE001 - propagate through caller thread
                 result_queue.put((None, exc))
             finally:
@@ -1368,7 +1426,8 @@ class AgentLoop:
         """
         self._update_memory(tc.name)
 
-        success = _is_tool_success(result)
+        policy_payload = _policy_denied_payload(result)
+        success = False if policy_payload else _is_tool_success(result)
         if success:
             self._called_ok.add(tc.name)
 
@@ -1385,6 +1444,19 @@ class AgentLoop:
             elapsed_ms=elapsed_ms,
             iteration=iteration,
         )
+        if policy_payload:
+            trace.write(
+                {
+                    "type": "policy_denied",
+                    "iter": iteration,
+                    "tool": tc.name,
+                    "call_id": tc.id,
+                    "status": policy_payload.get("trace_status", "denied"),
+                    "shadow": bool(policy_payload.get("shadow")),
+                    "decision_id": policy_payload.get("decision_id"),
+                    "rule_id": policy_payload.get("rule_id"),
+                }
+            )
         preview = trace_result[:200]
         react_trace.append({"type": "tool_call", "tool": tc.name, "result_preview": preview})
         self._emit("tool_result", {"tool": tc.name, "status": status, "elapsed_ms": elapsed_ms, "preview": preview})

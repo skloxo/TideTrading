@@ -1,7 +1,7 @@
 ---
 name: eastmoney
 category: data-source
-description: 东方财富（Eastmoney）免费免鉴权数据接口，覆盖资金流向、龙虎榜、融资融券、大宗交易、股东户数、限售解禁、行业概念板块、券商研报、财经新闻、美股/港股三大报表+主要指标、全市场选股与代码搜索。所有请求经共享 IP 限速层节流（东财按源 IP 限流并临时封禁突发请求），通过 Vibe-Trading 工具直接调用，无需 token。
+description: 东方财富（Eastmoney）免费免鉴权数据接口，覆盖资金流向、龙虎榜、融资融券、大宗交易、股东户数、限售解禁、行业概念板块、券商研报、财经新闻、A股/港股三大报表+主要指标、全市场选股与代码搜索；美股财报由 get_financial_statements 转 SEC EDGAR。东财请求经共享 IP 限速层节流（东财按源 IP 限流并临时封禁突发请求），通过 Vibe-Trading 工具直接调用，无需 token。
 ---
 # Eastmoney（东方财富）
 
@@ -45,7 +45,7 @@ resolve_secid("AAPL.US")     # -> "105.AAPL"（经 suggest 端点解析并进程
 
 - [资金流向 + 板块联动研究](eastmoney/scripts/fund_flow_example.py)
 - [龙虎榜 + 大宗交易 + 融资融券披露面研究](eastmoney/scripts/disclosure_example.py)
-- [研报舆情 + 美股/港股财报基本面研究](eastmoney/scripts/fundamentals_example.py)
+- [研报舆情 + 财报基本面研究](eastmoney/scripts/fundamentals_example.py)
 - [代码搜索 + 全市场选股](eastmoney/scripts/screen_search_example.py)
 
 ## 接口列表
@@ -84,11 +84,11 @@ resolve_secid("AAPL.US")     # -> "105.AAPL"（经 suggest 端点解析并进程
 | `get_research_reports` | [券商研报](eastmoney/references/研报舆情/券商研报.md) | A股 | 券商研报列表（标题/机构/分析师/评级/EPS·PE 预测）+ 同花顺一致预期 EPS |
 | `get_stock_news` | [财经新闻](eastmoney/references/研报舆情/财经新闻.md) | A股/港股/美股 | 个股新闻或全市场财经快讯（A 股走东财，美/港走 Yahoo） |
 
-### 财务报表（美股 / 港股）
+### 财务报表（A 股 / 港股；美股走 SEC）
 
 | 工具 | 标题(详细文档) | 市场 | 描述 |
 | ---- | -------------- | ---- | ---- |
-| `get_financial_statements` | [三大报表与主要指标](eastmoney/references/财务报表/三大报表与主要指标.md) | 美股/港股(东财)·A股(新浪) | 资产负债表/利润表/现金流量表/主要指标（GMAININDICATOR） |
+| `get_financial_statements` | [三大报表与主要指标](eastmoney/references/财务报表/三大报表与主要指标.md) | A股/港股(东财)·美股(SEC EDGAR) | 资产负债表/利润表/现金流量表/主要指标；美股不再走东财 |
 
 ### 选股检索
 

@@ -36,10 +36,10 @@ from src.tools.mcp import MCPRemoteTool, build_mcp_tool_wrappers
 pytestmark = pytest.mark.unit
 
 # Tool names exercising every tier of the ladder.
-_READ_TOOL = "get_positions"  # curated READ
-_WRITE_TOOL = "place_order"  # curated WRITE
+_READ_TOOL = "get_equity_positions"  # curated READ
+_WRITE_TOOL = "place_equity_order"  # curated WRITE
 _UNKNOWN_TOOL = "place_bracket_order"  # absent from map + annotations=None
-_DECEPTIVE_TOOL = "cancel_order"  # curated WRITE but lies readOnlyHint=True
+_DECEPTIVE_TOOL = "cancel_equity_order"  # curated WRITE but lies readOnlyHint=True
 
 assert _READ_TOOL in ROBINHOOD_TOOL_CLASS and ROBINHOOD_TOOL_CLASS[_READ_TOOL] is ToolClass.READ
 assert _WRITE_TOOL in ROBINHOOD_TOOL_CLASS and ROBINHOOD_TOOL_CLASS[_WRITE_TOOL] is ToolClass.WRITE
