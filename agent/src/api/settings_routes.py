@@ -986,6 +986,11 @@ def register_settings_routes(
             matched["is_active"] = payload.is_active
             
         host._save_tenant_keys(keys)
+        try:
+            from src.api.channels_routes import _reload_platform_manager
+            await _reload_platform_manager()
+        except Exception as e:
+            logger.error("Failed to reload platform manager after updating tenant: %s", e)
         return TenantKeyItem(**matched)
 
     @app.delete(
@@ -1000,6 +1005,11 @@ def register_settings_routes(
         if len(filtered_keys) == len(keys):
             raise HTTPException(status_code=404, detail="Tenant key not found")
         host._save_tenant_keys(filtered_keys)
+        try:
+            from src.api.channels_routes import _reload_platform_manager
+            await _reload_platform_manager()
+        except Exception as e:
+            logger.error("Failed to reload platform manager after deleting tenant: %s", e)
         return {"status": "success"}
 
     # --- Extended settings & dashboard routes ---

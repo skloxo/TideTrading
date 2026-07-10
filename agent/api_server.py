@@ -559,6 +559,14 @@ async def _run_startup_preflight() -> None:
         await _reload_platform_manager()
     except Exception as e:
         logger.exception("Failed to auto-start channel runtime on startup: %s", e)
+        
+    try:
+        from src.api.xueqiu_routes import _get_xueqiu_watcher
+        watcher = _get_xueqiu_watcher()
+        if watcher:
+            watcher.start()
+    except Exception as e:
+        logger.error("Failed to start Xueqiu combination watcher: %s", e)
 
 
 @app.on_event("shutdown")
@@ -566,6 +574,13 @@ async def _stop_scheduled_research_on_shutdown() -> None:
     """Stop the scheduled research executor on server shutdown."""
     await _stop_channel_runtime()
     await _stop_scheduled_research_executor()
+    try:
+        from src.api.xueqiu_routes import _get_xueqiu_watcher
+        watcher = _get_xueqiu_watcher()
+        if watcher:
+            await watcher.stop()
+    except Exception as e:
+        logger.error("Failed to stop Xueqiu combination watcher: %s", e)
 
 
 # ============================================================================
