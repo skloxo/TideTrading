@@ -57,15 +57,16 @@ COPY data/ /app/data/
 # Copy built frontend
 COPY --from=frontend-build /app/frontend/dist frontend/dist
 
-# Install CLI entrypoint
-RUN pip install --no-cache-dir -e .
+# Install CLI entrypoint with all channels dependencies
+RUN pip install --no-cache-dir -e .[channels]
 
 # Runtime should not run as root. Keep writable app data directories owned by
 # the service user so named Docker volumes inherit usable permissions.
 RUN useradd --create-home --shell /usr/sbin/nologin tide \
-    && mkdir -p agent/runs agent/sessions agent/uploads agent/.swarm/runs /home/tide/.tide-trading \
+    && mkdir -p agent/runs agent/sessions agent/uploads agent/.swarm/runs /home/tide/.tide-trading /home/tide/.tide-trading/.mootdx \
     && ln -s /home/tide/.tide-trading /home/tide/.vibe-trading-cnx \
     && ln -s /home/tide/.tide-trading /home/tide/.vibe-trading \
+    && ln -s /home/tide/.tide-trading/.mootdx /home/tide/.mootdx \
     && chown -R tide:tide /app /home/tide/.tide-trading
 USER tide
 
