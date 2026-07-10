@@ -568,6 +568,13 @@ async def _run_startup_preflight() -> None:
     except Exception as e:
         logger.error("Failed to start Xueqiu combination watcher: %s", e)
 
+    try:
+        from src.market.close_maintenance import CloseDataMaintenanceService
+        CloseDataMaintenanceService().start()
+    except Exception as e:
+        logger.error("Failed to start CloseDataMaintenanceService: %s", e)
+
+
 
 @app.on_event("shutdown")
 async def _stop_scheduled_research_on_shutdown() -> None:
@@ -581,6 +588,11 @@ async def _stop_scheduled_research_on_shutdown() -> None:
             await watcher.stop()
     except Exception as e:
         logger.error("Failed to stop Xueqiu combination watcher: %s", e)
+    try:
+        from src.market.close_maintenance import CloseDataMaintenanceService
+        await CloseDataMaintenanceService().stop()
+    except Exception as e:
+        logger.error("Failed to stop CloseDataMaintenanceService: %s", e)
 
 
 # ============================================================================
