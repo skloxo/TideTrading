@@ -11,9 +11,6 @@ import { ICPFooter } from "@/components/layout/ICPFooter";
 import { clearApiAuthKey, clearAdminToken, getApiAuthKey } from "@/lib/apiAuth";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 
-// Bump on each release; one place keeps the footer in sync with package.json.
-const APP_VERSION = "v1.7.5.5";
-
 export function Layout() {
   const { t, i18n: i18nHook } = useTranslation();
   const isZhLayout = i18nHook.language === "zh-CN";
@@ -62,10 +59,10 @@ export function Layout() {
     { to: "/agent", icon: Bot, label: t('layout.agent') },
     { to: "/runtime", icon: Activity, label: t('layout.runtime') },
     { to: "/reports", icon: FileText, label: t('layout.reports') },
-    { to: "/alpha-zoo", icon: Layers, label: t('layout.alphaZoo') },
     { to: "/xueqiu", icon: Activity, label: i18nHook.language === "zh-CN" ? "雪球监控" : "Xueqiu Watcher" },
-    { to: "/settings", icon: Settings, label: t('layout.settings') },
+    { to: "/alpha-zoo", icon: Layers, label: t('layout.alphaZoo') },
     { to: "/correlation", icon: BarChart3, label: t('layout.correlation') },
+    { to: "/settings", icon: Settings, label: t('layout.settings') },
   ];
 
   useEffect(() => {
@@ -416,12 +413,46 @@ export function Layout() {
         <div className={cn("border-t", isCollapsed ? "p-1 flex flex-col items-center gap-1" : "p-3 space-y-2")}>
           {isCollapsed ? (
             <>
-              <button onClick={toggle} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={dark ? t('layout.light') : t('layout.dark')}>
-                {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              </button>
-              <button onClick={() => setCollapsed(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={t('layout.expand')}>
+              {/* 1. Expand sidebar */}
+              <button
+                onClick={() => setCollapsed(false)}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title={t('layout.expand')}
+              >
                 <ChevronsRight className="h-3.5 w-3.5" />
               </button>
+              {/* 2. Toggle dark/light */}
+              <button
+                onClick={toggle}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title={dark ? t('layout.light') : t('layout.dark')}
+              >
+                {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              </button>
+              {/* 3. Toggle language */}
+              <button
+                onClick={() => {
+                  const nextLang = i18nHook.language === "zh-CN" ? "en" : "zh-CN";
+                  i18nHook.changeLanguage(nextLang).catch(console.error);
+                }}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title={i18nHook.language === "zh-CN" ? "Switch to English" : "切换为中文"}
+              >
+                <Languages className="h-3.5 w-3.5" />
+              </button>
+              {/* 4. Exit tenant */}
+              {profile?.is_tenant && (
+                <button
+                  onClick={() => {
+                    clearApiAuthKey();
+                    navigate("/login", { replace: true });
+                  }}
+                  className="p-1.5 text-muted-foreground hover:text-destructive rounded transition-colors"
+                  title={isZhLayout ? "退出租户" : "Log out"}
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -445,14 +476,27 @@ export function Layout() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <LanguageSwitcher />
-                <p className="text-[10px] text-muted-foreground/60">{t('app.version') || APP_VERSION}</p>
               </div>
               {/* Identity footer */}
               {profile && (
                 <div className="text-[10px] text-muted-foreground/50 border-t pt-1.5 border-border/30 space-y-1">
-                  <div className="flex justify-between gap-2 truncate">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="truncate" title={profile.name}>User: {profile.name}</span>
-                    <span className="shrink-0 uppercase">{profile.role}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="uppercase">{profile.role}</span>
+                      {profile.is_tenant && (
+                        <button
+                          onClick={() => {
+                            clearApiAuthKey();
+                            navigate("/login", { replace: true });
+                          }}
+                          className="p-0.5 text-muted-foreground/60 hover:text-destructive transition-colors animate-pulse"
+                          title={isZhLayout ? "退出租户" : "Log out"}
+                        >
+                          <LogOut className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {/* Admin status & logout */}
                   {profile.is_admin && (
@@ -473,19 +517,6 @@ export function Layout() {
                         <span>{isZhLayout ? "锁定" : "Lock"}</span>
                       </button>
                     </div>
-                  )}
-                  {/* Tenant logout */}
-                  {profile.is_tenant && (
-                    <button
-                      onClick={() => {
-                        clearApiAuthKey();
-                        navigate("/login", { replace: true });
-                      }}
-                      className="flex items-center gap-1 text-muted-foreground/60 hover:text-destructive transition-colors animate-pulse"
-                    >
-                      <LogOut className="h-3 w-3" />
-                      {isZhLayout ? "退出租户" : "Log out"}
-                    </button>
                   )}
                 </div>
               )}

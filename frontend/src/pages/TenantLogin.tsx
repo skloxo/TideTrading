@@ -124,7 +124,7 @@ export function TenantLogin() {
         </div>
       </div>
 
-      <ICPFooter />
+      <ICPFooter className="py-6" />
     </div>
   );
 }

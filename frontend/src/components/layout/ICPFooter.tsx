@@ -5,16 +5,16 @@ export function ICPFooter({ className = "" }: { className?: string }) {
   const isZh = i18n.language === "zh-CN";
 
   return (
-    <div className={`text-[11px] text-muted-foreground flex flex-col items-center gap-0.5 py-4 ${className}`}>
+    <div className={`text-[10px] text-muted-foreground/50 flex flex-col items-center gap-0.5 ${className}`}>
       <a
         href="https://beian.miit.gov.cn/"
         target="_blank"
         rel="noopener noreferrer"
-        className="hover:text-primary transition font-medium"
+        className="hover:text-primary transition"
       >
         粤ICP备2026092741号
       </a>
-      <span className="opacity-80">
+      <span>
         {isZh ? "联系邮箱：" : "Email: "}{" "}
         <a href="mailto:help@tide.red" className="hover:text-primary transition font-mono">
           help@tide.red

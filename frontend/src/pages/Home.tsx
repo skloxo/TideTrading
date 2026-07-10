@@ -1,6 +1,4 @@
-import { Link } from "react-router-dom";
 import {
-  ArrowRight,
   Bot,
   BarChart3,
   Zap,
@@ -142,22 +140,7 @@ export function Home() {
             : "A multi-dimensional trading & analysis workstation focused on A/H-shares, integrating sentiment parsing, capital flows, backtesting, and secure multi-tenant sandbox."}
         </p>
 
-        {/* CTA */}
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-          <Link
-            to="/agent"
-            className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-md bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-105 active:scale-95"
-          >
-            {isZh ? "进入智能体工作区" : "Enter Agent Workspace"}
-            <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-md border border-border/80 bg-card/60 backdrop-blur-sm font-medium text-sm hover:bg-card/90 hover:border-primary/30 transition-all"
-          >
-            {isZh ? "进入量化大屏" : "Live Dashboard"}
-          </Link>
-        </div>
+
 
       </section>
 

@@ -161,7 +161,7 @@ export function TenantRegister() {
         </div>
       </div>
 
-      <ICPFooter />
+      <ICPFooter className="py-6" />
     </div>
   );
 }
