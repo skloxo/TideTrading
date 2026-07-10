@@ -1038,7 +1038,7 @@ def register_settings_routes(
             tenant_keys_list = host_ref._load_tenant_keys()
             tenant_key_values = [k["key"] for k in tenant_keys_list if k.get("is_active", True)]
             is_admin_key = any(__import__("hmac").compare_digest(token, k) for k in admin_keys)
-            is_tenant = bool(token) and not is_admin_key and token in tenant_key_values
+            is_tenant = bool(token) and (is_admin_key or token in tenant_key_values)
             if is_tenant and tenant != "default":
                 for item in tenant_keys_list:
                     if item.get("tenant_id") == tenant:
