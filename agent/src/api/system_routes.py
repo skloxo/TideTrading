@@ -231,6 +231,15 @@ def register_system_routes(
             historical_range = "未开始"
             today_status = "待维护"
             total_stocks = 0
+            # Per-dimension health metrics
+            kline_rows = 0
+            valuation_rows = 0
+            capital_flow_rows = 0
+            theme_rows = 0
+            financial_rows = 0
+            kline_last_date = None
+            meta_coverage_pct = 0
+            health_alerts: list = []
             
             if db_path.exists():
                 try:
@@ -238,9 +247,21 @@ def register_system_routes(
                     cur = conn.cursor()
                     cur.execute("SELECT COUNT(*) FROM stock_meta")
                     total_stocks = cur.fetchone()[0]
-                    
+
+                    cur.execute("SELECT COUNT(*) FROM kline_daily")
+                    kline_rows = cur.fetchone()[0]
+                    cur.execute("SELECT COUNT(*) FROM stock_valuation")
+                    valuation_rows = cur.fetchone()[0]
+                    cur.execute("SELECT COUNT(*) FROM capital_flow")
+                    capital_flow_rows = cur.fetchone()[0]
+                    cur.execute("SELECT COUNT(*) FROM theme_mapping")
+                    theme_rows = cur.fetchone()[0]
+                    cur.execute("SELECT COUNT(*) FROM financial_indicator")
+                    financial_rows = cur.fetchone()[0]
+
                     cur.execute("SELECT MIN(date), MAX(date) FROM kline_daily")
                     min_d, max_d = cur.fetchone()
+                    kline_last_date = max_d
                     if min_d and max_d:
                         historical_range = f"{min_d} ~ {max_d}"
                         
@@ -251,18 +272,49 @@ def register_system_routes(
                             if max_d >= latest_trading_day:
                                 today_status = "已完成"
                             else:
-                                from datetime import time
-                                now = datetime.now()
+                                from datetime import time as dt_time
+                                now_dt = datetime.now()
                                 cur.execute("SELECT is_open FROM trade_calendar WHERE date = ?", (today_str,))
                                 row = cur.fetchone()
                                 is_today_open = row[0] if row else 0
                                 
-                                if is_today_open and now.time() >= time(15, 35):
+                                if is_today_open and now_dt.time() >= dt_time(15, 35):
                                     today_status = "同步延迟/失败"
                                 else:
                                     today_status = "等待下午收盘"
                         else:
                             today_status = "未同步历法"
+
+                    # Data health alerts
+                    if total_stocks < 3000:
+                        health_alerts.append(f"⚠ 股票元数据不足（{total_stocks} 条，应≥5000）")
+                    if kline_rows < 1_000_000:
+                        health_alerts.append(f"⚠ K线数据偏少（{kline_rows:,} 行，应≥900万）")
+                    if valuation_rows < 100_000:
+                        health_alerts.append(f"⚠ 估值数据不足（{valuation_rows:,} 行）")
+                    if capital_flow_rows < 100_000:
+                        health_alerts.append(f"⚠ 资金流数据不足（{capital_flow_rows:,} 行）")
+                    if theme_rows < 5000:
+                        health_alerts.append(f"⚠ 概念题材数据不足（{theme_rows:,} 行）")
+                    if today_status == "同步延迟/失败":
+                        health_alerts.append("🔴 今日收盘数据同步延迟或失败，请检查")
+                    # Data freshness: kline last date vs latest trading day
+                    if kline_last_date and latest_trading_day and kline_last_date < latest_trading_day:
+                        days_behind = (
+                            datetime.strptime(latest_trading_day, "%Y-%m-%d") -
+                            datetime.strptime(kline_last_date, "%Y-%m-%d")
+                        ).days
+                        if days_behind > 3:
+                            health_alerts.append(f"⚠ K线数据已落后 {days_behind} 天（最新：{kline_last_date}）")
+
+                    # Coverage: what % of stocks in stock_meta have kline data
+                    if total_stocks > 0 and kline_rows > 0:
+                        cur.execute("SELECT COUNT(DISTINCT code) FROM kline_daily")
+                        kline_stocks = cur.fetchone()[0]
+                        meta_coverage_pct = round(kline_stocks / total_stocks * 100, 1)
+                        if meta_coverage_pct < 80:
+                            health_alerts.append(f"⚠ K线覆盖率仅 {meta_coverage_pct}%（{kline_stocks}/{total_stocks} 只股票有数据）")
+
                     conn.close()
                 except Exception:
                     pass
@@ -272,6 +324,9 @@ def register_system_routes(
                 maintenance_running = CloseDataMaintenanceService()._running
             except Exception:
                 pass
+
+            if not maintenance_running:
+                health_alerts.append("🔴 收盘维护服务未运行（CloseDataMaintenanceService stopped）")
                 
             services_info["data_maintenance"] = {
                 "name": "收盘行情同步与 Gap Healing",
@@ -279,10 +334,21 @@ def register_system_routes(
                 "historical_range": historical_range,
                 "today_status": today_status,
                 "total_stocks": total_stocks,
-                "db_size_mb": round(db_size_mb, 2)
+                "db_size_mb": round(db_size_mb, 2),
+                # Per-dimension health metrics
+                "kline_rows": kline_rows,
+                "valuation_rows": valuation_rows,
+                "capital_flow_rows": capital_flow_rows,
+                "theme_rows": theme_rows,
+                "financial_rows": financial_rows,
+                "kline_last_date": kline_last_date,
+                "meta_coverage_pct": meta_coverage_pct,
+                "health_alerts": health_alerts,
+                "health_ok": len(health_alerts) == 0,
             }
         except Exception:
             pass
+
 
         # 5.2 THS Watchlist Sync
         try:

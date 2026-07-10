@@ -454,13 +454,48 @@ export function Monitor() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>{isZh ? "已监控股票数" : "Monitored Stocks"}:</span>
-                <span className="text-foreground font-semibold font-mono">{stats?.services?.data_maintenance?.total_stocks || 0}</span>
+                <span>{isZh ? "已监控股票数 / 覆盖率" : "Monitored Stocks / Coverage"}:</span>
+                <span className="text-foreground font-semibold font-mono">
+                  {stats?.services?.data_maintenance?.total_stocks || 0} /{" "}
+                  <span className={stats?.services?.data_maintenance?.meta_coverage_pct < 95 ? "text-amber-500" : "text-emerald-500"}>
+                    {stats?.services?.data_maintenance?.meta_coverage_pct || 0}%
+                  </span>
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>{isZh ? "K线数据条数" : "K-line Rows"}:</span>
+                <span className="text-foreground font-semibold font-mono">{stats?.services?.data_maintenance?.kline_rows?.toLocaleString() || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{isZh ? "估值 / 资金流记录数" : "Valuation / Fund Flow Rows"}:</span>
+                <span className="text-foreground font-semibold font-mono">
+                  {stats?.services?.data_maintenance?.valuation_rows?.toLocaleString() || 0} / {stats?.services?.data_maintenance?.capital_flow_rows?.toLocaleString() || 0}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>{isZh ? "概念题材 / 财务指标数" : "Theme Mappings / Fin Indicators"}:</span>
+                <span className="text-foreground font-semibold font-mono">
+                  {stats?.services?.data_maintenance?.theme_rows?.toLocaleString() || 0} / {stats?.services?.data_maintenance?.financial_rows?.toLocaleString() || 0}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>{isZh ? "公共数据库大小" : "Market DB Size"}:</span>
                 <span className="text-foreground font-semibold font-mono">{stats?.services?.data_maintenance?.db_size_mb || 0} MB</span>
               </div>
+
+              {stats?.services?.data_maintenance?.health_alerts && stats.services.data_maintenance.health_alerts.length > 0 && (
+                <div className="mt-3 p-2 bg-destructive/10 border border-destructive/20 rounded text-[10px] text-destructive space-y-1">
+                  <div className="font-bold flex items-center gap-1">
+                    <ShieldAlert className="h-3.5 w-3.5" />
+                    <span>{isZh ? "数据完整性与系统异常警告:" : "Data Health & System Alerts:"}</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5 font-medium">
+                    {stats.services.data_maintenance.health_alerts.map((alert: string, idx: number) => (
+                      <li key={idx} className="truncate">{alert}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 

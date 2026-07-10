@@ -497,7 +497,8 @@ def fetch_with_retry(func, *args, max_retries=3, delay=2.0, **kwargs):
         except Exception as e:
             last_exc = e
             wait_time = delay * (2 ** attempt)
-            logger.warning(f"Error executing {func.__name__} (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time:.1f}s...")
+            func_name = getattr(func, '__name__', str(func))
+            logger.warning(f"Error executing {func_name} (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time:.1f}s...")
             time.sleep(wait_time)
     raise last_exc
 
@@ -945,8 +946,11 @@ def fetch_listing_date(code: str) -> Optional[str]:
         logger.warning(f"[{code}] Failed to fetch listing date directly: {e}")
     return None
 
+_cached_spot_df = None
+
 def backfill_valuation(db_path: str, code: str, start_date: str, end_date: str, ts_pro: Optional[Any] = None):
     """Backfill valuation indicators using Tushare or free AkShare spot data."""
+    global _cached_spot_df
     if ts_pro is not None:
         try:
             ts_code = to_ts_code(code)
@@ -992,7 +996,10 @@ def backfill_valuation(db_path: str, code: str, start_date: str, end_date: str, 
 
     # Free Fallback: Fetch current spot valuation and store for today
     try:
-        df = fetch_with_retry(ak.stock_zh_a_spot_em)
+        if _cached_spot_df is None:
+            logger.info("Fetching and caching full A-share spot data for valuation fallback...")
+            _cached_spot_df = fetch_with_retry(ak.stock_zh_a_spot_em)
+        df = _cached_spot_df
         if df is not None and not df.empty:
             row = df[df['代码'] == code]
             if not row.empty:
@@ -1015,7 +1022,7 @@ def backfill_valuation(db_path: str, code: str, start_date: str, end_date: str, 
                 )
                 conn.commit()
                 conn.close()
-                logger.info(f"[{code}] Saved current spot valuation to database.")
+                logger.info(f"[{code}] Saved current spot valuation to database (cached).")
     except Exception as e:
         logger.error(f"Failed to fetch free spot valuation for {code}: {e}")
 
