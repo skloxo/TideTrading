@@ -23,13 +23,13 @@ Usage:
 
 OpenClaw config (~/.openclaw/config.yaml):
     skills:
-      - name: vibe-trading
+      - name: tide-trading
         command: python /path/to/agent/mcp_server.py
 
 Claude Desktop config:
     {
       "mcpServers": {
-        "vibe-trading": {
+        "tide-trading": {
           "command": "python",
           "args": ["/path/to/agent/mcp_server.py"]
         }
@@ -63,7 +63,7 @@ from src.market_data import (
     get_loader,
 )
 
-mcp = FastMCP("Vibe-Trading", version=APP_VERSION)
+mcp = FastMCP("TideTrading", version=APP_VERSION)
 
 logger = logging.getLogger(__name__)
 
@@ -1828,11 +1828,11 @@ def scan_shadow_signals(
 
 
 def main():
-    """Entry point for `vibe-trading-mcp` CLI command."""
+    """Entry point for `tide-trading-mcp` CLI command."""
     global _include_shell_tools, _registry, _governance_surface
     import argparse
 
-    parser = argparse.ArgumentParser(description="Vibe-Trading MCP Server")
+    parser = argparse.ArgumentParser(description="TideTrading MCP Server")
     parser.add_argument("--transport", choices=["stdio", "sse"], default="stdio", help="MCP transport (default: stdio)")
     parser.add_argument("--port", type=int, default=8900, help="SSE port (only used with --transport sse)")
     args = parser.parse_args()

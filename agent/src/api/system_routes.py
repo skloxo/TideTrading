@@ -380,7 +380,7 @@ def register_system_routes(
         """Liveness probe."""
         return HealthResponse(
             status="healthy",
-            service="Vibe-Trading API",
+            service="TideTrading API",
             timestamp=datetime.now(timezone.utc).isoformat()
         )
 
@@ -428,7 +428,7 @@ def register_system_routes(
         background_tasks.add_task(_get_terminate_process())
         return {
             "status": "shutting-down",
-            "service": "Vibe-Trading API",
+            "service": "TideTrading API",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -450,7 +450,7 @@ def register_system_routes(
     async def api_info():
         """Service metadata."""
         return {
-            "service": "Vibe-Trading API",
+            "service": "TideTrading API",
             "version": _app_version,
             "docs": "/docs",
             "health": "/health",

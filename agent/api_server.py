@@ -362,8 +362,8 @@ class RunResponse(BaseModel):
 # ============================================================================
 
 app = FastAPI(
-    title="Vibe-Trading API",
-    description="Vibe-Trading API: natural-language finance research, backtesting, and swarm workflows",
+    title="TideTrading API",
+    description="TideTrading API: natural-language finance research, backtesting, and swarm workflows",
     version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -1053,7 +1053,7 @@ def _shell_tools_enabled_for_request(request: Request) -> bool:
 def _ensure_agent_env_file() -> Path:
     """Ensure the project-local agent/.env exists."""
     if not ENV_PATH.exists():
-        ENV_PATH.write_text("# Created by Vibe-Trading Web UI settings.\n", encoding="utf-8")
+        ENV_PATH.write_text("# Created by TideTrading Web UI settings.\n", encoding="utf-8")
     return ENV_PATH
 
 
@@ -1532,7 +1532,7 @@ def serve_main(argv: list[str] | None = None) -> int:
                     raise
                 return await super().get_response("index.html", scope)
 
-    parser = argparse.ArgumentParser(description="Vibe-Trading Server")
+    parser = argparse.ArgumentParser(description="TideTrading Server")
     parser.add_argument("--port", type=int, default=8000, help="Listen port (default 8000)")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address")
     parser.add_argument("--dev", action="store_true", help="Dev mode: spawn Vite on :5173")
@@ -1572,7 +1572,7 @@ def serve_main(argv: list[str] | None = None) -> int:
         print("[warn] Run: cd frontend && npm run build")
 
     print("=" * 50)
-    print("  Vibe-Trading Server")
+    print("  TideTrading Server")
     print(f"  http://127.0.0.1:{args.port}")
     print("=" * 50)
 
