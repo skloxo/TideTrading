@@ -385,3 +385,12 @@ def run_preflight(console: Optional[Console] = None) -> List[CheckResult]:
 
     console.print()
     return results
+
+
+# Ensure mootdx directory target exists for the symlink in docker environments
+try:
+    from pathlib import Path
+    (Path.home() / ".tide-trading" / ".mootdx").mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+

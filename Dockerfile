@@ -14,10 +14,10 @@ RUN npm run build
 # ============================================================================
 FROM python:3.11-slim AS runtime
 
-LABEL org.opencontainers.image.title="Vibe-Trading" \
+LABEL org.opencontainers.image.title="TideTrading" \
     org.opencontainers.image.description="Natural-language finance research AI agent with backtesting" \
-    org.opencontainers.image.version="0.1.10" \
-    org.opencontainers.image.source="https://github.com/HKUDS/Vibe-Trading" \
+    org.opencontainers.image.version="1.7.8" \
+    org.opencontainers.image.source="https://github.com/skloxo/TideTrading" \
     org.opencontainers.image.licenses="MIT"
 
 WORKDIR /app
@@ -63,11 +63,16 @@ RUN pip install --no-cache-dir -e .[channels]
 # Runtime should not run as root. Keep writable app data directories owned by
 # the service user so named Docker volumes inherit usable permissions.
 RUN useradd --create-home --shell /usr/sbin/nologin tide \
-    && mkdir -p agent/runs agent/sessions agent/uploads agent/.swarm/runs /home/tide/.tide-trading /home/tide/.tide-trading/.mootdx \
+    && mkdir -p agent/runs agent/sessions agent/uploads agent/.swarm/runs /home/tide/.tide-trading \
     && ln -s /home/tide/.tide-trading /home/tide/.vibe-trading-cnx \
     && ln -s /home/tide/.tide-trading /home/tide/.vibe-trading \
     && ln -s /home/tide/.tide-trading/.mootdx /home/tide/.mootdx \
     && chown -R tide:tide /app /home/tide/.tide-trading
+
+# Copy and wire entrypoint (runs as root before USER switch so it can
+# create directories inside the mounted volume which is owned by tide).
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
+
 USER tide
 
 # Default port
@@ -78,4 +83,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8899/health')" || exit 1
 
 # Run API server (serves frontend/dist as static files)
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["tide", "serve", "--host", "0.0.0.0", "--port", "8899"]
