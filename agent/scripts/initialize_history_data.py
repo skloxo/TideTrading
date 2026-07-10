@@ -488,14 +488,34 @@ def init_db(db_path: str):
     conn.close()
     logger.info("Database initialization completed successfully.")
 
+_consecutive_network_errors = 0
+_network_blocked = False
+
 def fetch_with_retry(func, *args, max_retries=3, delay=2.0, **kwargs):
     """Wrapper to execute a fetching function with retries and exponential backoff."""
+    global _consecutive_network_errors, _network_blocked
+    
+    if _network_blocked:
+        raise RuntimeError("Network source blocked due to consecutive errors (circuit breaker active)")
+        
     last_exc = None
     for attempt in range(max_retries):
         try:
-            return func(*args, **kwargs)
+            res = func(*args, **kwargs)
+            _consecutive_network_errors = 0  # Reset on success
+            return res
         except Exception as e:
             last_exc = e
+            
+            # Detect network related errors to trigger circuit breaker
+            err_str = str(e).lower()
+            is_net_err = any(term in err_str for term in ("connection", "timeout", "disconnected", "remote end closed", "aborted", "rate limit", "time out"))
+            if is_net_err:
+                _consecutive_network_errors += 1
+                if _consecutive_network_errors >= 8:
+                    _network_blocked = True
+                    logger.error("!!! CIRCUIT BREAKER ACTIVE !!! 8 consecutive network failures. Disabling network fallbacks to avoid long hangs.")
+            
             wait_time = delay * (2 ** attempt)
             func_name = getattr(func, '__name__', str(func))
             logger.warning(f"Error executing {func_name} (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time:.1f}s...")
