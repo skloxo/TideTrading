@@ -7,8 +7,10 @@ import os
 import sqlite3
 from pathlib import Path
 
-db = '/home/vibe/.vibe-trading-cnx/stocks_default.db'
-if not os.path.exists(db):
+from src.config.paths import get_tenant_db_path
+db_path = get_tenant_db_path("default")
+db = str(db_path)
+if not db_path.exists():
     print(f'DB not found at {db}')
     exit(1)
 

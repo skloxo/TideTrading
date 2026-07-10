@@ -171,3 +171,16 @@ def test_register_delegates_to_inner_registry_and_updates_manifest_cache() -> No
     assert "new_read" in governed.tool_names
     assert governed.manifest_cache.get("new_read").risk_level == RiskLevel.R0_READ
     assert json.loads(governed.execute("new_read", {})) == {"status": "ok"}
+
+
+def test_getattr_delegates_to_inner() -> None:
+    inner = ToolRegistry()
+    inner.register(_ReadTool())
+    governed = GovernedToolRegistry(
+        inner,
+        manifest_cache=ManifestCache({}, surface=ToolSurface.MCP_STDIO),
+        context=RuntimeContext(surface=ToolSurface.MCP_STDIO, mode="enforce"),
+    )
+    # Test transparent __getattr__ delegation for _tools
+    assert hasattr(governed, "_tools")
+    assert "new_read" in governed._tools

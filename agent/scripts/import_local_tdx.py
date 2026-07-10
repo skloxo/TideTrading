@@ -9,9 +9,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger('import_local_tdx')
 
 def get_market_db_path():
-    base = Path.home() / '.vibe-trading-cnx'
-    base.mkdir(parents=True, exist_ok=True)
-    return base / 'stocks_market.db'
+    from src.config.paths import get_market_db_path as _get_path
+    return _get_path()
 
 def parse_day_file(file_path):
     records = []
@@ -94,7 +93,9 @@ def import_market_data(tdx_path):
     logger.info(f'导入完成！总耗时: {total_time:.1f} 秒，总日 K 线: {total_inserted:,} 条')
     logger.info('='*60)
 if __name__ == '__main__':
-    import_market_data('/home/vibe/.vibe-trading-cnx/vipdoc/vipdoc')
+    from src.config.paths import _get_active_runtime_dir
+    vipdoc_path = str(_get_active_runtime_dir() / 'vipdoc' / 'vipdoc')
+    import_market_data(vipdoc_path)
 
 
 

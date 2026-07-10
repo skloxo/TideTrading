@@ -44,7 +44,7 @@ LIVE_BROKER_READONLY_WILDCARD_ALLOWED_EXTRA_SCOPES: dict[str, frozenset[str]] = 
 LIVE_BROKER_WRITE_SCOPES: dict[str, frozenset[str]] = {
     "ibkr": frozenset({"mcp.write"}),
 }
-ROBINHOOD_AGENT_CONFIG_PATH = "~/.vibe-trading/agent.json"
+ROBINHOOD_AGENT_CONFIG_PATH = "~/.tide-trading/agent.json"
 LIVE_BROKER_WILDCARD_ALLOWLIST_ERROR = (
     "enabledTools allowlist ('*'); pin an explicit read-only tool list"
 )
@@ -178,7 +178,7 @@ def _allows_readonly_wildcard_probe(
     allowed = set(required | allowed_extras)
     return required.issubset(scopes) and scopes.isdisjoint(write_scopes) and scopes <= allowed
 
-# Canonical seed for the operator-side ``~/.vibe-trading-cnx/agent.json`` mcpServers
+# Canonical seed for the operator-side ``~/.tide-trading/agent.json`` mcpServers
 # entry that wires the Robinhood Agentic Trading channel. It ships OFF-by-default
 # read-only: an explicit READ allowlist (never ``["*"]``), OAuth auth, and the
 # streamableHttp transport. Operators copy this block into their protected config
@@ -197,8 +197,8 @@ ROBINHOOD_MCP_SERVER_SEED: dict[str, object] = {
     "auth": {
         "type": "oauth",
         "scopes": ["trading.read"],
-        "client_name": "Vibe-Trading-CNX",
-        "cache_dir": "~/.vibe-trading-cnx/live/robinhood/oauth",
+        "client_name": "TideTrading-CNX",
+        "cache_dir": "~/.tide-trading/live/robinhood/oauth",
     },
     # Seed the OFF-by-default READ allowlist to EXACTLY the canonical curated
     # READ tool names (``src.trading.connectors.robinhood.classification.ROBINHOOD_TOOL_CLASS``).
@@ -230,8 +230,8 @@ IBKR_MCP_SERVER_SEED: dict[str, object] = {
     "auth": {
         "type": "oauth",
         "scopes": ["mcp.read"],
-        "client_name": "Vibe-Trading-CNX",
-        "cache_dir": "~/.vibe-trading-cnx/live/ibkr/oauth",
+        "client_name": "TideTrading-CNX",
+        "cache_dir": "~/.tide-trading/live/ibkr/oauth",
     },
     "enabled_tools": ["*"],
 }
@@ -338,8 +338,8 @@ class MCPOAuthConfig(ConfigBase):
 
     type: Literal["oauth"] = "oauth"
     scopes: list[str] = Field(default_factory=list)
-    client_name: str = "Vibe-Trading-CNX"
-    cache_dir: str = "~/.vibe-trading-cnx/live/robinhood/oauth"
+    client_name: str = "TideTrading-CNX"
+    cache_dir: str = "~/.tide-trading/live/robinhood/oauth"
     callback_port: int | None = Field(default=None, ge=1, le=65535)
     client_id: str | None = None
     client_secret: str | None = None

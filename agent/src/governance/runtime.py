@@ -96,6 +96,9 @@ class GovernedToolRegistry:
     def __len__(self) -> int:
         return len(getattr(self.inner, "tool_names", []))
 
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.inner, name)
+
 
 def govern_registry(
     registry: Any,

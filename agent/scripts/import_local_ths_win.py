@@ -158,7 +158,7 @@ if __name__ == '__main__':
         # Fallback
         ths_dir = "C:/同花顺软件/同花顺/history"
         
-    wsl_db = "//wsl.localhost/Ubuntu-24.04/home/skloxo/.vibe-trading-cnx/stocks_market.db"
+    wsl_db = "//wsl.localhost/Ubuntu-24.04/home/skloxo/.tide-trading/stocks_market.db"
     import_ths_data(ths_dir, wsl_db)
 
 

@@ -21,7 +21,8 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-MEMORY_BASE = Path.home() / ".vibe-trading-cnx" / "memory"
+from src.config.paths import get_runtime_root
+MEMORY_BASE = get_runtime_root() / "memory"
 MAX_INDEX_LINES = 200
 MAX_ENTRY_CHARS = 8000
 MAX_RESULTS = 5

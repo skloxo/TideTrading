@@ -130,7 +130,7 @@ def test_ibkr_seed_is_official_readonly_oauth_probe() -> None:
     assert ibkr.url == "https://api.ibkr.com/v1/api/mcp"
     assert ibkr.auth is not None and ibkr.auth.type == "oauth"
     assert ibkr.auth.scopes == ["mcp.read"]
-    assert ibkr.auth.cache_dir == "~/.vibe-trading-cnx/live/ibkr/oauth"
+    assert ibkr.auth.cache_dir == "~/.tide-trading/live/ibkr/oauth"
     assert ibkr.enabled_tools == ["*"]
     assert "ibkr" in LIVE_BROKER_SERVER_KEYS
 

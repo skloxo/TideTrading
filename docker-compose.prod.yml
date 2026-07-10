@@ -23,7 +23,7 @@ services:
       # (sessions.db), user-created skills, shadow accounts, hypothesis
       # registry, broker connector config, agent.json. Without this volume a
       # rebuild/recreate wipes it all.
-      - vibe-cnx-home:/home/vibe/.vibe-trading-cnx
+      - vibe-cnx-home:/home/vibe/.tide-trading
       - vibe-cnx-swarm-runs:/app/agent/.swarm/runs
       - vibe-cnx-uploads:/app/agent/uploads
     restart: unless-stopped

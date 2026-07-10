@@ -1718,7 +1718,7 @@ def extract_shadow_strategy(
 
     Run `analyze_trade_journal` first if the journal hasn't been parsed.
     Returns shadow_id + rules preview. Profile persists to
-    ~/.vibe-trading/shadow_accounts/.
+    ~/.tide-trading/shadow_accounts/.
 
     Args:
         journal_path: Path to the CSV/Excel broker export.

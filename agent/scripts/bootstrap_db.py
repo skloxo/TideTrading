@@ -35,11 +35,11 @@ def get_runtime_db_path() -> Path:
     """Resolve the runtime database path using the project config."""
     try:
         sys.path.insert(0, "/app/agent")
-        from src.config.paths import get_runtime_root
-        return get_runtime_root() / "stocks_default.db"
+        from src.config.paths import get_tenant_db_path
+        return get_tenant_db_path("default")
     except Exception:
         home = Path.home()
-        return home / ".vibe-trading-cnx" / "stocks_default.db"
+        return home / ".tide-trading" / "stocks_default.db"
 
 
 def is_db_initialized(db_path: Path) -> bool:

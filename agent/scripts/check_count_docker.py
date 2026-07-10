@@ -1,5 +1,7 @@
 import sqlite3
-db = '/home/vibe/.vibe-trading-cnx/stocks_market.db'
+from src.config.paths import _get_active_runtime_dir
+import os
+db = os.path.join(str(_get_active_runtime_dir()), 'stocks_market.db')
 try:
     conn = sqlite3.connect(db)
     r = conn.execute('SELECT COUNT(*) FROM kline_daily').fetchone()

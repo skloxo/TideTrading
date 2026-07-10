@@ -25,7 +25,8 @@ def default_ledger_path() -> Path:
     override = os.getenv(_LEDGER_ENV, "").strip()
     if override:
         return Path(override).expanduser()
-    return Path.home() / ".vibe-trading" / "research-ledger" / "ledger.sqlite"
+    from src.config.paths import get_research_ledger_path
+    return get_research_ledger_path()
 
 
 class TrialLedger:

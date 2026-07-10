@@ -216,6 +216,7 @@ class SessionService:
         Returns:
             Result dictionary containing status, run_dir, run_id, metrics, and related fields.
         """
+        import contextvars
         from src.tools import build_registry
         from src.providers.chat import ChatLLM
         from src.agent.loop import AgentLoop
@@ -224,6 +225,8 @@ class SessionService:
         from src.governance.config import get_governance_mode
         from src.governance.decisions import RuntimeContext
         from src.governance.runtime import govern_registry
+
+        ctx = contextvars.copy_context()
 
         llm = ChatLLM()
         pm = PersistentMemory()
@@ -246,7 +249,8 @@ class SessionService:
 
         registry = await loop.run_in_executor(
             _AGENT_EXECUTOR,
-            lambda: build_registry(
+            lambda: ctx.run(
+                build_registry,
                 persistent_memory=pm,
                 include_shell_tools=include_shell_tools,
                 agent_config=agent_config,
@@ -282,7 +286,8 @@ class SessionService:
         try:
             result = await loop.run_in_executor(
                 _AGENT_EXECUTOR,
-                lambda: agent.run(
+                lambda: ctx.run(
+                    agent.run,
                     user_message=attempt.prompt,
                     history=history,
                     session_id=session_id,

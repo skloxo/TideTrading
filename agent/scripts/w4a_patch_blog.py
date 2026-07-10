@@ -26,7 +26,8 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[2]
 HTML_PATH = REPO / "wiki" / "research-lab" / "posts" / "alpha-191-in-2026.html"
-SUMMARY_PATH = Path.home() / ".vibe-trading" / "reports" / "bench_summary.json"
+from src.config.paths import _get_active_runtime_dir
+SUMMARY_PATH = _get_active_runtime_dir() / "reports" / "bench_summary.json"
 
 GTJA_KEY = "gtja191_csi300"
 

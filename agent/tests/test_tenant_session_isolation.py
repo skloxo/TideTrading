@@ -173,3 +173,95 @@ def test_admin_elevation_keeps_tenant_context(monkeypatch: pytest.MonkeyPatch) -
     # It must return Tenant A's sessions (length 1), NOT default tenant's sessions (length 0)!
     assert len(sessions) == 1
     assert sessions[0]["session_id"] == session_id
+
+
+@pytest.mark.anyio
+async def test_executor_tenant_context_propagation(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _local_client()
+    admin_headers = {"Authorization": "Bearer admin_secret"}
+
+    # 1. Create a tenant A
+    resp = client.post("/admin/tenants/keys", headers=admin_headers, json={"name": "Tenant A"})
+    assert resp.status_code == 200
+    tenant_a_key = resp.json()["key"]
+    tenant_a_id = resp.json()["tenant_id"]
+
+    # 2. Set active_tenant_var to Tenant A
+    from src.config.paths import active_tenant_var
+    active_tenant_var.set(tenant_a_id)
+
+    # Initialize session service for Tenant A
+    svc = api_server._get_session_service()
+    assert svc is not None
+
+    # 3. Create a session for Tenant A
+    session = svc.create_session(title="Session Context Prop", config={})
+    session_id = session.session_id
+
+    # 4. Intercept ChatLLM, build_registry and AgentLoop
+    import anyio
+    captured_tenants = []
+
+    class DummyLLM:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr("src.providers.chat.ChatLLM", DummyLLM)
+
+    class DummyAgent:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, user_message, history, session_id):
+            from src.config.paths import active_tenant_var
+            captured_tenants.append(active_tenant_var.get())
+            return {"status": "success", "content": "mocked response", "run_dir": None}
+
+    monkeypatch.setattr("src.agent.loop.AgentLoop", DummyAgent)
+
+    def mock_build_registry(*args, **kwargs):
+        from src.config.paths import active_tenant_var
+        captured_tenants.append(active_tenant_var.get())
+        from src.agent.tools import ToolRegistry
+        return ToolRegistry()
+    monkeypatch.setattr("src.tools.build_registry", mock_build_registry)
+
+    # 5. Send message directly via service (triggers background execution in task)
+    result = await svc.send_message(session_id, "test prompt")
+    attempt_id = result["attempt_id"]
+
+    # 6. Wait for execution to finish in the event loop
+    attempt_info = None
+    for _ in range(50):
+        attempt = svc.store.get_attempt(session_id, attempt_id)
+        if attempt:
+            attempt_info = {"status": attempt.status.value, "error": attempt.error}
+            if attempt.status.value in ("completed", "failed"):
+                break
+        await anyio.sleep(0.1)
+
+    # 7. Verify ContextVar was correctly propagated inside the executor thread tasks
+    assert len(captured_tenants) == 2
+    for t in captured_tenants:
+        assert t == tenant_a_id
+
+
+def test_tenant_search_index_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.config.paths import active_tenant_var
+    from src.session.search import get_shared_index, _shared_indexes
+
+    # Reset/clear the cached shared indexes dict in-place
+    _shared_indexes.clear()
+
+    active_tenant_var.set("tenant_a")
+    idx_a = get_shared_index()
+    assert "tenant_a" in _shared_indexes
+    assert idx_a.db_path.parent.name == "tenant_a"
+
+    active_tenant_var.set("tenant_b")
+    idx_b = get_shared_index()
+    assert "tenant_b" in _shared_indexes
+    assert idx_b.db_path.parent.name == "tenant_b"
+
+    assert idx_a is not idx_b
+    assert idx_a.db_path != idx_b.db_path

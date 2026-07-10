@@ -43,35 +43,20 @@ AGENT_DIR = Path(__file__).resolve().parent
 ENV_EXAMPLE_PATH = AGENT_DIR / ".env.example"
 
 def _get_active_runtime_dir() -> Path:
-    import os
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        return Path.home() / ".vibe-trading-cnx"
-    old_dir = Path.home() / ".vibe-trading-cnx"
-    new_dir = Path.home() / ".tide-trading"
-    if not new_dir.exists() and old_dir.exists():
-        return old_dir
-    return new_dir
+    from src.config.paths import _get_active_runtime_dir as _get_dir
+    return _get_dir()
 
 def _get_runs_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return Path(__file__).resolve().parent / "runs"
-    return get_runtime_root() / "runs"
+    from src.config.paths import get_runs_dir
+    return get_runs_dir()
 
 def _get_sessions_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return Path(__file__).resolve().parent / "sessions"
-    return get_runtime_root() / "sessions"
+    from src.config.paths import get_sessions_dir
+    return get_sessions_dir()
 
 def _get_uploads_dir() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get() or "default"
-    if tenant == "default":
-        return Path(__file__).resolve().parent / "uploads"
-    return get_runtime_root() / "uploads"
+    from src.config.paths import get_uploads_dir
+    return get_uploads_dir()
 
 class _DynamicEnvPath(type(Path())):
     def __new__(cls):
