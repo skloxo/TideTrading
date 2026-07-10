@@ -30,7 +30,7 @@ _SCHEDULED_RESEARCH_TRUE_VALUES = {"1", "true", "yes", "on"}
 # Module-level state
 # ---------------------------------------------------------------------------
 
-_scheduled_research_store: Any = None
+_scheduled_research_stores: dict[str, Any] = {}
 _scheduled_research_executor: Any = None
 
 
@@ -43,13 +43,16 @@ def _scheduled_research_scheduler_enabled() -> bool:
 
 
 def _get_scheduled_research_store():
-    """Return the singleton ScheduledResearchJobStore, creating it on first call."""
-    global _scheduled_research_store
-    if _scheduled_research_store is None:
+    """Return the tenant-specific ScheduledResearchJobStore, creating it on first call."""
+    from src.config.paths import active_tenant_var
+    tenant = active_tenant_var.get() or "default"
+
+    global _scheduled_research_stores
+    if tenant not in _scheduled_research_stores:
         from src.scheduled_research.store import ScheduledResearchJobStore
 
-        _scheduled_research_store = ScheduledResearchJobStore()
-    return _scheduled_research_store
+        _scheduled_research_stores[tenant] = ScheduledResearchJobStore()
+    return _scheduled_research_stores[tenant]
 
 
 async def _dispatch_scheduled_research_job(job) -> None:

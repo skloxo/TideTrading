@@ -265,3 +265,24 @@ def test_tenant_search_index_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert idx_a is not idx_b
     assert idx_a.db_path != idx_b.db_path
+
+
+def test_tenant_scheduled_research_store_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.config.paths import active_tenant_var
+    from src.api.scheduled_routes import _get_scheduled_research_store, _scheduled_research_stores
+
+    # Reset/clear the cached stores dict in-place
+    _scheduled_research_stores.clear()
+
+    active_tenant_var.set("tenant_a")
+    store_a = _get_scheduled_research_store()
+    assert "tenant_a" in _scheduled_research_stores
+    assert store_a.path.parent.parent.name == "tenant_a"
+
+    active_tenant_var.set("tenant_b")
+    store_b = _get_scheduled_research_store()
+    assert "tenant_b" in _scheduled_research_stores
+    assert store_b.path.parent.parent.name == "tenant_b"
+
+    assert store_a is not store_b
+    assert store_a.path != store_b.path
