@@ -49,6 +49,9 @@ const ProjectSettings = lazy(() =>
 const TenantLogin = lazy(() =>
   import("@/pages/TenantLogin").then((m) => ({ default: m.TenantLogin })),
 );
+const TenantRegister = lazy(() =>
+  import("@/pages/TenantRegister").then((m) => ({ default: m.TenantRegister })),
+);
 
 function PageLoader() {
   return (
@@ -96,4 +99,5 @@ export const router = createBrowserRouter([
   },
   // Standalone pages — outside Layout, no auth required to render
   { path: "/login", element: wrap(TenantLogin) },
+  { path: "/claim-sandbox", element: wrap(TenantRegister) },
 ]);

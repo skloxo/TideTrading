@@ -7,6 +7,7 @@ import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, isAuthRequiredError, type SessionItem, type UserProfile } from "@/lib/api";
 import { useAgentStore } from "@/stores/agent";
 import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
+import { ICPFooter } from "@/components/layout/ICPFooter";
 import { clearApiAuthKey, clearAdminToken, getApiAuthKey } from "@/lib/apiAuth";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 
@@ -488,6 +489,7 @@ export function Layout() {
                   )}
                 </div>
               )}
+              <ICPFooter className="border-t border-border/30 mt-2 pt-2 !pb-0" />
             </>
           )}
         </div>
