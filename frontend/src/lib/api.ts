@@ -396,6 +396,10 @@ export const api = {
       body: JSON.stringify({ agent_id, message }),
     }),
   getMonitorStats: () => request<MonitorStats>("/admin/monitor/stats"),
+  triggerMaintenance: () =>
+    request<{ status: string; message: string }>("/admin/monitor/trigger_maintenance", {
+      method: "POST",
+    }),
   getMonitorLogs: (params?: { limit?: number; level?: string; keyword?: string }) => {
     const q = new URLSearchParams();
     if (params?.limit) q.set("limit", params.limit.toString());

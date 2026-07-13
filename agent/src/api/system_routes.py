@@ -309,9 +309,9 @@ def register_system_routes(
 
                     # Coverage: what % of stocks in stock_meta have kline data
                     if total_stocks > 0 and kline_rows > 0:
-                        cur.execute("SELECT COUNT(DISTINCT code) FROM kline_daily")
+                        cur.execute("SELECT COUNT(DISTINCT code) FROM kline_daily WHERE code IN (SELECT code FROM stock_meta)")
                         kline_stocks = cur.fetchone()[0]
-                        meta_coverage_pct = round(kline_stocks / total_stocks * 100, 1)
+                        meta_coverage_pct = min(round(kline_stocks / total_stocks * 100, 1), 100.0)
                         if meta_coverage_pct < 80:
                             health_alerts.append(f"⚠ K线覆盖率仅 {meta_coverage_pct}%（{kline_stocks}/{total_stocks} 只股票有数据）")
 
@@ -350,17 +350,46 @@ def register_system_routes(
             pass
 
 
-        # 5.2 THS Watchlist Sync
+        # 5.2 THS Watchlist Sync — two-layer status
         try:
-            from src.market.ths_sync import ThsSyncService
+            from src.market.ths_sync import ThsSyncService, get_ths_cookie
             ths_running = False
             try:
                 ths_running = ThsSyncService()._running
             except Exception:
                 pass
+
+            # Per-tenant cookie status: scan all known tenants (always including default tenant)
+            tenants_with_cookie: list = []
+            tenants_no_cookie: list = []
+            try:
+                # Prepopulate with the default system tenant
+                all_tenants = [{"tenant_id": "default", "name": "系统默认租户"}]
+                try:
+                    all_tenants.extend(host._load_tenant_keys())
+                except Exception:
+                    pass
+
+                for tk in all_tenants:
+                    tid = tk.get("tenant_id", "default")
+                    tname = tk.get("name", tid)
+                    cookie = get_ths_cookie(tid)
+                    if cookie and len(cookie.strip()) > 5:
+                        tenants_with_cookie.append({"tenant_id": tid, "name": tname})
+                    else:
+                        tenants_no_cookie.append({"tenant_id": tid, "name": tname})
+            except Exception:
+                pass
+
             services_info["ths_sync"] = {
                 "name": "同花顺自选股双向同步",
-                "running": ths_running
+                # --- Layer 1: Global service process status ---
+                "running": ths_running,
+                # --- Layer 2: Per-tenant Cookie configuration ---
+                "tenants_with_cookie": tenants_with_cookie,
+                "tenants_no_cookie": tenants_no_cookie,
+                "cookie_configured_count": len(tenants_with_cookie),
+                "cookie_missing_count": len(tenants_no_cookie),
             }
         except Exception:
             pass
@@ -428,7 +457,32 @@ def register_system_routes(
             services=services_info,
         )
 
+    @app.post(
+        "/admin/monitor/trigger_maintenance",
+        dependencies=[Depends(require_admin)],
+    )
     @app.get(
+        "/admin/monitor/trigger_maintenance",
+        dependencies=[Depends(require_admin)],
+    )
+    async def trigger_maintenance(background_tasks: BackgroundTasks):
+        """Manually trigger the close data maintenance sync process in the background."""
+        from src.market.close_maintenance import CloseDataMaintenanceService
+        
+        service = CloseDataMaintenanceService()
+        
+        async def run_task():
+            try:
+                await service._execute_maintenance()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error("Manual trigger of close maintenance failed: %s", e)
+                
+        background_tasks.add_task(run_task)
+        return {"status": "success", "message": "Close data maintenance trigger task successfully scheduled in background"}
+
+    @app.get(
+
         "/admin/monitor/logs",
         response_model=List[LogEntry],
         dependencies=[Depends(require_admin)],

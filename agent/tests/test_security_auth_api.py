@@ -671,10 +671,12 @@ def test_admin_tenant_keys_crud_and_config_inheritance(
     admin_client = _remote_client()
     admin_headers = {"Authorization": "Bearer admin_secret"}
     
-    # Admin lists keys - should be empty initially
+    # Admin lists keys - should only contain "default" tenant initially
     resp = admin_client.get("/admin/tenants/keys", headers=admin_headers)
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["tenant_id"] == "default"
     
     # Admin creates a tenant key
     resp = admin_client.post("/admin/tenants/keys", headers=admin_headers, json={"name": "test-tenant-1"})
@@ -690,11 +692,12 @@ def test_admin_tenant_keys_crud_and_config_inheritance(
     tenant_dir = tmp_path / ".vibe-trading-cnx" / "tenants" / tenant_id
     assert tenant_dir.exists()
     
-    # List keys should now show the new key
+    # List keys should now show the new key in addition to default
     resp = admin_client.get("/admin/tenants/keys", headers=admin_headers)
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
-    assert resp.json()[0]["tenant_id"] == tenant_id
+    keys_data = resp.json()
+    assert len(keys_data) == 2
+    assert any(k["tenant_id"] == tenant_id for k in keys_data)
 
     # 3. Test tenant client settings access
     tenant_client = _remote_client()

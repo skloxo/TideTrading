@@ -547,14 +547,9 @@ class AgentLoop:
         self._previous_summary = ""
 
         state_store = RunStateStore()
-        from src.config.paths import active_tenant_var, get_runtime_root
-        tenant = active_tenant_var.get() or "default"
-        if tenant == "default":
-            runs_dir = RUNS_DIR
-            sessions_dir = SESSIONS_DIR
-        else:
-            runs_dir = get_runtime_root() / "runs"
-            sessions_dir = get_runtime_root() / "sessions"
+        from src.config.paths import get_runs_dir, get_sessions_dir
+        runs_dir = get_runs_dir()
+        sessions_dir = get_sessions_dir()
 
         runs_dir.mkdir(parents=True, exist_ok=True)
 

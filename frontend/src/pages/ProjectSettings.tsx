@@ -5,6 +5,7 @@ import { api, type DataSourceSettings, type FeatureFlagsResponse, type LLMProvid
 import { setAdminToken } from "@/lib/apiAuth";
 import { Database, KeyRound, Loader2, RotateCcw, Save, Server, SlidersHorizontal, ShieldAlert, Lock, Plus, Trash2, Edit, MessageSquareMore } from "lucide-react";
 
+
 interface LLMFormState {
   provider: string;
   model_name: string;
@@ -74,11 +75,14 @@ export function ProjectSettings() {
   const [clearIwencaiKey, setClearIwencaiKey] = useState(false);
   const [fredApiKey, setFredApiKey] = useState("");
   const [clearFredApiKey, setClearFredApiKey] = useState(false);
+  const [thsCookie, setThsCookie] = useState("");
+  const [clearThsCookie, setClearThsCookie] = useState(false);
 
   // Admin elevation states
   const [adminUsername, setAdminUsername] = useState("admin");
   const [adminPassword, setAdminPassword] = useState("");
   const [elevating, setElevating] = useState(false);
+
 
   useEffect(() => {
     let alive = true;
@@ -128,6 +132,8 @@ export function ProjectSettings() {
       setLoading(false);
     }
   };
+
+
 
   useEffect(() => {
     if (profile?.is_admin) {
@@ -224,6 +230,8 @@ export function ProjectSettings() {
         clear_iwencai_key: clearIwencaiKey,
         fred_api_key: fredApiKey.trim() || undefined,
         clear_fred_api_key: clearFredApiKey,
+        ths_cookie: thsCookie.trim() || undefined,
+        clear_ths_cookie: clearThsCookie,
         use_default: false,
       }, { headers: { "X-Vibe-Scope": "global" } });
       setDataSettings(updated);
@@ -233,6 +241,8 @@ export function ProjectSettings() {
       setClearIwencaiKey(false);
       setFredApiKey("");
       setClearFredApiKey(false);
+      setThsCookie("");
+      setClearThsCookie(false);
       toast.success(isZh ? "全局数据源设置已保存" : "Global data source settings saved");
     } catch (err: any) {
       toast.error(err?.message || "Failed to save data source settings");
@@ -444,8 +454,8 @@ export function ProjectSettings() {
     <div className="mx-auto max-w-5xl space-y-4 p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-4 border-border/60">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{isZh ? "项目全局设置 (系统管理员)" : "Project Settings (Admin)"}</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">{isZh ? "配置项目全局的默认大模型凭证及公共金融数据源接入 Token。" : "Configure default LLM settings and data source API tokens globally."}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{isZh ? "\u9879\u76ee\u5168\u5c40\u8bbe\u7f6e (\u7cfb\u7edf\u7ba1\u7406\u5458)" : "Project Settings (Admin)"}</h1>
+          <p className="max-w-3xl text-sm text-muted-foreground">{isZh ? "\u914d\u7f6e\u9879\u76ee\u5168\u5c40\u7684\u9ed8\u8ba4\u5927\u6a21\u578b\u51ed\u8bc1\u53ca\u516c\u5171\u91d1\u878d\u6570\u636e\u6e90\u63a5\u5165 Token\u3002" : "Configure default LLM settings and data source API tokens globally."}</p>
         </div>
       </div>
 
@@ -716,6 +726,36 @@ export function ProjectSettings() {
                     className="h-3.5 w-3.5 accent-primary"
                   />
                   {isZh ? "清除 Key" : "Clear Key"}
+                </label>
+              </div>
+            </label>
+
+            <label className="grid gap-2">
+              <span className={labelClass}>同花顺 (Tonghuashun) Cookie</span>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <textarea
+                  rows={2}
+                  value={thsCookie}
+                  onChange={(event) => setThsCookie(event.target.value)}
+                  className={`${fieldClass} pl-9 py-2 min-h-[60px] resize-y`}
+                  placeholder={dataSettings.ths_cookie_configured ? (isZh ? "已配置" : "Configured") : (isZh ? "未配置" : "Not Configured")}
+                  disabled={clearThsCookie}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className={hintClass}>{isZh ? "用于同花顺自选股同步服务的数据接入验证。" : "Access cookie required for Tonghuashun watchlist synchronization."}</span>
+                <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={clearThsCookie}
+                    onChange={(event) => {
+                      setClearThsCookie(event.target.checked);
+                      if (event.target.checked) setThsCookie("");
+                    }}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  {isZh ? "清除 Cookie" : "Clear Cookie"}
                 </label>
               </div>
             </label>

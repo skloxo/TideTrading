@@ -641,9 +641,6 @@ async def require_local_or_auth(
 
     # 2. Otherwise check admin session token
     if _is_request_admin(request):
-        tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
-        if tenant_keys:
-            raise HTTPException(status_code=401, detail="Authentication required (tenant context missing)")
         from src.config.paths import active_tenant_var
         active_tenant_var.set("default")
         return
@@ -687,9 +684,6 @@ async def require_admin(
 
     # 2. Otherwise check admin session token
     if _is_request_admin(request):
-        tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
-        if tenant_keys:
-            raise HTTPException(status_code=401, detail="Authentication required (tenant context missing)")
         from src.config.paths import active_tenant_var
         active_tenant_var.set("default")
         return
@@ -964,9 +958,6 @@ def _validate_api_auth(
 
     # 2. Admin Session Token elevation (only when no Bearer token is present).
     if _is_request_admin(request):
-        tenant_keys = [item["key"] for item in _load_tenant_keys() if item.get("is_active", True)]
-        if tenant_keys:
-            raise HTTPException(status_code=401, detail="Authentication required (tenant context missing)")
         from src.config.paths import active_tenant_var
         active_tenant_var.set("default")
         return

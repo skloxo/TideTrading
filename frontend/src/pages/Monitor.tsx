@@ -55,6 +55,21 @@ export function Monitor() {
   const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
 
+  const [triggeringMaintenance, setTriggeringMaintenance] = useState(false);
+
+  const handleTriggerMaintenance = async () => {
+    setTriggeringMaintenance(true);
+    try {
+      await api.triggerMaintenance();
+      toast.success(isZh ? "数据自愈任务已在后台启动，请稍后刷新查看" : "Data self-healing task launched in background");
+      setTimeout(() => fetchStats(), 3000);
+    } catch (err) {
+      toast.error(isZh ? "触发数据自愈失败" : "Failed to trigger data self-healing");
+    } finally {
+      setTriggeringMaintenance(false);
+    }
+  };
+
   const fetchQuoteStatus = async (showLoading = false, showToast = false) => {
     if (showLoading) setQuoteLoading(true);
     try {
@@ -309,6 +324,14 @@ export function Monitor() {
           <RefreshCw className="h-3.5 w-3.5" />
           {isZh ? "刷新全部" : "Refresh All"}
         </button>
+        <button
+          onClick={handleTriggerMaintenance}
+          disabled={triggeringMaintenance}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition disabled:opacity-60"
+        >
+          {triggeringMaintenance ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
+          {isZh ? "强制数据自愈" : "Force Data Sync"}
+        </button>
       </div>
 
       {error && (
@@ -499,7 +522,7 @@ export function Monitor() {
             </div>
           </div>
 
-          {/* THS Watchlist Sync Card */}
+          {/* THS Watchlist Sync Card — two layers */}
           <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-md p-3.5 hover:border-border/90 hover:bg-card/80 hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full blur-xl pointer-events-none group-hover:bg-green-500/10 transition-all duration-500" />
             
@@ -510,26 +533,49 @@ export function Monitor() {
                   {isZh ? "同花顺自选双向同步" : "THS Watchlist Sync"}
                 </span>
               </div>
+              {/* Layer 1: global engine badge */}
               <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase transition ${
                 stats?.services?.ths_sync?.running 
                   ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
                   : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}>
-                {stats?.services?.ths_sync?.running ? (isZh ? "运行中" : "RUNNING") : (isZh ? "已停止" : "STOPPED")}
+                {stats?.services?.ths_sync?.running ? (isZh ? "引擎运行中" : "ENGINE ON") : (isZh ? "引擎已停止" : "ENGINE OFF")}
               </span>
             </div>
             
-            <div className="space-y-2 pt-2.5">
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {isZh 
-                  ? "支持多租户 Cookie 隔离配置，进行同花顺云端自选股双向差分对账同步。未配置时将自动降级为本地自选模型。" 
-                  : "Bi-directional background synchronization of portfolios with Tonghuashun over secure cookies."}
-              </p>
+            <div className="space-y-2 pt-2.5 text-xs">
+              {/* Layer 2: per-tenant cookie status */}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{isZh ? "租户 Cookie 配置:" : "Tenant Cookie Config:"}</span>
+                {stats?.services?.ths_sync ? (() => {
+                  const ths = stats.services.ths_sync;
+                  const configured = ths.cookie_configured_count ?? 0;
+                  const missing = ths.cookie_missing_count ?? 0;
+                  const total = configured + missing;
+                  const allOk = missing === 0 && total > 0;
+                  return (
+                    <span className={`font-semibold font-mono ${allOk ? "text-emerald-500" : missing > 0 ? "text-amber-500" : "text-muted-foreground"}`}>
+                      {total === 0 ? "-" : `${configured}/${total} ${isZh ? "已配置" : "configured"}`}
+                    </span>
+                  );
+                })() : <span className="text-muted-foreground animate-pulse">...</span>}
+              </div>
+
+              {/* Show which tenants are missing cookie */}
+              {stats?.services?.ths_sync?.tenants_no_cookie?.length > 0 && (
+                <div className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
+                  ⚠ {isZh ? "未配置租户: " : "Missing: "}
+                  {stats?.services?.ths_sync?.tenants_no_cookie?.map((t: {tenant_id: string; name: string}) => t.name || t.tenant_id).join(", ")}
+                </div>
+              )}
+
+
               <div className="text-[10px] text-muted-foreground bg-muted/20 border border-border/40 rounded px-2 py-1 font-mono">
                 {isZh ? "同步频次: 盘中 5m / 盘后 30m" : "Interval: 5m Market / 30m Off-hour"}
               </div>
             </div>
           </div>
+
 
           {/* Watchlist Real-time Alert Card */}
           <div className="group relative border border-border/60 bg-card/50 backdrop-blur-sm rounded-md p-3.5 hover:border-border/90 hover:bg-card/80 hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden">

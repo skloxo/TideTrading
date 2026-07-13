@@ -932,6 +932,16 @@ def register_settings_routes(
         """List all configured tenant API keys."""
         host = _host()
         keys = host._load_tenant_keys()
+        has_default = any(k.get("tenant_id") == "default" for k in keys)
+        if not has_default:
+            default_item = {
+                "key": "default",
+                "tenant_id": "default",
+                "name": "默认租户 (default)",
+                "created_at": "2026-06-23T00:00:00Z",
+                "is_active": True
+            }
+            return [TenantKeyItem(**default_item)] + [TenantKeyItem(**k) for k in keys]
         return [TenantKeyItem(**k) for k in keys]
 
     @app.post(
@@ -970,6 +980,8 @@ def register_settings_routes(
     )
     async def update_tenant_key(tenant_id: str, payload: UpdateTenantKeyRequest):
         """Update status or name of an existing tenant key."""
+        if tenant_id == "default":
+            raise HTTPException(status_code=400, detail="Cannot modify default tenant properties")
         host = _host()
         keys = host._load_tenant_keys()
         matched = None
@@ -999,6 +1011,8 @@ def register_settings_routes(
     )
     async def delete_tenant_key(tenant_id: str):
         """Delete a tenant key (invalidating it instantly)."""
+        if tenant_id == "default":
+            raise HTTPException(status_code=400, detail="Cannot delete default tenant")
         host = _host()
         keys = host._load_tenant_keys()
         filtered_keys = [k for k in keys if k["tenant_id"] != tenant_id]

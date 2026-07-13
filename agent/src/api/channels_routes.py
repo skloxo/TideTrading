@@ -96,12 +96,21 @@ FEISHU_SECRET_PLACEHOLDERS: set[str] = {"", "your-feishu-app-secret"}
 FEISHU_CHANNELS_JSON = Path(__file__).resolve().parents[3] / "sessions" / "feishu_channels.json"
 WECHAT_CHANNELS_JSON = _get_active_runtime_dir() / "wechat_channels.json"
 
+def _get_channel_json_path(filename: str, legacy_path: Path) -> Path:
+    from src.config.paths import get_runtime_root
+    new_path = get_runtime_root() / filename
+    if not new_path.exists() and legacy_path.exists():
+        try:
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(legacy_path, new_path)
+        except Exception:
+            pass
+    return new_path
+
 def _get_feishu_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return Path(__file__).resolve().parents[3] / "sessions" / "feishu_channels.json"
-    return get_runtime_root() / "feishu_channels.json"
+    legacy = Path(__file__).resolve().parents[3] / "sessions" / "feishu_channels.json"
+    return _get_channel_json_path("feishu_channels.json", legacy)
 
 def _load_feishu_channels() -> list[dict[str, Any]]:
     """Load Feishu channels from the persistent JSON file. Handles legacy migration."""
@@ -121,12 +130,7 @@ def _save_feishu_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _get_wechat_channels_json_path() -> Path:
-    """Get path to the WeChat channels persistent JSON file based on active tenant."""
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return WECHAT_CHANNELS_JSON
-    return get_runtime_root() / "wechat_channels.json"
+    return _get_channel_json_path("wechat_channels.json", WECHAT_CHANNELS_JSON)
 
 def _load_wechat_channels() -> list[dict[str, Any]]:
     """Load WeChat channels from the persistent JSON file."""
@@ -146,11 +150,8 @@ def _save_wechat_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _get_dingtalk_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return Path(__file__).resolve().parents[3] / "sessions" / "dingtalk_channels.json"
-    return get_runtime_root() / "dingtalk_channels.json"
+    legacy = Path(__file__).resolve().parents[3] / "sessions" / "dingtalk_channels.json"
+    return _get_channel_json_path("dingtalk_channels.json", legacy)
 
 def _load_dingtalk_channels() -> list[dict[str, Any]]:
     channels = []
@@ -168,11 +169,8 @@ def _save_dingtalk_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _get_qq_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return Path(__file__).resolve().parents[3] / "sessions" / "qq_channels.json"
-    return get_runtime_root() / "qq_channels.json"
+    legacy = Path(__file__).resolve().parents[3] / "sessions" / "qq_channels.json"
+    return _get_channel_json_path("qq_channels.json", legacy)
 
 def _load_qq_channels() -> list[dict[str, Any]]:
     channels = []
@@ -190,11 +188,8 @@ def _save_qq_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _get_email_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return Path(__file__).resolve().parents[3] / "sessions" / "email_channels.json"
-    return get_runtime_root() / "email_channels.json"
+    legacy = Path(__file__).resolve().parents[3] / "sessions" / "email_channels.json"
+    return _get_channel_json_path("email_channels.json", legacy)
 
 def _load_email_channels() -> list[dict[str, Any]]:
     channels = []
@@ -212,11 +207,8 @@ def _save_email_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _get_msteams_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return Path(__file__).resolve().parents[3] / "sessions" / "msteams_channels.json"
-    return get_runtime_root() / "msteams_channels.json"
+    legacy = Path(__file__).resolve().parents[3] / "sessions" / "msteams_channels.json"
+    return _get_channel_json_path("msteams_channels.json", legacy)
 
 def _load_msteams_channels() -> list[dict[str, Any]]:
     channels = []
@@ -234,11 +226,8 @@ def _save_msteams_channels(channels: list[dict[str, Any]]) -> None:
     path.write_text(json.dumps(channels, indent=2, ensure_ascii=False), encoding="utf-8")
 
 def _get_websocket_channels_json_path() -> Path:
-    from src.config.paths import active_tenant_var, get_runtime_root
-    tenant = active_tenant_var.get()
-    if tenant == "default":
-        return Path(__file__).resolve().parents[3] / "sessions" / "websocket_channels.json"
-    return get_runtime_root() / "websocket_channels.json"
+    legacy = Path(__file__).resolve().parents[3] / "sessions" / "websocket_channels.json"
+    return _get_channel_json_path("websocket_channels.json", legacy)
 
 def _load_websocket_channels() -> list[dict[str, Any]]:
     channels = []

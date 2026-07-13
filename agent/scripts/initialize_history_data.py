@@ -967,11 +967,12 @@ def fetch_listing_date(code: str) -> Optional[str]:
     return None
 
 _cached_spot_df = None
+_ts_pro_disabled = False
 
 def backfill_valuation(db_path: str, code: str, start_date: str, end_date: str, ts_pro: Optional[Any] = None):
     """Backfill valuation indicators using Tushare or free AkShare spot data."""
-    global _cached_spot_df
-    if ts_pro is not None:
+    global _cached_spot_df, _ts_pro_disabled
+    if ts_pro is not None and not _ts_pro_disabled:
         try:
             ts_code = to_ts_code(code)
             ts_start = start_date.replace('-', '')
@@ -1012,7 +1013,8 @@ def backfill_valuation(db_path: str, code: str, start_date: str, end_date: str, 
                 logger.info(f"[{code}] Backfilled {len(records)} valuation records via Tushare.")
                 return
         except Exception as e:
-            logger.warning(f"[{code}] Tushare valuation backfill failed: {e}. Falling back to AkShare spot.")
+            _ts_pro_disabled = True
+            logger.warning(f"[{code}] Tushare valuation backfill failed: {e}. Disabling Tushare for remainder of run, falling back to AkShare spot.")
 
     # Free Fallback: Fetch current spot valuation and store for today
     try:
@@ -1094,7 +1096,8 @@ def backfill_capital_flow(db_path: str, code: str, start_date: str, end_date: st
 
 def backfill_margin_trading(db_path: str, code: str, start_date: str, end_date: str, ts_pro: Optional[Any] = None):
     """Backfill margin trading details using Tushare (if configured)."""
-    if ts_pro is not None:
+    global _ts_pro_disabled
+    if ts_pro is not None and not _ts_pro_disabled:
         try:
             ts_code = to_ts_code(code)
             ts_start = start_date.replace('-', '')
@@ -1133,7 +1136,8 @@ def backfill_margin_trading(db_path: str, code: str, start_date: str, end_date: 
                 logger.info(f"[{code}] Backfilled {len(records)} margin trading records via Tushare.")
                 return
         except Exception as e:
-            logger.warning(f"[{code}] Tushare margin trading backfill failed: {e}.")
+            _ts_pro_disabled = True
+            logger.warning(f"[{code}] Tushare margin trading backfill failed: {e}. Disabling Tushare for remainder of run.")
             
     logger.info(f"[{code}] Margin trading history skipped (requires TUSHARE_TOKEN).")
 

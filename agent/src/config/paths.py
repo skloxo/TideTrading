@@ -292,11 +292,22 @@ def get_runtime_root(config_path: Path | None = None) -> Path:
     """
     if config_path is not None:
         return config_path.expanduser().parent
-    tenant = active_tenant_var.get()
+    tenant = active_tenant_var.get() or "default"
     base = _get_active_runtime_dir()
+    tenant_dir = base / "tenants" / tenant
+    
+    # Backward compatibility migration for default tenant's .env file
     if tenant == "default":
-        return base
-    return base / "tenants" / tenant
+        tenant_dir.mkdir(parents=True, exist_ok=True)
+        new_env = tenant_dir / ".env"
+        old_env = base / ".env"
+        if old_env.exists() and not new_env.exists():
+            try:
+                import shutil
+                shutil.copy2(old_env, new_env)
+            except Exception:
+                pass
+    return tenant_dir
 
 
 def get_market_db_path() -> Path:
@@ -329,12 +340,20 @@ def get_tenant_db_path(tenant_id: str | None = None) -> Path:
     Each tenant has their own independent copy.
     """
     tid = tenant_id or active_tenant_var.get() or "default"
-    if tid == "default":
-        root = _get_active_runtime_dir()
-    else:
-        root = _get_active_runtime_dir() / "tenants" / tid
+    root = _get_active_runtime_dir() / "tenants" / tid
     root.mkdir(parents=True, exist_ok=True)
-    return root / f"stocks_{tid}.db"
+    new_db = root / f"stocks_{tid}.db"
+    
+    # Backward compatibility migration for default tenant database
+    if tid == "default":
+        old_db = _get_active_runtime_dir() / "stocks_default.db"
+        if old_db.exists() and not new_db.exists():
+            try:
+                import shutil
+                shutil.copy2(old_db, new_db)
+            except Exception:
+                pass
+    return new_db
 
 
 
@@ -388,26 +407,50 @@ def get_data_dir(config_path: Path | None = None) -> Path:
 
 def get_sessions_dir() -> Path:
     """Return the sessions directory for the active tenant."""
-    tenant = active_tenant_var.get()
+    tenant = active_tenant_var.get() or "default"
+    new_dir = get_runtime_root() / "sessions"
     if tenant == "default":
-        return Path(__file__).resolve().parents[2] / "sessions"
-    return get_runtime_root() / "sessions"
+        old_dir = Path(__file__).resolve().parents[2] / "sessions"
+        if old_dir.exists() and not new_dir.exists():
+            try:
+                new_dir.parent.mkdir(parents=True, exist_ok=True)
+                new_dir.symlink_to(old_dir)
+            except Exception:
+                pass
+    new_dir.mkdir(parents=True, exist_ok=True)
+    return new_dir
 
 
 def get_runs_dir() -> Path:
     """Return the runs directory for the active tenant."""
-    tenant = active_tenant_var.get()
+    tenant = active_tenant_var.get() or "default"
+    new_dir = get_runtime_root() / "runs"
     if tenant == "default":
-        return Path(__file__).resolve().parents[2] / "runs"
-    return get_runtime_root() / "runs"
+        old_dir = Path(__file__).resolve().parents[2] / "runs"
+        if old_dir.exists() and not new_dir.exists():
+            try:
+                new_dir.parent.mkdir(parents=True, exist_ok=True)
+                new_dir.symlink_to(old_dir)
+            except Exception:
+                pass
+    new_dir.mkdir(parents=True, exist_ok=True)
+    return new_dir
 
 
 def get_uploads_dir() -> Path:
     """Return the uploads directory for the active tenant."""
-    tenant = active_tenant_var.get()
+    tenant = active_tenant_var.get() or "default"
+    new_dir = get_runtime_root() / "uploads"
     if tenant == "default":
-        return Path(__file__).resolve().parents[2] / "uploads"
-    return get_runtime_root() / "uploads"
+        old_dir = Path(__file__).resolve().parents[2] / "uploads"
+        if old_dir.exists() and not new_dir.exists():
+            try:
+                new_dir.parent.mkdir(parents=True, exist_ok=True)
+                new_dir.symlink_to(old_dir)
+            except Exception:
+                pass
+    new_dir.mkdir(parents=True, exist_ok=True)
+    return new_dir
 
 
 def get_workspace_path() -> Path:

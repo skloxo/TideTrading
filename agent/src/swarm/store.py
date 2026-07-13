@@ -70,10 +70,18 @@ def swarm_runs_root() -> Path:
     the store location and the allow-list from drifting again.
     """
     from src.config.paths import get_runtime_root, active_tenant_var
-    tenant = active_tenant_var.get()
+    tenant = active_tenant_var.get() or "default"
+    new_dir = get_runtime_root() / "swarm" / "runs"
     if tenant == "default":
-        return Path(__file__).resolve().parents[2] / ".swarm" / "runs"
-    return get_runtime_root() / "swarm" / "runs"
+        old_dir = Path(__file__).resolve().parents[2] / ".swarm" / "runs"
+        if old_dir.exists() and not new_dir.exists():
+            try:
+                new_dir.parent.mkdir(parents=True, exist_ok=True)
+                new_dir.symlink_to(old_dir)
+            except Exception:
+                pass
+    new_dir.mkdir(parents=True, exist_ok=True)
+    return new_dir
 
 
 _TRANSIENT_WINERRORS = (5, 32)  # ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION

@@ -15,17 +15,13 @@ logger = logging.getLogger("ths_sync")
 def get_ths_cookie(tenant_id: str) -> Optional[str]:
     """
     自足获取指定租户的 THS_COOKIE
+    优先从租户对应的 .env 文件中读取，防止多租户环境下跨租户污染；未找到时才退回系统环境变量。
     """
-    cookie = os.environ.get("THS_COOKIE")
-    if cookie:
-        return cookie
-
     from src.config.paths import _get_active_runtime_dir
     base_dir = _get_active_runtime_dir()
-    if tenant_id == "default":
+    env_path = base_dir / "tenants" / tenant_id / ".env"
+    if tenant_id == "default" and not env_path.exists():
         env_path = base_dir / ".env"
-    else:
-        env_path = base_dir / "tenants" / tenant_id / ".env"
 
     if env_path.exists():
         try:
@@ -35,10 +31,15 @@ def get_ths_cookie(tenant_id: str) -> Optional[str]:
                     continue
                 k, v = line.split("=", 1)
                 if k.strip() == "THS_COOKIE":
-                    return v.strip().strip("'\"")
+                    val = v.strip().strip("'\"")
+                    if val:
+                        return val
         except Exception as e:
             logger.error(f"[ThsSync] Failed to read THS_COOKIE from {env_path}: {e}")
-    return None
+
+    # Fallback to os.environ (which has tenant-scoped monkeypatching)
+    return os.environ.get("THS_COOKIE")
+
 
 
 class ThsSyncManager:
