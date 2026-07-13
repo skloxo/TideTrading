@@ -262,29 +262,21 @@ export function TenantManagement() {
                       <div className="inline-flex items-center gap-1.5">
                         <button
                           type="button"
-                          disabled={key.tenant_id === "default"}
                           onClick={() => handleToggleTenantKey(key.tenant_id, key.is_active !== false)}
                           className={`rounded p-1 transition ${
-                            key.tenant_id === "default"
-                              ? "text-muted-foreground/30 cursor-not-allowed opacity-40"
-                              : key.is_active !== false
-                                ? "text-yellow-500 hover:bg-yellow-500/10"
-                                : "text-green-500 hover:bg-green-500/10"
+                            key.is_active !== false
+                              ? "text-yellow-500 hover:bg-yellow-500/10"
+                              : "text-green-500 hover:bg-green-500/10"
                           }`}
-                          title={key.tenant_id === "default" ? (isZh ? "系统内置默认租户不可禁用" : "Default tenant cannot be disabled") : (key.is_active !== false ? (isZh ? "禁用该密钥" : "Disable") : (isZh ? "启用该密钥" : "Enable"))}
+                          title={key.is_active !== false ? (isZh ? "禁用该密钥" : "Disable") : (isZh ? "启用该密钥" : "Enable")}
                         >
                           <Power className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
-                          disabled={key.tenant_id === "default"}
                           onClick={() => handleDeleteTenantKey(key.tenant_id)}
-                          className={`rounded p-1 transition ${
-                            key.tenant_id === "default"
-                              ? "text-muted-foreground/30 cursor-not-allowed opacity-40"
-                              : "text-red-400 hover:text-red-500 hover:bg-red-500/10"
-                          }`}
-                          title={key.tenant_id === "default" ? (isZh ? "系统内置默认租户不可删除" : "Default tenant cannot be deleted") : (isZh ? "删除租户" : "Delete")}
+                          className="text-red-400 hover:text-red-500 hover:bg-red-500/10 rounded p-1 transition"
+                          title={isZh ? "删除租户" : "Delete"}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
