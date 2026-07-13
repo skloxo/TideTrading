@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { api, type TenantKey, type UserProfile } from "@/lib/api";
-import { setAdminToken } from "@/lib/apiAuth";
+import { setAdminToken, clearAdminToken } from "@/lib/apiAuth";
 import { Power, Trash2, Loader2, Copy, Check, Save, Plus, ShieldAlert, Lock } from "lucide-react";
 
 export function TenantManagement() {
@@ -26,6 +26,12 @@ export function TenantManagement() {
   const [adminUsername, setAdminUsername] = useState("admin");
   const [adminPassword, setAdminPassword] = useState("");
   const [elevating, setElevating] = useState(false);
+
+  const handleAdminDeelevate = () => {
+    clearAdminToken();
+    toast.success(isZh ? "已退出管理员提权状态" : "Logged out from admin elevation");
+    window.location.reload();
+  };
 
   useEffect(() => {
     let alive = true;
@@ -187,18 +193,30 @@ export function TenantManagement() {
               : "Workspaces are physically isolated under each tenant ID automatically."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setGeneratedKey("");
-            setNewKeyName("");
-            setIsTenantModalOpen(true);
-          }}
-          className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 px-3.5 py-2 text-xs font-semibold transition cursor-pointer shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          {isZh ? "生成新租户密钥" : "Generate Tenant Key"}
-        </button>
+        <div className="flex items-center gap-2">
+          {profile?.is_admin && (
+            <button
+              type="button"
+              onClick={handleAdminDeelevate}
+              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted active:scale-95 transition-all cursor-pointer shadow-sm"
+            >
+              <Lock className="h-3.5 w-3.5 text-amber-500" />
+              {isZh ? "退出管理提权" : "Exit Admin Elevation"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setGeneratedKey("");
+              setNewKeyName("");
+              setIsTenantModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 px-3.5 py-2 text-xs font-semibold transition cursor-pointer shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            {isZh ? "生成新租户密钥" : "Generate Tenant Key"}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-4 shadow-sm">

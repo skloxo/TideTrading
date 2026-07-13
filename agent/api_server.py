@@ -834,26 +834,13 @@ def _load_tenant_keys() -> list[dict]:
     """Load tenant API keys from ~/.tide/tenants/tenant_keys.json."""
     import json
     path = _get_active_runtime_dir() / "tenants" / "tenant_keys.json"
-    keys = []
-    if path.exists():
-        try:
-            keys = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.error(f"Failed to load tenant keys: {e}")
-    
-    # Ensure default tenant is present in the keys list (making it a standard tenant)
-    has_default = any(k.get("tenant_id") == "default" for k in keys)
-    if not has_default:
-        default_item = {
-            "key": "default",
-            "tenant_id": "default",
-            "name": "默认租户 (default)",
-            "created_at": "2026-06-23T00:00:00Z",
-            "is_active": True
-        }
-        keys.insert(0, default_item)
-        _save_tenant_keys(keys)
-    return keys
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.error(f"Failed to load tenant keys: {e}")
+        return []
 
 def _save_tenant_keys(keys: list[dict]) -> None:
     """Save tenant API keys to ~/.tide/tenants/tenant_keys.json."""
