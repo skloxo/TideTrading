@@ -505,9 +505,9 @@ def _build_native_deepseek(
 
 
 def _load_env_file(path: Path) -> None:
-    """Load a single .env file into os.environ (setdefault, no override)."""
+    """Load a single .env file into os.environ with override so stored settings take precedence."""
     if load_dotenv is not None:
-        load_dotenv(dotenv_path=path, override=False)
+        load_dotenv(dotenv_path=path, override=True)
     else:
         for raw in path.read_text(encoding="utf-8").splitlines():
             line = raw.strip()
@@ -516,7 +516,7 @@ def _load_env_file(path: Path) -> None:
             key, value = line.split("=", 1)
             key = key.strip()
             if key:
-                os.environ.setdefault(key, value.strip().strip('"').strip("'"))
+                os.environ[key] = value.strip().strip('"').strip("'")
 
 
 def _ensure_dotenv() -> None:
@@ -562,6 +562,9 @@ def _sync_provider_env() -> None:
     """
     _ensure_dotenv()
     provider = os.getenv("LANGCHAIN_PROVIDER", "openai").lower()
+
+    if os.getenv("LANGCHAIN_MODEL_NAME"):
+        os.environ["OPENAI_MODEL"] = os.getenv("LANGCHAIN_MODEL_NAME", "")
 
     if provider in {"openai-codex", "openai_codex"}:
         codex_url = os.getenv("OPENAI_CODEX_BASE_URL", "https://chatgpt.com/backend-api/codex/responses")

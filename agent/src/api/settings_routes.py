@@ -600,6 +600,7 @@ def register_settings_routes(
         updates: Dict[str, str] = {
             "LANGCHAIN_PROVIDER": provider.name,
             "LANGCHAIN_MODEL_NAME": model_name,
+            "OPENAI_MODEL": model_name,
             provider.base_url_env: base_url,
             "LANGCHAIN_TEMPERATURE": str(payload.temperature),
             "TIMEOUT_SECONDS": str(payload.timeout_seconds),

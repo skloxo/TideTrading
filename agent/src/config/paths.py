@@ -43,12 +43,12 @@ def _read_tenant_env_file(env_path: Path, mtime: float) -> dict[str, str]:
 
 
 def get_tenant_env_values(tenant: str) -> dict[str, str]:
-    """Retrieve settings from the tenant-specific .env file."""
+    """Retrieve settings from the tenant-specific .env file or default runtime .env."""
     if tenant == "default":
-        return {}
-    # Use standard tenant path structure derived from home
-    tenant_dir = _get_active_runtime_dir() / "tenants" / tenant
-    env_path = tenant_dir / ".env"
+        env_path = _get_active_runtime_dir() / ".env"
+    else:
+        tenant_dir = _get_active_runtime_dir() / "tenants" / tenant
+        env_path = tenant_dir / ".env"
     if not env_path.exists():
         return {}
     try:
@@ -73,12 +73,11 @@ def _get_tenant_env(key: str) -> object:
         if overrides is not None and key in overrides:
             return overrides[key]
         
-        # 2. Check cached tenant-specific .env file
+        # 2. Check cached tenant-specific / default .env file
         tenant = active_tenant_var.get()
-        if tenant != "default":
-            vals = get_tenant_env_values(tenant)
-            if key in vals:
-                return vals[key]
+        vals = get_tenant_env_values(tenant)
+        if key in vals:
+            return vals[key]
     finally:
         in_tenant_env_lookup.reset(token)
             
