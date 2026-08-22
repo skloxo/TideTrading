@@ -1,0 +1,3 @@
+[console_scripts]
+vibe-trading-cnx = cli:main
+vibe-trading-cnx-mcp = mcp_server:main

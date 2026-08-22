@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { 
   Cpu, Terminal, Settings, Check, Lock, Unlock, Grid
 } from "lucide-react";
-import { Responsive, WidthProvider } from "react-grid-layout/legacy";
+import RGL, { Responsive } from "react-grid-layout";
 import { api } from "@/lib/api";
 
 import "react-grid-layout/css/styles.css";
@@ -27,7 +27,9 @@ import { EChartsRelationGraph } from "@/components/dashboard/EChartsRelationGrap
 import { ReActTimeline } from "@/components/dashboard/ReActTimeline";
 import { AgentChatConsole } from "@/components/dashboard/AgentChatConsole";
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
+const WidthProvider = (RGL as any).WidthProvider || ((Comp: any) => Comp);
+const ResponsiveComponent = Responsive || (RGL as any).Responsive || RGL;
+const ResponsiveGridLayout: any = WidthProvider(ResponsiveComponent);
 
 interface TerminalLog {
   time: string;

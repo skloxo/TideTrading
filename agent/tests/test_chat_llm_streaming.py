@@ -265,3 +265,51 @@ def test_content_filter_triggered_flag_false_on_stop() -> None:
     assert response.content == "text"
     assert response.finish_reason == "stop"
     assert response.content_filter_triggered is False
+
+
+def test_parse_xml_tool_call_hermes_format() -> None:
+    """Hermes / Ornith / Qwen XML tool calls must parse into executable ToolCallRequests."""
+    content = (
+        '好的，不筛了。我先带你了解 tide 这个项目。我直接看项目结构。\n\n'
+        '<tool_call> <function=bash> <parameter=command> echo "=== 当前工作目录 ===" && pwd </parameter> </function> </tool_call>'
+    )
+    response = ChatLLM._parse_response(_FakeChunk(content=content))
+
+    assert response.content == "好的，不筛了。我先带你了解 tide 这个项目。我直接看项目结构。"
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0].name == "bash"
+    assert response.tool_calls[0].arguments == {
+        "command": 'echo "=== 当前工作目录 ===" && pwd'
+    }
+    assert response.finish_reason == "tool_calls"
+
+
+def test_parse_xml_tool_call_json_inside_tag() -> None:
+    """JSON body inside <tool_call> must parse correctly."""
+    content = (
+        '<tool_call>\n'
+        '{"name": "echo_probe", "arguments": {"marker": "json-test"}}\n'
+        '</tool_call>'
+    )
+    response = ChatLLM._parse_response(_FakeChunk(content=content))
+
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0].name == "echo_probe"
+    assert response.tool_calls[0].arguments == {"marker": "json-test"}
+    assert response.finish_reason == "tool_calls"
+
+
+def test_extract_embedded_thinking_and_dangling_think() -> None:
+    """Embedded <think> tags and dangling </think> must be extracted into reasoning_content."""
+    # 1. Standard <think>...</think>
+    standard_content = "<think>\nExploring code\n</think>\n\nHere is the answer."
+    resp1 = ChatLLM._parse_response(_FakeChunk(content=standard_content))
+    assert resp1.content == "Here is the answer."
+    assert resp1.reasoning_content == "Exploring code"
+
+    # 2. Dangling </think> (user screenshot case)
+    dangling_content = "The user wants me to stop noise. Let me check. </think>\n\n好的，我直接看。"
+    resp2 = ChatLLM._parse_response(_FakeChunk(content=dangling_content))
+    assert resp2.content == "好的，我直接看。"
+    assert resp2.reasoning_content == "The user wants me to stop noise. Let me check."
+

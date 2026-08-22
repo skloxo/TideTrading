@@ -97,3 +97,42 @@ def test_agent_loop_executes_dsml_textual_tool_call(tmp_path: Path) -> None:
         event_type == "tool_result" and payload["tool"] == "echo_probe"
         for event_type, payload in events
     )
+
+
+def test_agent_loop_executes_xml_textual_tool_call(tmp_path: Path) -> None:
+    """Hermes / Ornith XML tool calls must drive the ReAct tool executor."""
+    xml_call = (
+        'The user wants me to explore. </think>\n\n'
+        '好的，我来帮你探测。\n\n'
+        '<tool_call>\n'
+        '<function=echo_probe>\n'
+        '<parameter=marker>ran-xml-ornith</parameter>\n'
+        '</function>\n'
+        '</tool_call>'
+    )
+    registry = ToolRegistry()
+    registry.register(_EchoProbeTool())
+    memory = PersistentMemory(memory_dir=tmp_path / "memory")
+    events: list[tuple[str, dict[str, Any]]] = []
+    agent = AgentLoop(
+        registry=registry,
+        llm=_chat_llm(_ScriptedStreamingLLM([xml_call, "探测完成，结果一切正常。"])),
+        event_callback=lambda event_type, payload: events.append((event_type, payload)),
+        max_iterations=2,
+        persistent_memory=memory,
+    )
+    agent.memory.run_dir = str(tmp_path / "run")
+
+    result = agent.run("explore project")
+
+    assert result["status"] == "success"
+    assert result["content"] == "探测完成，结果一切正常。"
+    assert any(
+        event_type == "tool_call" and payload["tool"] == "echo_probe"
+        for event_type, payload in events
+    )
+    assert any(
+        event_type == "tool_result" and payload["tool"] == "echo_probe"
+        for event_type, payload in events
+    )
+

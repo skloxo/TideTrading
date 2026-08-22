@@ -6,6 +6,7 @@ ChatLLM is designed specifically for the AgentLoop ReAct cycle.
 from __future__ import annotations
 
 import html
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -146,7 +147,6 @@ _DSML_PARAMETER_RE = re.compile(
     re.DOTALL,
 )
 _DSML_ATTR_RE = re.compile(r"""([A-Za-z_][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
-_DSML_PREFIXES = ("<||dsml||tool_calls", "<｜｜dsml｜｜tool_calls")
 
 
 def _parse_dsml_attrs(raw: str) -> dict[str, str]:
@@ -157,22 +157,8 @@ def _parse_dsml_attrs(raw: str) -> dict[str, str]:
     return attrs
 
 
-def _is_possible_dsml_tool_call_prefix(content: str) -> bool:
-    """Return True while buffered stream text could still be a DSML call."""
-    compact = re.sub(r"\s+", "", content.lstrip()[:80]).lower()
-    if not compact:
-        return True
-    return any(prefix.startswith(compact) or compact.startswith(prefix) for prefix in _DSML_PREFIXES)
-
-
 def _parse_dsml_tool_calls(content: Any) -> list[ToolCallRequest]:
-    """Parse DeepSeek-style DSML tool calls embedded as assistant content.
-
-    Some OpenAI-compatible relays/models return tool calls as a textual DSML
-    block rather than LangChain ``AIMessage.tool_calls``. Treat only pure DSML
-    tool-call payloads as executable so examples embedded in normal prose never
-    cross into the tool path.
-    """
+    """Parse DeepSeek-style DSML tool calls embedded as assistant content."""
     if not isinstance(content, str):
         return []
 
@@ -209,6 +195,171 @@ def _parse_dsml_tool_calls(content: Any) -> list[ToolCallRequest]:
             )
 
     return tool_calls
+
+
+def _extract_embedded_thinking(
+    content: Any,
+    existing_reasoning: Optional[str] = None,
+) -> tuple[str, Optional[str]]:
+    """Extract embedded <think>...</think> or dangling </think> traces from assistant content."""
+    if not isinstance(content, str):
+        return content if isinstance(content, str) else "", existing_reasoning
+
+    reasoning_parts: list[str] = []
+    if existing_reasoning and str(existing_reasoning).strip():
+        reasoning_parts.append(str(existing_reasoning).strip())
+
+    # 1. Standard <think>...</think>
+    think_pattern = re.compile(r"<\s*think\b[^>]*>(?P<body>.*?)<\s*/\s*think\s*>", re.DOTALL | re.IGNORECASE)
+    for m in think_pattern.finditer(content):
+        body = m.group("body").strip()
+        if body:
+            reasoning_parts.append(body)
+    cleaned = think_pattern.sub("", content)
+
+    # 2. Dangling </think> (missing opening <think> tag)
+    if "</think>" in cleaned.lower():
+        parts = re.split(r"<\s*/\s*think\s*>", cleaned, flags=re.IGNORECASE, maxsplit=1)
+        dangling_body = parts[0].strip()
+        if dangling_body:
+            reasoning_parts.append(dangling_body)
+        cleaned = parts[1] if len(parts) > 1 else ""
+
+    combined_reasoning = "\n\n".join(p for p in reasoning_parts if p) or None
+    return cleaned.strip(), combined_reasoning
+
+
+_TOOL_CALL_BLOCK_RE = re.compile(
+    r"<\s*tool_call\b[^>]*>(?P<body>.*?)<\s*/\s*tool_call\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
+_FUNC_TAG_RE = re.compile(
+    r"<\s*function(?P<attrs>[^>]*)>(?P<body>.*?)<\s*/\s*function\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
+_PARAM_TAG_RE = re.compile(
+    r"<\s*parameter(?P<attrs>[^>]*)>(?P<body>.*?)<\s*/\s*parameter\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
+_EMBEDDED_PREFIXES = (
+    "<||dsml||tool_calls",
+    "<｜｜dsml｜｜tool_calls",
+    "<tool_call",
+    "<function",
+    "<think",
+    "</think",
+)
+
+
+def _extract_name_from_tag_attrs(attrs_str: str) -> str:
+    """Extract tool or parameter name from tag attribute strings."""
+    attrs_str = (attrs_str or "").strip()
+    if not attrs_str:
+        return ""
+    if attrs_str.startswith("="):
+        val = attrs_str[1:].strip()
+        if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+            return val[1:-1].strip()
+        return val.split()[0].strip()
+    match = re.search(r'\bname\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))', attrs_str, re.IGNORECASE)
+    if match:
+        return (match.group(1) or match.group(2) or match.group(3) or "").strip()
+    return ""
+
+
+def _parse_xml_tool_calls(content: Any) -> tuple[str, list[ToolCallRequest]]:
+    """Parse Hermes / Qwen / Ornith XML-style <tool_call> blocks."""
+    if not isinstance(content, str):
+        return "", []
+
+    stripped = content.strip()
+    blocks = list(_TOOL_CALL_BLOCK_RE.finditer(stripped))
+    if not blocks:
+        return stripped, []
+
+    tool_calls: list[ToolCallRequest] = []
+    for block in blocks:
+        body = block.group("body").strip()
+        funcs = list(_FUNC_TAG_RE.finditer(body))
+        if funcs:
+            for f in funcs:
+                name = _extract_name_from_tag_attrs(f.group("attrs"))
+                fbody = f.group("body").strip()
+                params = list(_PARAM_TAG_RE.finditer(fbody))
+                args: dict[str, Any] = {}
+                if params:
+                    for p in params:
+                        pname = _extract_name_from_tag_attrs(p.group("attrs"))
+                        pbody = html.unescape(p.group("body")).strip()
+                        if pbody.startswith(("{", "[", '"', "true", "false", "null")) or pbody.isdigit():
+                            try:
+                                args[pname] = json.loads(pbody)
+                            except Exception:
+                                args[pname] = pbody
+                        else:
+                            args[pname] = pbody
+                elif fbody.startswith("{") and fbody.endswith("}"):
+                    try:
+                        args = json.loads(fbody)
+                    except Exception:
+                        args = {"input": fbody}
+                elif fbody:
+                    args = {"command": fbody}
+                if name:
+                    tool_calls.append(
+                        ToolCallRequest(
+                            id=f"call_{len(tool_calls) + 1}",
+                            name=name,
+                            arguments=args,
+                        )
+                    )
+        elif body.startswith("{") and body.endswith("}"):
+            try:
+                data = json.loads(body)
+                name = data.get("name") or data.get("function") or ""
+                args = data.get("arguments") or data.get("parameters") or data.get("input") or {}
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except Exception:
+                        pass
+                if name:
+                    tool_calls.append(
+                        ToolCallRequest(
+                            id=f"call_{len(tool_calls) + 1}",
+                            name=name,
+                            arguments=args if isinstance(args, dict) else {"input": args},
+                        )
+                    )
+            except Exception:
+                pass
+
+    cleaned = _TOOL_CALL_BLOCK_RE.sub("", stripped).strip()
+    return cleaned, tool_calls
+
+
+def _parse_embedded_tool_calls(content: Any) -> tuple[str, list[ToolCallRequest]]:
+    """Parse both DSML and XML/JSON tool calls embedded in assistant content."""
+    if not isinstance(content, str):
+        return "", []
+
+    dsml_calls = _parse_dsml_tool_calls(content)
+    if dsml_calls:
+        return "", dsml_calls
+
+    cleaned_content, xml_calls = _parse_xml_tool_calls(content)
+    if xml_calls:
+        return cleaned_content, xml_calls
+
+    return content, []
+
+
+def _is_possible_embedded_tool_call_prefix(content: str) -> bool:
+    """Return True while buffered stream text could still be an embedded tool call."""
+    compact = re.sub(r"\s+", "", content.lstrip()[:80]).lower()
+    if not compact:
+        return True
+    return any(prefix.startswith(compact) or compact.startswith(prefix) for prefix in _EMBEDDED_PREFIXES)
 
 
 class ChatLLM:
@@ -278,17 +429,17 @@ class ChatLLM:
             config = {"timeout": timeout} if timeout else {}
             accumulated = None
             pending_text = ""
-            possible_dsml_text = True
+            possible_embedded_text = True
             for chunk in llm.stream(messages, config=config):
                 if should_cancel and should_cancel():
                     break
                 if chunk.content and on_text_chunk:
-                    if possible_dsml_text:
+                    if possible_embedded_text:
                         pending_text += chunk.content
-                        if _is_possible_dsml_tool_call_prefix(pending_text):
+                        if _is_possible_embedded_tool_call_prefix(pending_text):
                             pass
                         else:
-                            possible_dsml_text = False
+                            possible_embedded_text = False
                             on_text_chunk(pending_text)
                             pending_text = ""
                     else:
@@ -338,21 +489,10 @@ class ChatLLM:
     def _parse_response(ai_message: Any) -> LLMResponse:
         """Convert a LangChain AIMessage (or AIMessageChunk) to ``LLMResponse``.
 
-        Single source for reasoning: ``additional_kwargs["reasoning_content"]``,
-        populated by ``ChatOpenAIWithReasoning`` on both stream and non-stream paths.
-
-        ``usage_metadata`` is forwarded as-is from the underlying message so
-        downstream cost / billing audit code (e.g. swarm worker token totals)
-        can use real provider tokens instead of a character-count heuristic.
-        For ``AIMessageChunk`` the metadata accumulates via the ``__add__``
-        merge LangChain performs while the response is being streamed; the
-        final aggregate carries the same shape as the non-stream path.
+        Single source for reasoning: ``additional_kwargs["reasoning_content"]``
+        combined with any inline ``<think>...</think>`` traces.
         """
         usage = getattr(ai_message, "usage_metadata", None)
-        # Some providers / older LangChain versions surface a ``UsageMetadata``
-        # TypedDict that doesn't json-serialise without a cast. Normalise to a
-        # plain ``dict[str, int]`` so the value can be persisted alongside the
-        # rest of the run state without surprises.
         if usage is not None and not isinstance(usage, dict):
             try:
                 usage = dict(usage)
@@ -369,11 +509,20 @@ class ChatLLM:
             if isinstance(raw, dict) and raw.get("id")
         }
 
+        # 1. Extract embedded thinking (both <think>...</think> and dangling </think>)
+        clean_content, extracted_reasoning = _extract_embedded_thinking(
+            ai_message.content, additional_kwargs.get("reasoning_content")
+        )
+
+        # 2. Extract native tool calls
         native_tool_calls: list[ToolCallRequest] = []
-        for index, tc in enumerate(ai_message.tool_calls):
-            extra_content = _merge_tool_call_extra_content(tc, raw_by_id.get(tc["id"]))
+        for index, tc in enumerate(getattr(ai_message, "tool_calls", []) or []):
+            extra_content = _merge_tool_call_extra_content(tc, raw_by_id.get(tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)))
+            tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", "")
+            tc_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", "")
+            tc_args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
             signature = (
-                thought_signatures_by_id.get(str(tc["id"]))
+                thought_signatures_by_id.get(str(tc_id))
                 or thought_signatures_by_index.get(index)
                 or extra_content.get("thought_signature")
             )
@@ -381,20 +530,27 @@ class ChatLLM:
                 extra_content.setdefault("thought_signature", signature)
             native_tool_calls.append(
                 ToolCallRequest(
-                    id=tc["id"],
-                    name=tc["name"],
-                    arguments=tc["args"],
+                    id=tc_id,
+                    name=tc_name,
+                    arguments=tc_args,
                     thought_signature=signature,
                     extra_content=extra_content,
                 )
             )
 
-        dsml_tool_calls = [] if native_tool_calls else _parse_dsml_tool_calls(ai_message.content)
-        tool_calls = native_tool_calls or dsml_tool_calls
+        # 3. Extract embedded tool calls (DSML or XML/JSON) if native_tool_calls is empty
+        if native_tool_calls:
+            tool_calls = native_tool_calls
+            final_content = clean_content
+            has_embedded_calls = False
+        else:
+            final_content, embedded_tool_calls = _parse_embedded_tool_calls(clean_content)
+            tool_calls = embedded_tool_calls
+            has_embedded_calls = bool(embedded_tool_calls)
 
         finish_reason = (
             "tool_calls"
-            if dsml_tool_calls
+            if has_embedded_calls
             else _dedupe_finish_reason(
                 ai_message.response_metadata.get("finish_reason", "stop")
             )
@@ -404,9 +560,9 @@ class ChatLLM:
         )
 
         return LLMResponse(
-            content="" if dsml_tool_calls else ai_message.content,
+            content=final_content,
             tool_calls=tool_calls,
-            reasoning_content=additional_kwargs.get("reasoning_content"),
+            reasoning_content=extracted_reasoning,
             finish_reason=finish_reason,
             usage_metadata=usage,
             content_filter_triggered=content_filter_triggered,
