@@ -146,6 +146,33 @@ def test_stream_dsml_tool_call_content_is_not_emitted_as_text() -> None:
     assert response.tool_calls[0].name == "bash"
 
 
+def test_stream_xml_tool_call_content_is_not_emitted_as_text() -> None:
+    """XML/Hermes <tool_call> payloads should not flash as assistant text in CLI/UI."""
+    content = (
+        "<tool_call>\n"
+        "<function=web_search>\n"
+        "<parameter=query>\n"
+        "中际旭创\n"
+        "</parameter>\n"
+        "</function>\n"
+        "</tool_call>"
+    )
+    fake = _FakeStreamingLLM([_FakeChunk(content=content)])
+    text_chunks: list[str] = []
+
+    response = _client(fake).stream_chat(
+        [{"role": "user", "content": "hi"}],
+        on_text_chunk=text_chunks.append,
+    )
+
+    assert text_chunks == []
+    assert response.content == ""
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0].name == "web_search"
+    assert response.tool_calls[0].arguments == {"query": "中际旭创"}
+
+
+
 def test_should_cancel_stops_stream_early() -> None:
     """A should_cancel predicate breaks the chunk loop; later chunks are dropped."""
     fake = _FakeStreamingLLM([

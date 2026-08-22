@@ -362,6 +362,126 @@ def _is_possible_embedded_tool_call_prefix(content: str) -> bool:
     return any(prefix.startswith(compact) or compact.startswith(prefix) for prefix in _EMBEDDED_PREFIXES)
 
 
+class _StreamTextFilter:
+    """Filters out <think>...</think>, <tool_call>...</tool_call>, and <||dsml||... from streaming text chunks."""
+
+    _THINK_OPEN = re.compile(r"<\s*think\b[^>]*>", re.IGNORECASE)
+    _THINK_CLOSE = re.compile(r"<\s*/\s*think\s*>", re.IGNORECASE)
+    _TOOL_OPEN = re.compile(r"<\s*tool_call\b[^>]*>|<[|｜]{2}dsml[|｜]{2}tool_calls\b[^>]*>", re.IGNORECASE)
+    _TOOL_CLOSE = re.compile(r"<\s*/\s*tool_call\s*>|<[|｜]{2}/[|｜]{2}dsml[|｜]{2}tool_calls\s*>|</[|｜]{2}dsml[|｜]{2}tool_calls\s*>", re.IGNORECASE)
+
+    def __init__(self, on_text_chunk: Optional[Any], on_reasoning_chunk: Optional[Any]) -> None:
+        self.on_text_chunk = on_text_chunk
+        self.on_reasoning_chunk = on_reasoning_chunk
+        self.mode = "NORMAL"
+        self.buffer = ""
+
+    def feed(self, text: str) -> None:
+        if not text:
+            return
+        self.buffer += text
+        while self.buffer:
+            if self.mode == "NORMAL":
+                m_think = self._THINK_OPEN.search(self.buffer)
+                m_think_close = self._THINK_CLOSE.search(self.buffer)
+                m_tool = self._TOOL_OPEN.search(self.buffer)
+
+                # Check which comes first
+                earliest_pos = len(self.buffer) + 1
+                earliest_type = None
+                earliest_match = None
+
+                if m_think and m_think.start() < earliest_pos:
+                    earliest_pos = m_think.start()
+                    earliest_type = "THINK"
+                    earliest_match = m_think
+                if m_think_close and m_think_close.start() < earliest_pos:
+                    earliest_pos = m_think_close.start()
+                    earliest_type = "THINK_CLOSE"
+                    earliest_match = m_think_close
+                if m_tool and m_tool.start() < earliest_pos:
+                    earliest_pos = m_tool.start()
+                    earliest_type = "TOOL"
+                    earliest_match = m_tool
+
+                if earliest_type == "THINK":
+                    prefix = self.buffer[:earliest_match.start()]
+                    if prefix and self.on_text_chunk:
+                        self.on_text_chunk(prefix)
+                    self.mode = "THINKING"
+                    self.buffer = self.buffer[earliest_match.end():]
+                    continue
+                elif earliest_type == "THINK_CLOSE":
+                    think_body = self.buffer[:earliest_match.start()]
+                    if think_body and self.on_reasoning_chunk:
+                        self.on_reasoning_chunk(think_body)
+                    self.buffer = self.buffer[earliest_match.end():]
+                    continue
+                elif earliest_type == "TOOL":
+                    prefix = self.buffer[:earliest_match.start()]
+                    if prefix and self.on_text_chunk:
+                        self.on_text_chunk(prefix)
+                    self.mode = "TOOL_CALL"
+                    self.buffer = self.buffer[earliest_match.end():]
+                    continue
+
+                # Check if buffer ends with a potential partial opening tag
+                buf_lower = self.buffer.lower()
+                if any("<tool_call".startswith(buf_lower[i:]) or "<think".startswith(buf_lower[i:]) or "<||dsml".startswith(buf_lower[i:]) or "<｜｜dsml".startswith(buf_lower[i:]) for i in range(max(0, len(buf_lower) - 25), len(buf_lower)) if "<" in buf_lower[i:]):
+                    safe_len = self.buffer.rfind("<")
+                    if safe_len > 0:
+                        safe_text = self.buffer[:safe_len]
+                        if self.on_text_chunk:
+                            self.on_text_chunk(safe_text)
+                        self.buffer = self.buffer[safe_len:]
+                    break
+                else:
+                    if self.on_text_chunk:
+                        self.on_text_chunk(self.buffer)
+                    self.buffer = ""
+
+            elif self.mode == "THINKING":
+                m_close = self._THINK_CLOSE.search(self.buffer)
+                if m_close:
+                    think_body = self.buffer[:m_close.start()]
+                    if think_body and self.on_reasoning_chunk:
+                        self.on_reasoning_chunk(think_body)
+                    self.mode = "NORMAL"
+                    self.buffer = self.buffer[m_close.end():]
+                    continue
+
+                buf_lower = self.buffer.lower()
+                if any("</think>".startswith(buf_lower[i:]) for i in range(max(0, len(buf_lower) - 9), len(buf_lower)) if "<" in buf_lower[i:]):
+                    safe_len = self.buffer.rfind("<")
+                    if safe_len > 0:
+                        safe_text = self.buffer[:safe_len]
+                        if self.on_reasoning_chunk:
+                            self.on_reasoning_chunk(safe_text)
+                        self.buffer = self.buffer[safe_len:]
+                    break
+                else:
+                    if self.on_reasoning_chunk:
+                        self.on_reasoning_chunk(self.buffer)
+                    self.buffer = ""
+
+            elif self.mode == "TOOL_CALL":
+                m_tool_close = self._TOOL_CLOSE.search(self.buffer)
+                if m_tool_close:
+                    self.mode = "NORMAL"
+                    self.buffer = self.buffer[m_tool_close.end():]
+                    continue
+                else:
+                    self.buffer = ""
+
+    def flush(self, is_tool_call_response: bool = False) -> None:
+        if self.buffer:
+            if self.mode == "THINKING" and self.on_reasoning_chunk:
+                self.on_reasoning_chunk(self.buffer)
+            elif self.mode == "NORMAL" and not is_tool_call_response and self.on_text_chunk:
+                self.on_text_chunk(self.buffer)
+            self.buffer = ""
+
+
 class ChatLLM:
     """LLM chat client with function calling support.
 
@@ -428,31 +548,20 @@ class ChatLLM:
             llm = self._llm.bind_tools(tools) if tools else self._llm
             config = {"timeout": timeout} if timeout else {}
             accumulated = None
-            pending_text = ""
-            possible_embedded_text = True
+            stream_filter = _StreamTextFilter(on_text_chunk, on_reasoning_chunk)
             for chunk in llm.stream(messages, config=config):
                 if should_cancel and should_cancel():
                     break
-                if chunk.content and on_text_chunk:
-                    if possible_embedded_text:
-                        pending_text += chunk.content
-                        if _is_possible_embedded_tool_call_prefix(pending_text):
-                            pass
-                        else:
-                            possible_embedded_text = False
-                            on_text_chunk(pending_text)
-                            pending_text = ""
-                    else:
-                        on_text_chunk(chunk.content)
+                if chunk.content:
+                    stream_filter.feed(chunk.content)
                 reasoning = getattr(chunk, "additional_kwargs", {}).get("reasoning_content")
-                if reasoning and not chunk.content and on_reasoning_chunk:
+                if reasoning and on_reasoning_chunk:
                     on_reasoning_chunk(reasoning)
                 accumulated = chunk if accumulated is None else accumulated + chunk
             if accumulated is None:
                 return LLMResponse(content="", tool_calls=[], finish_reason="stop")
             response = self._parse_response(accumulated)
-            if pending_text and not (response.has_tool_calls and response.content == ""):
-                on_text_chunk(pending_text)
+            stream_filter.flush(is_tool_call_response=response.has_tool_calls)
             return response
         except Exception as exc:
             provider = os.getenv("LANGCHAIN_PROVIDER", "openai").strip().lower() or "openai"
