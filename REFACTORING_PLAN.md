@@ -1,3 +1,12 @@
+# 🌊 TideTrading 项目正式退役与资产萃取封存公告 (Project Retired & Sealed)
+
+> **归档日期**：2026-11-08  
+> **归档状态**：[x] 已正式退役下线封账 (RETIRED & ARCHIVED)  
+> **资产萃取成果**：核心高价值代码（雪球监控全栈套件、A股免Key多级行情源中台、飞书机器人、量化与风险平价算法、大模型思考流解析器）已提纯至 Workspace/coding/wheels/。  
+> **系统清理完成**：WSL Systemd 升级看门狗已停用、Docker 容器与镜像数据卷已销毁释放（释放 ~4.3GB 空间）、Windows FRPC 穿透与云端 Nginx 代理已平滑退役。
+
+---
+
 # 🌊 TideTrading 架构第一性原理重构看板 (Master Task Cards Kanban - SSOT)
 
 > **项目定位**：A股量化交易与盘中投研决策系统。  
